@@ -85,7 +85,7 @@
 
     </LinearLayout>
 
-    <!-- Chat RecyclerView -->
+    <!-- Chat -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_chat"
         android:layout_width="match_parent"
@@ -113,15 +113,36 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
+        <!-- Attachment preview thumbnail (hidden until image attached) -->
+        <ImageView
+            android:id="@+id/iv_attach_preview"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:scaleType="centerCrop"
+            android:background="@drawable/bg_input_box"
+            android:visibility="gone"
+            android:layout_marginBottom="6dp"
+            android:contentDescription="Attached image — tap to remove"/>
+
+        <!-- Input row -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="bottom"
             android:background="@drawable/bg_input_box"
-            android:paddingStart="12dp"
+            android:paddingStart="4dp"
             android:paddingEnd="6dp"
             android:paddingVertical="6dp">
+
+            <ImageButton
+                android:id="@+id/btn_attach"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_icon_btn"
+                android:src="@drawable/ic_attach"
+                android:contentDescription="Attach image"
+                android:tint="#64748b"/>
 
             <EditText
                 android:id="@+id/et_input"

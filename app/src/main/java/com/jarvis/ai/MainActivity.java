@@ -60,7 +60,7 @@ import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final int    PERM_CODE        = 101;
+    private static final int    PERM_CODE       = 101;
     private static final int    REQUEST_GALLERY  = 200;
     private static final int    REQUEST_CAMERA   = 201;
     private static final String PREFS            = "jarvis_prefs";
@@ -91,12 +91,12 @@ public class MainActivity extends AppCompatActivity {
     private String pendingImageUriStr;
 
     // ── TTS ──────────────────────────────────────────────────────────────────
-    private MediaPlayer  mediaPlayer;
-    private boolean      isSpeaking = false;
-    private TextToSpeech androidTts;
-    private boolean      ttsReady   = false;
+    private MediaPlayer   mediaPlayer;
+    private boolean       isSpeaking = false;
+    private TextToSpeech  androidTts;
+    private boolean       ttsReady   = false;
 
-    // ── OkHttp ───────────────────────────────────────────────────────────────
+    // ── OkHttp (shared) ──────────────────────────────────────────────────────
     private final OkHttpClient httpClient = new OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(90, TimeUnit.SECONDS)
@@ -262,31 +262,49 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Android native TTS — British male voice
+    //  Android native TTS — British male voice, deep pitch
     // ════════════════════════════════════════════════════════════════════════
     private void initAndroidTts() {
         androidTts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
-                androidTts.setLanguage(new Locale("en", "GB"));
-                androidTts.setPitch(0.80f);
-                androidTts.setSpeechRate(0.90f);
+                androidTts.setPitch(0.60f);
+                androidTts.setSpeechRate(0.88f);
 
-                // Try to find a British male voice
                 java.util.Set<Voice> voices = androidTts.getVoices();
+                Voice best = null;
                 if (voices != null) {
-                    Voice best = null;
+                    // Pass 1: named male en-GB
                     for (Voice v : voices) {
-                        String name = v.getName().toLowerCase();
-                        if (name.contains("en-gb") || name.contains("en_gb")) {
-                            if (best == null) best = v;
-                            if (name.contains("male") || name.contains("daniel") ||
-                                name.contains("george") || name.contains("oliver")) {
-                                best = v;
-                                break;
+                        String n = v.getName().toLowerCase();
+                        if ((n.contains("en-gb") || n.contains("en_gb")) &&
+                            (n.contains("male") || n.contains("daniel") || n.contains("george") ||
+                             n.contains("oliver") || n.contains("arthur") || n.contains("james"))) {
+                            best = v; break;
+                        }
+                    }
+                    // Pass 2: any en-GB
+                    if (best == null) {
+                        for (Voice v : voices) {
+                            String n = v.getName().toLowerCase();
+                            if (n.contains("en-gb") || n.contains("en_gb")) {
+                                best = v; break;
                             }
                         }
                     }
-                    if (best != null) androidTts.setVoice(best);
+                    // Pass 3: any male en-US
+                    if (best == null) {
+                        for (Voice v : voices) {
+                            String n = v.getName().toLowerCase();
+                            if ((n.contains("en-us") || n.contains("en_us")) && n.contains("male")) {
+                                best = v; break;
+                            }
+                        }
+                    }
+                }
+                if (best != null) {
+                    androidTts.setVoice(best);
+                } else {
+                    androidTts.setLanguage(new java.util.Locale("en", "GB"));
                 }
                 ttsReady = true;
             }
@@ -535,13 +553,17 @@ public class MainActivity extends AppCompatActivity {
                 mainHandler.post(() -> {
                     hideTyping();
                     history.add(new HistoryItem("model", reply));
-                    String display = (imageUrl != null && !imageUrl.isEmpty())
-                        ? reply + "\n\n[Image generated — open in browser to view]"
-                        : reply;
-                    addJarvisMsg(display);
+                    if (imageUrl != null && !imageUrl.isEmpty()) {
+                        messages.add(new Message(Message.TYPE_URL_IMAGE, reply, null, imageUrl));
+                        adapter.notifyItemInserted(messages.size() - 1);
+                        recycler.scrollToPosition(messages.size() - 1);
+                        speak("Here is your generated image, sir.");
+                    } else {
+                        addJarvisMsg(reply);
+                        speak(reply);
+                    }
                     saveHistory();
                     btnSend.setEnabled(true);
-                    speak(reply);
                 });
             }
             @Override

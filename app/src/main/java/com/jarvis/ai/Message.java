@@ -10,12 +10,14 @@ public class Message {
     public final String text;
     public final String imageUri;
 
+    // Text message
     public Message(int type, String text) {
         this.type     = type;
         this.text     = text;
         this.imageUri = null;
     }
 
+    // Image message
     public Message(int type, String text, String imageUri) {
         this.type     = type;
         this.text     = text;

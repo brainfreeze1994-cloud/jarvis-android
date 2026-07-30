@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.speech.tts.Voice;
 import android.view.KeyEvent;
 import android.view.View;
@@ -63,8 +64,6 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             if (plain.length() > 600) plain = plain.substring(0, 600);
             tts.stop();
             tts.speak(plain, TextToSpeech.QUEUE_FLUSH, null, "JARVIS_UTTERANCE");
-            final String js = "if(window._jarvisSpeakStart) window._jarvisSpeakStart();";
-            mainHandler.post(() -> webView.evaluateJavascript(js, null));
         }
 
         @JavascriptInterface
@@ -121,9 +120,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
 
             Set<Voice> voices = tts.getVoices();
             Voice bestVoice = null;
-
             if (voices != null) {
-                // 1st priority: British male offline voice
                 for (Voice v : voices) {
                     String name = v.getName().toLowerCase();
                     String lang = v.getLocale().getLanguage() + "-" + v.getLocale().getCountry();
@@ -132,56 +129,54 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                                      name.contains("james") || name.contains("george") ||
                                      !name.contains("female");
                     if (isBritish && isMale && !v.isNetworkConnectionRequired()) {
-                        bestVoice = v;
-                        break;
+                        bestVoice = v; break;
                     }
                 }
-                // 2nd priority: any British offline voice
                 if (bestVoice == null) {
                     for (Voice v : voices) {
                         String lang = v.getLocale().getLanguage() + "-" + v.getLocale().getCountry();
                         if (lang.equalsIgnoreCase("en-GB") && !v.isNetworkConnectionRequired()) {
-                            bestVoice = v;
-                            break;
+                            bestVoice = v; break;
                         }
                     }
                 }
-                // 3rd priority: any English offline voice
                 if (bestVoice == null) {
                     for (Voice v : voices) {
                         if (v.getLocale().getLanguage().equals("en") && !v.isNetworkConnectionRequired()) {
-                            bestVoice = v;
-                            break;
+                            bestVoice = v; break;
                         }
                     }
                 }
             }
 
             if (bestVoice != null) tts.setVoice(bestVoice);
+            tts.setSpeechRate(0.90f);
+            tts.setPitch(0.75f);
 
-            tts.setSpeechRate(0.90f);  // slower = authoritative
-            tts.setPitch(0.75f);        // lower = deep male voice
+            // ✅ Notify JS when TTS finishes speaking
+            tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override public void onStart(String utteranceId) {}
+                @Override public void onDone(String utteranceId) {
+                    mainHandler.post(() -> {
+                        if (webView != null)
+                            webView.evaluateJavascript("if(window._ttsFinished) window._ttsFinished();", null);
+                    });
+                }
+                @Override public void onError(String utteranceId) {
+                    mainHandler.post(() -> {
+                        if (webView != null)
+                            webView.evaluateJavascript("if(window._ttsFinished) window._ttsFinished();", null);
+                    });
+                }
+            });
 
             ttsReady = true;
-            mainHandler.post(this::injectTtsBridge);
+            mainHandler.post(() -> injectTtsBridge());
         }
     }
 
     private void injectTtsBridge() {
-        String js =
-            "(function() {" +
-            "  if (!window.Android) return;" +
-            "  window._nativeTtsReady = true;" +
-            "  var origSpeak = window.speak;" +
-            "  if (typeof origSpeak === 'function') {" +
-            "    window.speak = function(text) {" +
-            "      Android.speak(text);" +
-            "      setTimeout(function() {" +
-            "        if (window.wakeEnabled) setState('wake'); else setState('idle');" +
-            "      }, Math.min(text.length * 60, 15000));" +
-            "    };" +
-            "  }" +
-            "})();";
+        String js = "(function() { window._androidTtsReady = (window.Android != null); })();";
         webView.evaluateJavascript(js, null);
     }
 
@@ -208,9 +203,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
-                if (url.contains("jarvis-ai-seven-dun.vercel.app") || url.startsWith("javascript:")) {
-                    return false;
-                }
+                if (url.contains("jarvis-ai-seven-dun.vercel.app") || url.startsWith("javascript:")) return false;
                 try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); } catch (Exception e) {}
                 return true;
             }
@@ -234,42 +227,29 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
-                if (newProgress < 100) {
-                    progressBar.setVisibility(View.VISIBLE);
-                    progressBar.setProgress(newProgress);
-                } else {
-                    progressBar.setVisibility(View.GONE);
-                }
+                if (newProgress < 100) { progressBar.setVisibility(View.VISIBLE); progressBar.setProgress(newProgress); }
+                else progressBar.setVisibility(View.GONE);
             }
-
             @Override
             public void onPermissionRequest(PermissionRequest request) {
                 runOnUiThread(() -> request.grant(request.getResources()));
             }
-
             @Override
             public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
                 callback.invoke(origin, true, false);
             }
-
             @Override
             public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback2,
                                              FileChooserParams fileChooserParams) {
                 filePathCallback = filePathCallback2;
                 Intent intent = fileChooserParams.createIntent();
-                try {
-                    startActivityForResult(intent, FILE_CHOOSER_CODE);
-                } catch (Exception e) {
-                    filePathCallback = null;
-                    return false;
-                }
+                try { startActivityForResult(intent, FILE_CHOOSER_CODE); }
+                catch (Exception e) { filePathCallback = null; return false; }
                 return true;
             }
-
             @Override
             public boolean onJsAlert(WebView view, String url, String message, JsResult result) {
-                result.confirm();
-                return true;
+                result.confirm(); return true;
             }
         });
     }
@@ -287,11 +267,8 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                                            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == MIC_PERMISSION_CODE) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                webView.reload();
-            } else {
-                Toast.makeText(this, "Microphone access needed for voice commands", Toast.LENGTH_LONG).show();
-            }
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) webView.reload();
+            else Toast.makeText(this, "Microphone access needed for voice commands", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -299,19 +276,14 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == FILE_CHOOSER_CODE && filePathCallback != null) {
-            filePathCallback.onReceiveValue(
-                WebChromeClient.FileChooserParams.parseResult(resultCode, data)
-            );
+            filePathCallback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
             filePathCallback = null;
         }
     }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
-            webView.goBack();
-            return true;
-        }
+        if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) { webView.goBack(); return true; }
         return super.onKeyDown(keyCode, event);
     }
 

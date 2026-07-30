@@ -350,7 +350,7 @@ public class MainActivity extends AppCompatActivity {
                         byte[] audio = resp.body().bytes();
                         if (audio.length > 100) {
                             String ct  = resp.header("Content-Type", "audio/wav");
-                            String ext = (ct != null && ct.contains("mp3")) ? ".mp3" : ".wav";
+                            String ext = (ct != null && (ct.contains("mp3") || ct.contains("mpeg"))) ? ".mp3" : ".wav";
                             File   tmp = File.createTempFile("jarvis_tts_", ext, getCacheDir());
                             java.nio.file.Files.write(tmp.toPath(), audio);
 

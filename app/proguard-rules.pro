@@ -1,0 +1,3 @@
+-keep class com.jarvis.ai.** { *; }
+-keepattributes *Annotation*
+-dontwarn okhttp3.**

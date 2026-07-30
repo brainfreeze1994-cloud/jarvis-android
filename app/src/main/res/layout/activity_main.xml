@@ -1,33 +1,162 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#070d1a">
 
-    <ProgressBar
-        android:id="@+id/progress_bar"
-        style="?android:attr/progressBarStyleHorizontal"
+    <!-- Top Bar -->
+    <LinearLayout
+        android:id="@+id/topbar"
         android:layout_width="match_parent"
-        android:layout_height="3dp"
-        android:layout_alignParentTop="true"
-        android:progressTint="#3b82f6"
-        android:progressBackgroundTint="#0d1b2a"
-        android:max="100"
-        android:visibility="gone" />
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp"
+        android:background="#0d1424"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
 
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-        android:id="@+id/swipe_refresh"
+        <TextView
+            android:id="@+id/tv_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="J.A.R.V.I.S"
+            android:textColor="#93c5fd"
+            android:textSize="18sp"
+            android:letterSpacing="0.3"
+            android:fontFamily="sans-serif-medium"/>
+
+        <TextView
+            android:id="@+id/tv_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="STANDBY"
+            android:textColor="#3b82f6"
+            android:textSize="10sp"
+            android:letterSpacing="0.15"
+            android:background="@drawable/bg_status_badge"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:layout_marginEnd="8dp"/>
+
+        <ImageButton
+            android:id="@+id/btn_clear"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@drawable/bg_icon_btn"
+            android:src="@drawable/ic_delete"
+            android:contentDescription="Clear"
+            android:tint="#64748b"/>
+
+    </LinearLayout>
+
+    <!-- Orb section -->
+    <LinearLayout
+        android:id="@+id/orb_section"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_below="@id/progress_bar">
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingTop="20dp"
+        android:paddingBottom="12dp"
+        app:layout_constraintTop_toBottomOf="@id/topbar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
-        <WebView
-            android:id="@+id/webview"
+        <com.jarvis.ai.OrbView
+            android:id="@+id/orb_view"
+            android:layout_width="130dp"
+            android:layout_height="130dp"
+            android:clickable="true"
+            android:focusable="true"/>
+
+        <TextView
+            android:id="@+id/tv_orb_hint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="TAP TO SPEAK"
+            android:textColor="#3b82f6"
+            android:textSize="9sp"
+            android:letterSpacing="0.2"
+            android:layout_marginTop="8dp"/>
+
+    </LinearLayout>
+
+    <!-- Chat RecyclerView -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_chat"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp"
+        android:clipToPadding="false"
+        android:scrollbars="none"
+        app:layout_constraintTop_toBottomOf="@id/orb_section"
+        app:layout_constraintBottom_toTopOf="@id/input_container"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
+    <!-- Input Container -->
+    <LinearLayout
+        android:id="@+id/input_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#0d1424"
+        android:paddingTop="8dp"
+        android:paddingBottom="12dp"
+        android:paddingHorizontal="12dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="#070d1a"
-            android:overScrollMode="never" />
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="bottom"
+            android:background="@drawable/bg_input_box"
+            android:paddingStart="12dp"
+            android:paddingEnd="6dp"
+            android:paddingVertical="6dp">
 
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+            <EditText
+                android:id="@+id/et_input"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@null"
+                android:textColor="#e2e8f0"
+                android:textColorHint="#64748b"
+                android:textSize="15sp"
+                android:hint="Ask JARVIS anything…"
+                android:maxLines="4"
+                android:inputType="textMultiLine|textCapSentences"
+                android:imeOptions="actionSend"/>
 
-</RelativeLayout>
+            <ImageButton
+                android:id="@+id/btn_mic"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_icon_btn"
+                android:src="@drawable/ic_mic"
+                android:contentDescription="Voice"
+                android:tint="#64748b"/>
+
+            <ImageButton
+                android:id="@+id/btn_send"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_send_btn"
+                android:src="@drawable/ic_send"
+                android:contentDescription="Send"
+                android:tint="#ffffff"/>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

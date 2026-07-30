@@ -30,23 +30,18 @@ jobs:
           pip install Pillow -q
           python3 generate_icons.py
 
-      - name: Install Gradle 8.6
+      - name: Install Gradle
         run: |
           wget -q https://services.gradle.org/distributions/gradle-8.6-bin.zip
           unzip -q gradle-8.6-bin.zip -d /opt/gradle
           echo "/opt/gradle/gradle-8.6/bin" >> $GITHUB_PATH
 
       - name: Build Debug APK
-        run: gradle assembleDebug --no-daemon
+        run: gradle assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: JARVIS-Android-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
-
-      - name: Show APK info
-        run: |
-          echo "✅ JARVIS APK built successfully!"
-          ls -lh app/build/outputs/apk/debug/app-debug.apk

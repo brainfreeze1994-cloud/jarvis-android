@@ -13,10 +13,11 @@ import okhttp3.Response;
 public class JarvisApi {
 
     private static final String API_URL = "https://jarvis-ai-seven-dun.vercel.app/api/jarvis";
-    private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    private static final MediaType JSON  = MediaType.get("application/json; charset=utf-8");
+
     private static final OkHttpClient client = new OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(90, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .build();
 
@@ -25,7 +26,7 @@ public class JarvisApi {
         void onError(String error);
     }
 
-    public static void ask(List<HistoryItem> history, Callback cb) {
+    public static void ask(List<HistoryItem> history, String imageBase64, Callback cb) {
         new Thread(() -> {
             try {
                 JSONArray messages = new JSONArray();
@@ -35,8 +36,13 @@ public class JarvisApi {
                     msg.put("text", item.text);
                     messages.put(msg);
                 }
+
                 JSONObject body = new JSONObject();
                 body.put("messages", messages);
+
+                if (imageBase64 != null && !imageBase64.isEmpty()) {
+                    body.put("imageBase64", imageBase64);
+                }
 
                 RequestBody rb = RequestBody.create(body.toString(), JSON);
                 Request req = new Request.Builder()
@@ -47,14 +53,19 @@ public class JarvisApi {
 
                 try (Response resp = client.newCall(req).execute()) {
                     String bodyStr = resp.body() != null ? resp.body().string() : "";
-                    if (!resp.isSuccessful()) { cb.onError("Server error " + resp.code()); return; }
+                    if (!resp.isSuccessful()) {
+                        cb.onError("Server error " + resp.code());
+                        return;
+                    }
                     JSONObject data = new JSONObject(bodyStr);
                     String reply    = data.optString("reply", "I have no response.");
                     String imageUrl = data.optString("imageUrl", null);
                     cb.onSuccess(reply, imageUrl);
                 }
+
             } catch (Exception e) {
                 cb.onError(e.getMessage() != null ? e.getMessage() : "Network error");
             }
         }).start();
     }
+}

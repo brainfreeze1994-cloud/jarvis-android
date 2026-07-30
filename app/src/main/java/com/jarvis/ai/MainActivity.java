@@ -65,7 +65,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int    REQUEST_CAMERA   = 201;
     private static final String PREFS            = "jarvis_prefs";
     private static final String KEY_HIS          = "history_v2";
-    private static final String SPEAK_URL        = "https://jarvis-ai-seven-dun.vercel.app/api/speak";
+   // StreamElements TTS — British Male Brian, free, no API key
+    
 
     // ── Views ────────────────────────────────────────────────────────────────
     private OrbView      orbView;
@@ -339,16 +340,11 @@ public class MainActivity extends AppCompatActivity {
         new Thread(() -> {
             boolean kokoroOk = false;
             try {
-                okhttp3.MediaType jsonType = okhttp3.MediaType.get("application/json; charset=utf-8");
-                org.json.JSONObject body = new org.json.JSONObject();
-                body.put("text", finalText);
-
-                Request req = new Request.Builder()
-                    .url(SPEAK_URL)
-                    .post(RequestBody.create(body.toString(), jsonType))
-                    .addHeader("Content-Type", "application/json")
-                    .build();
-
+                String encodedText = java.net.URLEncoder.encode(finalText, "UTF-8");
+                    Request req = new Request.Builder()
+                    .url("https://api.streamelements.com/kappa/v2/speech?voice=Brian&text=" + encodedText)
+                    .get()
+                   .build();
                 try (Response resp = httpClient.newCall(req).execute()) {
                     if (resp.isSuccessful() && resp.body() != null) {
                         byte[] audio = resp.body().bytes();

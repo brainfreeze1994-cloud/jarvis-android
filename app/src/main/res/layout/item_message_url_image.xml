@@ -5,7 +5,6 @@
     android:orientation="horizontal"
     android:padding="4dp">
 
-    <!-- AI Avatar -->
     <TextView
         android:id="@+id/tv_avatar"
         android:layout_width="30dp"
@@ -26,7 +25,6 @@
         android:layout_marginStart="8dp"
         android:layout_marginEnd="32dp">
 
-        <!-- Caption -->
         <TextView
             android:id="@+id/tv_message"
             android:layout_width="wrap_content"
@@ -37,7 +35,6 @@
             android:padding="10dp"
             android:layout_marginBottom="4dp"/>
 
-        <!-- Generated image -->
         <ImageView
             android:id="@+id/iv_image"
             android:layout_width="match_parent"
@@ -46,7 +43,6 @@
             android:background="@drawable/bg_bubble_jarvis"
             android:clipToOutline="true"/>
 
-        <!-- Tap hint -->
         <TextView
             android:id="@+id/tv_hint"
             android:layout_width="wrap_content"

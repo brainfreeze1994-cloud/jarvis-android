@@ -19,8 +19,8 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      -  name: Setup Android SDK
+         uses: android-actions/setup-android@v3.2.1
 
       - name: Set local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties

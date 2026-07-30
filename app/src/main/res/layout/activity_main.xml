@@ -2,52 +2,32 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#070d1a"
-    android:gravity="center">
+    android:background="#070d1a">
 
-    <ImageView
-        android:id="@+id/splash_orb"
-        android:layout_width="180dp"
-        android:layout_height="180dp"
-        android:layout_centerInParent="true"
-        android:layout_marginBottom="40dp"
-        android:src="@drawable/ic_orb"
-        android:contentDescription="JARVIS Orb" />
+    <ProgressBar
+        android:id="@+id/progress_bar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_alignParentTop="true"
+        android:progressTint="#3b82f6"
+        android:progressBackgroundTint="#0d1b2a"
+        android:max="100"
+        android:visibility="gone" />
 
-    <TextView
-        android:id="@+id/splash_title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/splash_orb"
-        android:layout_centerHorizontal="true"
-        android:text="J.A.R.V.I.S"
-        android:textSize="32sp"
-        android:textColor="#93c5fd"
-        android:letterSpacing="0.3"
-        android:fontFamily="sans-serif-medium"
-        android:visibility="invisible" />
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipe_refresh"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/progress_bar">
 
-    <TextView
-        android:id="@+id/splash_subtitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/splash_title"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="8dp"
-        android:text="JUST A RATHER VERY INTELLIGENT SYSTEM"
-        android:textSize="9sp"
-        android:textColor="#64748b"
-        android:letterSpacing="0.2"
-        android:visibility="invisible" />
+        <WebView
+            android:id="@+id/webview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#070d1a"
+            android:overScrollMode="never" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true"
-        android:layout_marginBottom="32dp"
-        android:text="v1.0.0"
-        android:textSize="11sp"
-        android:textColor="#334155" />
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
 </RelativeLayout>

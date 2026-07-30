@@ -5,6 +5,9 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -15,9 +18,6 @@ import android.provider.MediaStore;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
-import android.speech.tts.TextToSpeech;
-import android.speech.tts.UtteranceProgressListener;
-import android.speech.tts.Voice;
 import android.util.Base64;
 import android.view.View;
 import android.view.WindowManager;
@@ -38,6 +38,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -47,15 +48,22 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
-public class MainActivity extends AppCompatActivity implements TextToSpeech.OnInitListener {
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
-    private static final int    PERM_CODE      = 101;
-    private static final int    REQUEST_GALLERY = 200;
-    private static final int    REQUEST_CAMERA  = 201;
-    private static final String PREFS           = "jarvis_prefs";
-    private static final String KEY_HIS         = "history_v2";
+public class MainActivity extends AppCompatActivity {
+
+    private static final int    PERM_CODE       = 101;
+    private static final int    REQUEST_GALLERY  = 200;
+    private static final int    REQUEST_CAMERA   = 201;
+    private static final String PREFS            = "jarvis_prefs";
+    private static final String KEY_HIS          = "history_v2";
+    private static final String SPEAK_URL        = "https://jarvis-ai-seven-dun.vercel.app/api/speak";
 
     // ── Views ────────────────────────────────────────────────────────────────
     private OrbView      orbView;
@@ -78,10 +86,18 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     // ── Attachment ───────────────────────────────────────────────────────────
     private Uri    cameraImageUri;
     private String pendingImageBase64;
+    private String pendingImageUriStr;
 
     // ── TTS ──────────────────────────────────────────────────────────────────
-    private TextToSpeech tts;
-    private boolean      ttsReady = false;
+    private MediaPlayer mediaPlayer;
+    private boolean     isSpeaking = false;
+
+    // ── OkHttp ───────────────────────────────────────────────────────────────
+    private final OkHttpClient httpClient = new OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(90, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .build();
 
     // ── Speech Recognition ───────────────────────────────────────────────────
     private SpeechRecognizer speechRec;
@@ -128,8 +144,6 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         recycler.setLayoutManager(llm);
         recycler.setAdapter(adapter);
 
-        tts = new TextToSpeech(this, this);
-
         requestPermissions();
         loadHistory();
 
@@ -146,6 +160,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
 
         if (history.isEmpty()) {
             addJarvisMsg("Good day, sir. J.A.R.V.I.S online. All systems nominal. How may I assist you?");
+            speak("Good day, sir. J.A.R.V.I.S online. All systems nominal. How may I assist you?");
         }
     }
 
@@ -169,8 +184,8 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             return;
         }
         try {
-            String ts   = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-            File   dir  = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+            String ts    = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+            File   dir   = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
             File   photo = File.createTempFile("JARVIS_" + ts, ".jpg", dir);
             cameraImageUri = FileProvider.getUriForFile(
                 this, getPackageName() + ".provider", photo);
@@ -192,96 +207,63 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode != RESULT_OK) return;
         Uri imageUri = null;
-        if (requestCode == REQUEST_CAMERA) {
-            imageUri = cameraImageUri;
-        } else if (requestCode == REQUEST_GALLERY && data != null) {
-            imageUri = data.getData();
-        }
+        if      (requestCode == REQUEST_CAMERA  && cameraImageUri != null) imageUri = cameraImageUri;
+        else if (requestCode == REQUEST_GALLERY && data != null)            imageUri = data.getData();
         if (imageUri != null) encodeImageAsync(imageUri);
     }
 
     private void encodeImageAsync(Uri uri) {
+        final String uriStr = uri.toString();
         new Thread(() -> {
             try (InputStream is = getContentResolver().openInputStream(uri)) {
-                if (is == null) throw new IOException("null stream");
-                byte[] bytes = is.readAllBytes();
-                if (bytes.length > 3_000_000) {
-                    mainHandler.post(() ->
-                        Toast.makeText(this, "Image too large (max ~3 MB)", Toast.LENGTH_SHORT).show());
-                    return;
+                if (is == null) throw new IOException("Cannot open image stream");
+
+                // Decode + scale to max 1024px + JPEG 80%
+                Bitmap bmp = BitmapFactory.decodeStream(is);
+                if (bmp == null) throw new IOException("Cannot decode bitmap");
+
+                int w = bmp.getWidth(), h = bmp.getHeight();
+                int maxPx = 1024;
+                if (w > maxPx || h > maxPx) {
+                    float scale = Math.min((float) maxPx / w, (float) maxPx / h);
+                    bmp = Bitmap.createScaledBitmap(bmp, (int)(w * scale), (int)(h * scale), true);
                 }
+
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                bmp.compress(Bitmap.CompressFormat.JPEG, 80, baos);
+                byte[] bytes = baos.toByteArray();
+
                 String b64 = "data:image/jpeg;base64,"
                     + Base64.encodeToString(bytes, Base64.NO_WRAP);
+
                 mainHandler.post(() -> {
                     pendingImageBase64 = b64;
+                    pendingImageUriStr = uriStr;
                     ivAttachPreview.setImageURI(uri);
                     ivAttachPreview.setVisibility(View.VISIBLE);
                     Toast.makeText(this, "Image attached — tap to remove", Toast.LENGTH_SHORT).show();
                 });
             } catch (Exception e) {
                 mainHandler.post(() ->
-                    Toast.makeText(this, "Failed to attach image", Toast.LENGTH_SHORT).show());
+                    Toast.makeText(this, "Failed to attach image: " + e.getMessage(), Toast.LENGTH_SHORT).show());
             }
         }).start();
     }
 
     private void clearAttachment() {
         pendingImageBase64 = null;
+        pendingImageUriStr = null;
         ivAttachPreview.setImageDrawable(null);
         ivAttachPreview.setVisibility(View.GONE);
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  TTS
+    //  Cloudflare Kokoro TTS — full text, no char cap, British Male George
     // ════════════════════════════════════════════════════════════════════════
-    @Override
-    public void onInit(int status) {
-        if (status != TextToSpeech.SUCCESS) return;
-
-        int res = tts.setLanguage(Locale.UK);
-        if (res == TextToSpeech.LANG_MISSING_DATA || res == TextToSpeech.LANG_NOT_SUPPORTED)
-            tts.setLanguage(Locale.US);
-
-        Set<Voice> voices = tts.getVoices();
-        Voice best = null;
-        if (voices != null) {
-            for (Voice v : voices) {
-                String n = v.getName().toLowerCase();
-                String l = v.getLocale().getLanguage() + "-" + v.getLocale().getCountry();
-                boolean brit = l.equalsIgnoreCase("en-GB") || n.contains("en-gb");
-                boolean male = n.contains("male") || n.contains("daniel") ||
-                               n.contains("james") || n.contains("george") ||
-                               !n.contains("female");
-                if (brit && male && !v.isNetworkConnectionRequired()) { best = v; break; }
-            }
-            if (best == null) for (Voice v : voices) {
-                String l = v.getLocale().getLanguage() + "-" + v.getLocale().getCountry();
-                if (l.equalsIgnoreCase("en-GB") && !v.isNetworkConnectionRequired()) { best = v; break; }
-            }
-            if (best == null) for (Voice v : voices) {
-                if (v.getLocale().getLanguage().equals("en") && !v.isNetworkConnectionRequired()) { best = v; break; }
-            }
-        }
-        if (best != null) tts.setVoice(best);
-
-        tts.setSpeechRate(0.90f);
-        tts.setPitch(0.75f);
-
-        tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
-            @Override public void onStart(String id) {}
-            @Override public void onDone(String id) {
-                mainHandler.post(() -> setState(OrbView.OrbState.IDLE));
-            }
-            @Override public void onError(String id) {
-                mainHandler.post(() -> setState(OrbView.OrbState.IDLE));
-            }
-        });
-
-        ttsReady = true;
-    }
-
     private void speak(String text) {
-        if (!ttsReady || tts == null) return;
+        if (text == null || text.trim().isEmpty()) return;
+
+        // Strip markdown
         String plain = text
             .replaceAll("```[\\s\\S]*?```",           "code block.")
             .replaceAll("`([^`]+)`",                   "$1")
@@ -291,27 +273,116 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
             .replaceAll("\\[([^\\]]+)\\]\\([^)]+\\)",  "$1")
             .replaceAll("(?m)^\\s*[-*+]\\s",           "")
             .replaceAll("(?m)^\\s*\\d+\\.\\s",         "")
+            .replaceAll("\\n{3,}",                     "\n\n")
             .trim();
-        if (plain.length() > 800) plain = plain.substring(0, 800);
+
+        if (plain.isEmpty()) return;
+
         setState(OrbView.OrbState.SPEAKING);
-        tts.stop();
-        tts.speak(plain, TextToSpeech.QUEUE_FLUSH, null, "JARVIS");
+        isSpeaking = true;
+
+        if (mediaPlayer != null) {
+            try { mediaPlayer.stop(); mediaPlayer.release(); } catch (Exception ignored) {}
+            mediaPlayer = null;
+        }
+
+        final String finalText = plain;
+        new Thread(() -> {
+            try {
+                okhttp3.MediaType jsonType = okhttp3.MediaType.get("application/json; charset=utf-8");
+                org.json.JSONObject bodyObj = new org.json.JSONObject();
+                bodyObj.put("text", finalText);
+
+                Request req = new Request.Builder()
+                    .url(SPEAK_URL)
+                    .post(RequestBody.create(bodyObj.toString(), jsonType))
+                    .addHeader("Content-Type", "application/json")
+                    .build();
+
+                try (Response resp = httpClient.newCall(req).execute()) {
+                    if (!resp.isSuccessful() || resp.body() == null) {
+                        mainHandler.post(() -> {
+                            isSpeaking = false;
+                            setState(OrbView.OrbState.IDLE);
+                        });
+                        return;
+                    }
+
+                    byte[] audio = resp.body().bytes();
+                    String ct    = resp.header("Content-Type", "audio/wav");
+                    String ext   = (ct != null && ct.contains("mp3")) ? ".mp3" : ".wav";
+                    File   tmp   = File.createTempFile("jarvis_tts_", ext, getCacheDir());
+                    java.nio.file.Files.write(tmp.toPath(), audio);
+
+                    mainHandler.post(() -> {
+                        try {
+                            mediaPlayer = new MediaPlayer();
+                            mediaPlayer.setDataSource(tmp.getAbsolutePath());
+                            mediaPlayer.prepare();
+                            mediaPlayer.setOnCompletionListener(mp -> {
+                                isSpeaking = false;
+                                setState(OrbView.OrbState.IDLE);
+                                mp.release();
+                                mediaPlayer = null;
+                                tmp.delete();
+                            });
+                            mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+                                isSpeaking = false;
+                                setState(OrbView.OrbState.IDLE);
+                                mp.release();
+                                mediaPlayer = null;
+                                return true;
+                            });
+                            mediaPlayer.start();
+                        } catch (Exception e) {
+                            isSpeaking = false;
+                            setState(OrbView.OrbState.IDLE);
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                mainHandler.post(() -> {
+                    isSpeaking = false;
+                    setState(OrbView.OrbState.IDLE);
+                });
+            }
+        }).start();
+    }
+
+    private void stopSpeaking() {
+        if (mediaPlayer != null) {
+            try { mediaPlayer.stop(); mediaPlayer.release(); } catch (Exception ignored) {}
+            mediaPlayer = null;
+        }
+        isSpeaking = false;
+        setState(OrbView.OrbState.IDLE);
     }
 
     // ════════════════════════════════════════════════════════════════════════
     //  Speech Recognition
     // ════════════════════════════════════════════════════════════════════════
     private void toggleListening() {
+        if (isSpeaking) { stopSpeaking(); return; }
         if (isListening) stopListening(); else startListening();
     }
 
     private void startListening() {
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            Toast.makeText(this, "Speech recognition not available", Toast.LENGTH_SHORT).show();
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Microphone permission required", Toast.LENGTH_SHORT).show();
+            ActivityCompat.requestPermissions(this,
+                new String[]{Manifest.permission.RECORD_AUDIO}, PERM_CODE);
             return;
         }
-        if (tts != null) tts.stop();
-        if (speechRec != null) speechRec.destroy();
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Toast.makeText(this, "Speech recognition not available on this device", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        if (speechRec != null) {
+            try { speechRec.destroy(); } catch (Exception ignored) {}
+            speechRec = null;
+        }
         speechRec = SpeechRecognizer.createSpeechRecognizer(this);
         speechRec.setRecognitionListener(new RecognitionListener() {
             @Override public void onReadyForSpeech(Bundle p) {
@@ -330,9 +401,13 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
                 mainHandler.post(() -> {
                     setState(OrbView.OrbState.IDLE);
                     tvOrbHint.setText("TAP TO SPEAK");
-                    if (error != SpeechRecognizer.ERROR_NO_MATCH &&
-                        error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT)
-                        Toast.makeText(MainActivity.this, "Voice error — try again", Toast.LENGTH_SHORT).show();
+                    if (error != SpeechRecognizer.ERROR_NO_MATCH
+                        && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                        && error != SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
+                        Toast.makeText(MainActivity.this,
+                            "Voice error (" + error + ") — tap to try again",
+                            Toast.LENGTH_SHORT).show();
+                    }
                 });
             }
             @Override public void onResults(Bundle results) {
@@ -353,15 +428,18 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
 
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE,        "en-US");
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE,        Locale.getDefault());
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS,  false);
         intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS,      1);
+        intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1500L);
         speechRec.startListening(intent);
     }
 
     private void stopListening() {
         isListening = false;
-        if (speechRec != null) speechRec.stopListening();
+        if (speechRec != null) {
+            try { speechRec.stopListening(); } catch (Exception ignored) {}
+        }
         setState(OrbView.OrbState.IDLE);
         tvOrbHint.setText("TAP TO SPEAK");
     }
@@ -373,7 +451,7 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
         String text = etInput.getText().toString().trim();
         if (text.isEmpty() && pendingImageBase64 == null) return;
         if (currentState == OrbView.OrbState.THINKING) return;
-        if (text.isEmpty()) text = "Analyse this image and describe what you see.";
+        if (text.isEmpty()) text = "Analyse this image and describe what you see in detail.";
         etInput.setText("");
         askJarvis(text);
     }
@@ -381,8 +459,15 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     private void askJarvis(String userText) {
         history.add(new HistoryItem("user", userText));
         addUserMsg(userText);
-        saveHistory();
 
+        // Show image bubble immediately in chat
+        if (pendingImageUriStr != null) {
+            messages.add(new Message(Message.TYPE_IMAGE, null, pendingImageUriStr));
+            adapter.notifyItemInserted(messages.size() - 1);
+            recycler.scrollToPosition(messages.size() - 1);
+        }
+
+        saveHistory();
         setState(OrbView.OrbState.THINKING);
         showTyping();
         btnSend.setEnabled(false);
@@ -531,13 +616,17 @@ public class MainActivity extends AppCompatActivity implements TextToSpeech.OnIn
     // ════════════════════════════════════════════════════════════════════════
     @Override protected void onPause() {
         super.onPause();
-        if (tts != null) tts.stop();
-        if (speechRec != null) speechRec.stopListening();
+        stopSpeaking();
+        if (speechRec != null) {
+            try { speechRec.stopListening(); } catch (Exception ignored) {}
+        }
     }
 
     @Override protected void onDestroy() {
-        if (tts != null) { tts.stop(); tts.shutdown(); }
-        if (speechRec != null) { speechRec.destroy(); }
+        stopSpeaking();
+        if (speechRec != null) {
+            try { speechRec.destroy(); } catch (Exception ignored) {}
+        }
         super.onDestroy();
     }
 }

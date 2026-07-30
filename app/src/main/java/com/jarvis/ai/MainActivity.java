@@ -5,10 +5,15 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.Voice;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.GeolocationPermissions;
+import android.webkit.JavascriptInterface;
 import android.webkit.JsResult;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
@@ -24,8 +29,10 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+import java.util.Locale;
+import java.util.Set;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements TextToSpeech.OnInitListener {
 
     private static final String JARVIS_URL = "https://jarvis-ai-seven-dun.vercel.app";
     private static final int MIC_PERMISSION_CODE = 101;
@@ -35,6 +42,41 @@ public class MainActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private SwipeRefreshLayout swipeRefresh;
     private ValueCallback<Uri[]> filePathCallback;
+    private TextToSpeech tts;
+    private boolean ttsReady = false;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    public class JarvisBridge {
+
+        @JavascriptInterface
+        public void speak(String text) {
+            if (!ttsReady || tts == null) return;
+            String plain = text
+                .replaceAll("```[\\s\\S]*?```", "code block.")
+                .replaceAll("`([^`]+)`", "$1")
+                .replaceAll("\\*\\*(.*?)\\*\\*", "$1")
+                .replaceAll("\\*(.*?)\\*", "$1")
+                .replaceAll("#{1,6}\\s", "")
+                .replaceAll("\\[([^\\]]+)\\]\\([^)]+\\)", "$1")
+                .replaceAll("(?m)^\\s*[-*+]\\s", "")
+                .replaceAll("(?m)^\\s*\\d+\\.\\s", "");
+            if (plain.length() > 600) plain = plain.substring(0, 600);
+            tts.stop();
+            tts.speak(plain, TextToSpeech.QUEUE_FLUSH, null, "JARVIS_UTTERANCE");
+            final String js = "if(window._jarvisSpeakStart) window._jarvisSpeakStart();";
+            mainHandler.post(() -> webView.evaluateJavascript(js, null));
+        }
+
+        @JavascriptInterface
+        public void stopSpeaking() {
+            if (tts != null) tts.stop();
+        }
+
+        @JavascriptInterface
+        public boolean isTtsReady() {
+            return ttsReady;
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,6 +99,8 @@ public class MainActivity extends AppCompatActivity {
         progressBar  = findViewById(R.id.progress_bar);
         swipeRefresh = findViewById(R.id.swipe_refresh);
 
+        tts = new TextToSpeech(this, this);
+
         setupWebView();
         requestMicPermission();
 
@@ -65,6 +109,80 @@ public class MainActivity extends AppCompatActivity {
         swipeRefresh.setOnRefreshListener(() -> webView.reload());
 
         webView.loadUrl(JARVIS_URL);
+    }
+
+    @Override
+    public void onInit(int status) {
+        if (status == TextToSpeech.SUCCESS) {
+            int result = tts.setLanguage(Locale.UK);
+            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                tts.setLanguage(Locale.US);
+            }
+
+            Set<Voice> voices = tts.getVoices();
+            Voice bestVoice = null;
+
+            if (voices != null) {
+                // 1st priority: British male offline voice
+                for (Voice v : voices) {
+                    String name = v.getName().toLowerCase();
+                    String lang = v.getLocale().getLanguage() + "-" + v.getLocale().getCountry();
+                    boolean isBritish = lang.equalsIgnoreCase("en-GB") || name.contains("en-gb");
+                    boolean isMale = name.contains("male") || name.contains("daniel") ||
+                                     name.contains("james") || name.contains("george") ||
+                                     !name.contains("female");
+                    if (isBritish && isMale && !v.isNetworkConnectionRequired()) {
+                        bestVoice = v;
+                        break;
+                    }
+                }
+                // 2nd priority: any British offline voice
+                if (bestVoice == null) {
+                    for (Voice v : voices) {
+                        String lang = v.getLocale().getLanguage() + "-" + v.getLocale().getCountry();
+                        if (lang.equalsIgnoreCase("en-GB") && !v.isNetworkConnectionRequired()) {
+                            bestVoice = v;
+                            break;
+                        }
+                    }
+                }
+                // 3rd priority: any English offline voice
+                if (bestVoice == null) {
+                    for (Voice v : voices) {
+                        if (v.getLocale().getLanguage().equals("en") && !v.isNetworkConnectionRequired()) {
+                            bestVoice = v;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (bestVoice != null) tts.setVoice(bestVoice);
+
+            tts.setSpeechRate(0.90f);  // slower = authoritative
+            tts.setPitch(0.75f);        // lower = deep male voice
+
+            ttsReady = true;
+            mainHandler.post(this::injectTtsBridge);
+        }
+    }
+
+    private void injectTtsBridge() {
+        String js =
+            "(function() {" +
+            "  if (!window.Android) return;" +
+            "  window._nativeTtsReady = true;" +
+            "  var origSpeak = window.speak;" +
+            "  if (typeof origSpeak === 'function') {" +
+            "    window.speak = function(text) {" +
+            "      Android.speak(text);" +
+            "      setTimeout(function() {" +
+            "        if (window.wakeEnabled) setState('wake'); else setState('idle');" +
+            "      }, Math.min(text.length * 60, 15000));" +
+            "    };" +
+            "  }" +
+            "})();";
+        webView.evaluateJavascript(js, null);
     }
 
     private void setupWebView() {
@@ -84,6 +202,8 @@ public class MainActivity extends AppCompatActivity {
             "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
         );
 
+        webView.addJavascriptInterface(new JarvisBridge(), "Android");
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -100,6 +220,7 @@ public class MainActivity extends AppCompatActivity {
                 progressBar.setVisibility(View.GONE);
                 swipeRefresh.setRefreshing(false);
                 webView.evaluateJavascript("document.body.style.background='#070d1a';", null);
+                if (ttsReady) injectTtsBridge();
             }
 
             @Override
@@ -195,8 +316,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override protected void onResume()  { super.onResume();  webView.onResume(); }
-    @Override protected void onPause()   { super.onPause();   webView.onPause(); }
-    @Override protected void onDestroy() { webView.destroy(); super.onDestroy(); }
+    @Override protected void onPause()   { super.onPause();   webView.onPause(); if (tts != null) tts.stop(); }
+    @Override protected void onDestroy() {
+        if (tts != null) { tts.stop(); tts.shutdown(); }
+        webView.destroy();
+        super.onDestroy();
+    }
 
     private String buildOfflinePage() {
         return "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>" +

@@ -39,7 +39,7 @@ jobs:
       - name: Grant gradlew permission
         run: chmod +x gradlew
 
-      -  name: Build Debug APK
+      - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | head -100
 
       - name: Upload APK Artifact

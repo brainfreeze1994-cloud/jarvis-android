@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="end"
+    android:padding="4dp">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginStart="64dp"
+        android:layout_marginEnd="8dp">
+
+        <ImageView
+            android:id="@+id/iv_image"
+            android:layout_width="200dp"
+            android:layout_height="150dp"
+            android:scaleType="centerCrop"
+            android:background="@drawable/bg_bubble_user"
+            android:clipToOutline="true"/>
+
+        <TextView
+            android:id="@+id/tv_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_bubble_user"
+            android:textColor="#93c5fd"
+            android:textSize="13sp"
+            android:padding="8dp"
+            android:layout_marginTop="2dp"
+            android:visibility="gone"/>
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tv_avatar"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:gravity="center"
+        android:text="YOU"
+        android:textColor="#93c5fd"
+        android:textSize="7sp"
+        android:fontFamily="sans-serif-medium"
+        android:background="@drawable/bg_avatar_user"
+        android:layout_marginTop="2dp"/>
+
+</LinearLayout>

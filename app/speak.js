@@ -17,7 +17,6 @@ module.exports = async function handler(req, res) {
     const { text = '' } = body;
     if (!text.trim()) return res.status(400).json({ error: 'No text provided' });
 
-    // Strip markdown for clean speech
     const plain = text
       .replace(/```[\s\S]*?```/g,        'code block.')
       .replace(/`([^`]+)`/g,              '$1')
@@ -33,7 +32,6 @@ module.exports = async function handler(req, res) {
 
     if (!plain) return res.status(400).json({ error: 'Empty text after cleanup' });
 
-    // Cloudflare Kokoro TTS — bm_george = British Male, deep, authoritative
     const cfRes = await fetch(
       `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/ai/run/@cf/jaaari/kokoro-82m`,
       {

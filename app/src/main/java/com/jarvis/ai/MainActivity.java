@@ -145,27 +145,68 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // ── Android native TTS init ───────────────────────────────────────────────
-    private void initTts() {
-        androidTts = new TextToSpeech(this, status -> {
-            if (status != TextToSpeech.SUCCESS) return;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                for (android.speech.tts.Voice voice : androidTts.getVoices()) {
-                    if (voice.getLocale().getLanguage().equals("en")
-                            && voice.getLocale().getCountry().equals("GB")
-                            && !voice.isNetworkConnectionRequired()) {
-                        androidTts.setVoice(voice);
-                        break;
-                    }
-                }
+   // ── Android native TTS init — Google neural male voice ────────────────────
+private void initTts() {
+    // Force Google TTS engine for neural (non-robotic) voices
+    androidTts = new TextToSpeech(this, status -> {
+        if (status != TextToSpeech.SUCCESS) {
+            // Google engine unavailable — fall back to default engine
+            androidTts = new TextToSpeech(this, s2 -> {
+                if (s2 == TextToSpeech.SUCCESS) setupTtsVoice();
+            });
+            return;
+        }
+        setupTtsVoice();
+    }, "com.google.android.tts");
+}
+
+private void setupTtsVoice() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        android.speech.tts.Voice bestVoice = null;
+        int bestScore = -1;
+
+        for (android.speech.tts.Voice voice : androidTts.getVoices()) {
+            String name    = voice.getName().toLowerCase();
+            String lang    = voice.getLocale().getLanguage();
+            String country = voice.getLocale().getCountry();
+
+            if (!lang.equals("en")) continue;
+
+            boolean isBritish = country.equals("GB");
+            boolean isMale    = name.contains("male") || name.contains("#male")
+                             || name.contains("-male") || name.contains("guy")
+                             || name.contains("daniel") || name.contains("james")
+                             || name.contains("george") || name.contains("oliver")
+                             || name.contains("brian")  || name.contains("harry")
+                             || name.contains("en-gb-x-gba") || name.contains("en-gb-x-gbb");
+            boolean isNeural  = name.contains("neural") || name.contains("wavenet")
+                             || name.contains("enhanced") || name.contains("local")
+                             || voice.getQuality() >= android.speech.tts.Voice.QUALITY_HIGH;
+
+            int score = 0;
+            if (isMale)    score += 20;
+            if (isBritish) score += 10;
+            if (isNeural)  score += 5;
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestVoice = voice;
             }
+        }
+
+        if (bestVoice != null) {
+            androidTts.setVoice(bestVoice);
+        } else {
             androidTts.setLanguage(new Locale("en", "GB"));
-            androidTts.setPitch(0.85f);
-            androidTts.setSpeechRate(0.92f);
-            ttsReady = true;
-        });
+        }
+    } else {
+        androidTts.setLanguage(new Locale("en", "GB"));
     }
 
+    androidTts.setPitch(0.78f);       // Lower = deeper, manlier
+    androidTts.setSpeechRate(0.90f);  // Slightly slower = more authoritative
+    ttsReady = true;
+}
     // ── Main speak entry point ────────────────────────────────────────────────
     private void speak(String text) {
         if (text == null || text.trim().isEmpty()) return;

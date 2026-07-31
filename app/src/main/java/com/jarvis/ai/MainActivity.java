@@ -155,17 +155,16 @@ public class MainActivity extends AppCompatActivity {
         androidTts = new TextToSpeech(this, status -> {
             if (status != TextToSpeech.SUCCESS) return;
             androidTts.setLanguage(new Locale("en", "GB"));
-            androidTts.setPitch(0.80f);
+            androidTts.setPitch(0.75f);
             androidTts.setSpeechRate(0.90f);
             ttsReady = true;
         });
     }
 
-    // ── speak(): splits into sentence chunks, streams each via Vercel TTS ─────
+    // ── speak(): sentence-chunked streaming via Vercel → Deepgram Zeus ────────
     private void speak(String text) {
         if (text == null || text.trim().isEmpty()) return;
 
-        // Clean markdown
         String cleaned = text
             .replaceAll("```[\\s\\S]*?```", "code block.")
             .replaceAll("`([^`]+)`", "$1")
@@ -184,8 +183,8 @@ public class MainActivity extends AppCompatActivity {
         isSpeaking = true;
         stopMediaPlayer();
 
-        // Split into ~300-char sentence chunks and stream them sequentially.
-        // First chunk plays in ~3s; full response plays with NO character limit.
+        // Split into ~300-char sentence chunks, stream sequentially.
+        // First chunk plays in ~3s. No character limit — reads everything.
         List<String> chunks = splitSentences(cleaned);
         streamChunks(chunks, 0);
     }
@@ -207,7 +206,7 @@ public class MainActivity extends AppCompatActivity {
         return chunks;
     }
 
-    /** Fetch TTS audio for chunk[index], play it, then move to chunk[index+1]. */
+    /** Fetch TTS audio for chunk[index], play it at lowered pitch, then move to next. */
     private void streamChunks(List<String> chunks, int index) {
         if (!isSpeaking || index >= chunks.size()) {
             isSpeaking = false;
@@ -240,6 +239,9 @@ public class MainActivity extends AppCompatActivity {
                                     mediaPlayer = new MediaPlayer();
                                     mediaPlayer.setDataSource(tmp.getAbsolutePath());
                                     mediaPlayer.prepare();
+                                    // Lower pitch for deeper JARVIS voice (0.80 = 20% deeper)
+                                    mediaPlayer.setPlaybackParams(
+                                        mediaPlayer.getPlaybackParams().setPitch(0.80f));
                                     mediaPlayer.setOnCompletionListener(mp -> {
                                         mp.release();
                                         mediaPlayer = null;
@@ -263,7 +265,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             } catch (Exception ignored) {}
-            // If this chunk fails, skip to next
+            // Skip failed chunk, continue with next
             streamChunks(chunks, index + 1);
         }).start();
     }

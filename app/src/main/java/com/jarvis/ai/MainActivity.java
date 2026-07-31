@@ -62,6 +62,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int    REQUEST_CAMERA  = 201;
     private static final String PREFS           = "jarvis_prefs";
     private static final String KEY_HIS         = "history_v2";
+    private static final String SPEAK_URL       = "https://jarvis-ai-seven-dun.vercel.app/api/speak";
 
     private OrbView      orbView;
     private TextView     tvStatus;
@@ -97,12 +98,16 @@ public class MainActivity extends AppCompatActivity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Gson    gson        = new Gson();
 
+    // ── onCreate ──────────────────────────────────────────────────────────────
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+            WindowManager.LayoutParams.FLAG_FULLSCREEN);
         getWindow().getDecorView().setSystemUiVisibility(
-            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY |
+            View.SYSTEM_UI_FLAG_FULLSCREEN |
+            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
         setContentView(R.layout.activity_main);
 
         orbView         = findViewById(R.id.orb_view);
@@ -140,11 +145,12 @@ public class MainActivity extends AppCompatActivity {
         if (history.isEmpty()) {
             addJarvisMsg("Good day, sir. J.A.R.V.I.S online. All systems nominal. How may I assist you?");
             mainHandler.postDelayed(() ->
-                speak("Good day, sir. J.A.R.V.I.S online. All systems nominal. How may I assist you?"), 1500);
+                speak("Good day, sir. J.A.R.V.I.S online. All systems nominal. How may I assist you?"),
+                1500);
         }
     }
 
-    // ── TTS fallback init ─────────────────────────────────────────────────────
+    // ── TTS fallback (Android native, en-GB) ──────────────────────────────────
     private void initTts() {
         androidTts = new TextToSpeech(this, status -> {
             if (status != TextToSpeech.SUCCESS) return;
@@ -155,12 +161,11 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    // ── Speak: Vercel → Cloudflare Deepgram Aura-2 "draco" (British Male) ─────
-    private static final String SPEAK_URL = "https://jarvis-ai-seven-dun.vercel.app/api/speak";
-
+    // ── speak(): splits into sentence chunks, streams each via Vercel TTS ─────
     private void speak(String text) {
         if (text == null || text.trim().isEmpty()) return;
 
+        // Clean markdown
         String cleaned = text
             .replaceAll("```[\\s\\S]*?```", "code block.")
             .replaceAll("`([^`]+)`", "$1")
@@ -179,11 +184,41 @@ public class MainActivity extends AppCompatActivity {
         isSpeaking = true;
         stopMediaPlayer();
 
-        final String finalText = cleaned;
+        // Split into ~300-char sentence chunks and stream them sequentially.
+        // First chunk plays in ~3s; full response plays with NO character limit.
+        List<String> chunks = splitSentences(cleaned);
+        streamChunks(chunks, 0);
+    }
+
+    /** Split text into ~300-char sentence groups for pipelined TTS streaming. */
+    private List<String> splitSentences(String text) {
+        List<String> chunks = new ArrayList<>();
+        String[] sentences = text.split("(?<=[.!?])\\s+");
+        StringBuilder current = new StringBuilder();
+        for (String sentence : sentences) {
+            if (current.length() + sentence.length() > 300 && current.length() > 0) {
+                chunks.add(current.toString().trim());
+                current = new StringBuilder();
+            }
+            current.append(sentence).append(" ");
+        }
+        if (current.length() > 0) chunks.add(current.toString().trim());
+        if (chunks.isEmpty()) chunks.add(text);
+        return chunks;
+    }
+
+    /** Fetch TTS audio for chunk[index], play it, then move to chunk[index+1]. */
+    private void streamChunks(List<String> chunks, int index) {
+        if (!isSpeaking || index >= chunks.size()) {
+            isSpeaking = false;
+            mainHandler.post(() -> setState(OrbView.OrbState.IDLE));
+            return;
+        }
+        final String chunk = chunks.get(index);
         new Thread(() -> {
             try {
                 JSONObject jo = new JSONObject();
-                jo.put("text", finalText);
+                jo.put("text", chunk);
                 String jsonBody = jo.toString();
                 okhttp3.RequestBody body = okhttp3.RequestBody.create(
                     jsonBody.getBytes("UTF-8"),
@@ -197,7 +232,8 @@ public class MainActivity extends AppCompatActivity {
                     if (resp.isSuccessful() && resp.body() != null) {
                         byte[] audio = resp.body().bytes();
                         if (audio.length > 500) {
-                            File tmp = File.createTempFile("jarvis_tts_", ".mp3", getCacheDir());
+                            File tmp = File.createTempFile(
+                                "jarvis_c" + index + "_", ".mp3", getCacheDir());
                             java.nio.file.Files.write(tmp.toPath(), audio);
                             mainHandler.post(() -> {
                                 try {
@@ -208,19 +244,18 @@ public class MainActivity extends AppCompatActivity {
                                         mp.release();
                                         mediaPlayer = null;
                                         tmp.delete();
-                                        isSpeaking = false;
-                                        setState(OrbView.OrbState.IDLE);
+                                        streamChunks(chunks, index + 1);
                                     });
                                     mediaPlayer.setOnErrorListener((mp, w, e) -> {
                                         mp.release();
                                         mediaPlayer = null;
                                         tmp.delete();
-                                        mainHandler.post(() -> fallbackTts(finalText));
+                                        streamChunks(chunks, index + 1);
                                         return true;
                                     });
                                     mediaPlayer.start();
                                 } catch (Exception e) {
-                                    mainHandler.post(() -> fallbackTts(finalText));
+                                    streamChunks(chunks, index + 1);
                                 }
                             });
                             return;
@@ -228,8 +263,8 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             } catch (Exception ignored) {}
-            // Fallback to Android TTS if Vercel call fails
-            mainHandler.post(() -> fallbackTts(finalText));
+            // If this chunk fails, skip to next
+            streamChunks(chunks, index + 1);
         }).start();
     }
 
@@ -260,9 +295,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void stopSpeaking() {
+        isSpeaking = false;
         stopMediaPlayer();
         if (androidTts != null && androidTts.isSpeaking()) androidTts.stop();
-        isSpeaking = false;
         setState(OrbView.OrbState.IDLE);
     }
 
@@ -285,7 +320,8 @@ public class MainActivity extends AppCompatActivity {
             String ts = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
             File photo = File.createTempFile("JARVIS_" + ts, ".jpg",
                 getExternalFilesDir(Environment.DIRECTORY_PICTURES));
-            cameraImageUri = FileProvider.getUriForFile(this, getPackageName() + ".provider", photo);
+            cameraImageUri = FileProvider.getUriForFile(
+                this, getPackageName() + ".provider", photo);
             intent.putExtra(MediaStore.EXTRA_OUTPUT, cameraImageUri);
             startActivityForResult(intent, REQUEST_CAMERA);
         } catch (IOException e) {
@@ -305,7 +341,7 @@ public class MainActivity extends AppCompatActivity {
         if (res != RESULT_OK) return;
         Uri uri = null;
         if (req == REQUEST_CAMERA && cameraImageUri != null) uri = cameraImageUri;
-        else if (req == REQUEST_GALLERY && data != null)    uri = data.getData();
+        else if (req == REQUEST_GALLERY && data != null)     uri = data.getData();
         if (uri != null) encodeImageAsync(uri);
     }
 
@@ -395,7 +431,8 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onResults(Bundle results) {
                 isListening = false;
                 mainHandler.post(() -> tvOrbHint.setText("TAP TO SPEAK"));
-                ArrayList<String> m = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                ArrayList<String> m =
+                    results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                 if (m != null && !m.isEmpty() && !m.get(0).trim().isEmpty())
                     mainHandler.post(() -> askJarvis(m.get(0).trim()));
                 else
@@ -405,7 +442,8 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onEvent(int t, Bundle b) {}
         });
         Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
         i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
         speechRec.startListening(i);

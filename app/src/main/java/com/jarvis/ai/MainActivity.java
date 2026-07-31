@@ -58,7 +58,7 @@ import okhttp3.OkHttpClient;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final int    PERM_CODE      = 101;
+    private static final int    PERM_CODE       = 101;
     private static final int    REQUEST_GALLERY = 200;
     private static final int    REQUEST_CAMERA  = 201;
     private static final String PREFS           = "jarvis_prefs";
@@ -81,9 +81,9 @@ public class MainActivity extends AppCompatActivity {
     private String pendingImageBase64;
     private String pendingImageUriStr;
 
-    // TTS — Kokoro (server) primary, Android native fallback
+    // TTS — Edge TTS (server, British Male Ryan) primary, Android native fallback
     private TextToSpeech tts;
-    private boolean      ttsReady   = false;
+    private boolean      ttsReady  = false;
     private boolean      isSpeaking = false;
     private MediaPlayer  ttsPlayer  = null;
 
@@ -149,6 +149,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // ── TTS init (Android native — fallback only) ─────────────────────────────
     private void initTts() {
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
@@ -167,24 +168,17 @@ public class MainActivity extends AppCompatActivity {
             int bestScore = -1;
             for (android.speech.tts.Voice v : tts.getVoices()) {
                 String name = v.getName().toLowerCase();
-                String lang = v.getLocale().getLanguage();
-                if (!lang.equals("en")) continue;
+                if (!v.getLocale().getLanguage().equals("en")) continue;
                 boolean isFemale = name.contains("female") || name.contains("woman")
                     || name.contains("girl") || name.contains("zira") || name.contains("hazel")
                     || name.contains("susan") || name.contains("kate") || name.contains("en-gb-x-gbc")
-                    || name.contains("en-gb-x-gbd") || name.contains("en-us-x-tpf")
-                    || name.contains("en-us-x-iol") || name.contains("samantha");
+                    || name.contains("en-gb-x-gbd") || name.contains("samantha");
                 if (isFemale) continue;
-                String country = v.getLocale().getCountry();
-                boolean isBritish = country.equals("GB");
-                boolean isMale = name.contains("male") || name.contains("#male")
-                    || name.contains("-male") || name.contains("en-gb-x-gba")
-                    || name.contains("en-gb-x-gbb") || name.contains("en-gb-x-gbg")
-                    || name.contains("daniel") || name.contains("george")
-                    || name.contains("oliver") || name.contains("harry")
-                    || name.contains("james")  || name.contains("arthur")
-                    || name.contains("en-us-x-sfg") || name.contains("en-us-x-tpg")
-                    || name.contains("en-us-x-iog");
+                boolean isBritish = v.getLocale().getCountry().equals("GB");
+                boolean isMale = name.contains("male") || name.contains("daniel")
+                    || name.contains("george") || name.contains("oliver")
+                    || name.contains("harry") || name.contains("james")
+                    || name.contains("en-gb-x-gba") || name.contains("en-gb-x-gbb");
                 boolean isNeural = name.contains("neural") || name.contains("wavenet")
                     || name.contains("enhanced") || name.contains("local")
                     || v.getQuality() >= android.speech.tts.Voice.QUALITY_HIGH;
@@ -215,26 +209,29 @@ public class MainActivity extends AppCompatActivity {
         ttsReady = true;
     }
 
+    // ── Clean markdown for speech ─────────────────────────────────────────────
     private String cleanForTts(String text) {
         return text
             .replaceAll("```[\\s\\S]*?```", "code block.")
-            .replaceAll("`([^`]+)`",         "$1")
+            .replaceAll("`([^`]+)`", "$1")
             .replaceAll("\\*\\*(.*?)\\*\\*", "$1")
-            .replaceAll("\\*(.*?)\\*",       "$1")
-            .replaceAll("#{1,6}\\s",         "")
+            .replaceAll("\\*(.*?)\\*", "$1")
+            .replaceAll("#{1,6}\\s", "")
             .replaceAll("\\[([^\\]]+)\\]\\([^)]+\\)", "$1")
             .replaceAll("(?m)^\\s*[-*+]\\s", " ")
-            .replaceAll("(?m)^\\s*\\d+\\.\\s"," ")
-            .replaceAll("\\n+",              " ")
+            .replaceAll("(?m)^\\s*\\d+\\.\\s", " ")
+            .replaceAll("\\n+", " ")
             .trim();
     }
 
+    // ── Speak — Edge TTS server first, Android native fallback ────────────────
     private void speak(String text) {
         if (text == null || text.trim().isEmpty()) return;
         String clean = cleanForTts(text);
         if (clean.isEmpty()) return;
         isSpeaking = true;
         setState(OrbView.OrbState.SPEAKING);
+
         new Thread(() -> {
             try {
                 org.json.JSONObject body = new org.json.JSONObject();
@@ -252,8 +249,9 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             } catch (Exception e) {
-                android.util.Log.w("JARVIS_TTS", "Kokoro failed: " + e.getMessage());
+                android.util.Log.w("JARVIS_TTS", "Edge TTS failed: " + e.getMessage());
             }
+            // Fallback to Android native TTS
             mainHandler.post(() -> speakNative(clean));
         }).start();
     }
@@ -261,7 +259,7 @@ public class MainActivity extends AppCompatActivity {
     private void playAudioBytes(byte[] audioBytes) {
         try {
             if (ttsPlayer != null) { try { ttsPlayer.release(); } catch (Exception ignored) {} }
-            java.io.File tmpFile = java.io.File.createTempFile("tts_", ".wav", getCacheDir());
+            java.io.File tmpFile = java.io.File.createTempFile("tts_", ".mp3", getCacheDir());
             try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tmpFile)) {
                 fos.write(audioBytes);
             }
@@ -276,14 +274,14 @@ public class MainActivity extends AppCompatActivity {
             });
             ttsPlayer.setOnErrorListener((mp, what, extra) -> {
                 mp.release(); ttsPlayer = null; tmpFile.delete();
-                speakNative(cleanForTts("Sorry, audio playback failed."));
+                speakNative(clean);
                 return true;
             });
             ttsPlayer.prepare();
             ttsPlayer.start();
         } catch (Exception e) {
-            android.util.Log.e("JARVIS_TTS", "Audio error: " + e.getMessage());
-            speakNative(cleanForTts("Audio playback failed, sir."));
+            android.util.Log.e("JARVIS_TTS", "Playback error: " + e.getMessage());
+            speakNative(clean);
         }
     }
 
@@ -306,6 +304,7 @@ public class MainActivity extends AppCompatActivity {
         setState(OrbView.OrbState.IDLE);
     }
 
+    // ── Attachment ────────────────────────────────────────────────────────────
     private void showAttachDialog() {
         new AlertDialog.Builder(this)
             .setTitle("Attach image")
@@ -344,7 +343,7 @@ public class MainActivity extends AppCompatActivity {
         if (res != RESULT_OK) return;
         Uri uri = null;
         if (req == REQUEST_CAMERA && cameraImageUri != null) uri = cameraImageUri;
-        else if (req == REQUEST_GALLERY && data != null)    uri = data.getData();
+        else if (req == REQUEST_GALLERY && data != null)     uri = data.getData();
         if (uri != null) encodeImageAsync(uri);
     }
 
@@ -357,7 +356,7 @@ public class MainActivity extends AppCompatActivity {
                 int w = bmp.getWidth(), h = bmp.getHeight(), maxPx = 1024;
                 if (w > maxPx || h > maxPx) {
                     float s = Math.min((float) maxPx / w, (float) maxPx / h);
-                    bmp = Bitmap.createScaledBitmap(bmp, (int)(w*s), (int)(h*s), true);
+                    bmp = Bitmap.createScaledBitmap(bmp, (int)(w * s), (int)(h * s), true);
                 }
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 bmp.compress(Bitmap.CompressFormat.JPEG, 80, baos);
@@ -384,6 +383,7 @@ public class MainActivity extends AppCompatActivity {
         ivAttachPreview.setVisibility(View.GONE);
     }
 
+    // ── Speech recognition ────────────────────────────────────────────────────
     private void toggleListening() {
         if (isSpeaking) { stopSpeaking(); return; }
         if (isListening) stopListening(); else startListening();
@@ -406,7 +406,10 @@ public class MainActivity extends AppCompatActivity {
         speechRec.setRecognitionListener(new RecognitionListener() {
             @Override public void onReadyForSpeech(Bundle p) {
                 isListening = true;
-                mainHandler.post(() -> { setState(OrbView.OrbState.LISTENING); tvOrbHint.setText("LISTENING — TAP TO STOP"); });
+                mainHandler.post(() -> {
+                    setState(OrbView.OrbState.LISTENING);
+                    tvOrbHint.setText("LISTENING — TAP TO STOP");
+                });
             }
             @Override public void onBeginningOfSpeech() {}
             @Override public void onRmsChanged(float r) {}
@@ -420,7 +423,8 @@ public class MainActivity extends AppCompatActivity {
                     if (error != SpeechRecognizer.ERROR_NO_MATCH
                         && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT
                         && error != SpeechRecognizer.ERROR_RECOGNIZER_BUSY)
-                        Toast.makeText(MainActivity.this, "Voice error (" + error + ")", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this,
+                            "Voice error (" + error + ")", Toast.LENGTH_SHORT).show();
                 });
             }
             @Override public void onResults(Bundle results) {
@@ -449,6 +453,7 @@ public class MainActivity extends AppCompatActivity {
         tvOrbHint.setText("TAP TO SPEAK");
     }
 
+    // ── Chat ──────────────────────────────────────────────────────────────────
     private void sendText() {
         String text = etInput.getText().toString().trim();
         if (text.isEmpty() && pendingImageBase64 == null) return;
@@ -529,6 +534,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // ── Memory ────────────────────────────────────────────────────────────────
     private void saveHistory() {
         List<HistoryItem> toSave = history.size() > 80
             ? history.subList(history.size() - 80, history.size()) : history;
@@ -549,7 +555,10 @@ public class MainActivity extends AppCompatActivity {
             for (HistoryItem item : vis)
                 messages.add(new Message(
                     "user".equals(item.role) ? Message.TYPE_USER : Message.TYPE_JARVIS, item.text));
-            if (!messages.isEmpty()) { adapter.notifyDataSetChanged(); recycler.scrollToPosition(messages.size() - 1); }
+            if (!messages.isEmpty()) {
+                adapter.notifyDataSetChanged();
+                recycler.scrollToPosition(messages.size() - 1);
+            }
         } catch (Exception ignored) {}
     }
 
@@ -566,6 +575,7 @@ public class MainActivity extends AppCompatActivity {
             .setNegativeButton("Cancel", null).show();
     }
 
+    // ── State ─────────────────────────────────────────────────────────────────
     private void setState(OrbView.OrbState state) {
         currentState = state;
         orbView.setState(state);
@@ -573,6 +583,7 @@ public class MainActivity extends AppCompatActivity {
         tvStatus.setText(labels[state.ordinal()]);
     }
 
+    // ── Permissions ───────────────────────────────────────────────────────────
     private void requestPermissions() {
         List<String> needed = new ArrayList<>();
         needed.add(Manifest.permission.RECORD_AUDIO);
@@ -606,4 +617,3 @@ public class MainActivity extends AppCompatActivity {
         if (tts != null) { tts.stop(); tts.shutdown(); }
         super.onDestroy();
     }
-}

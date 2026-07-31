@@ -58,11 +58,11 @@ import okhttp3.Response;
 public class MainActivity extends AppCompatActivity {
 
     private static final int    PERM_CODE       = 101;
-    private static final int    REQUEST_GALLERY = 200;
-    private static final int    REQUEST_CAMERA  = 201;
-    private static final String PREFS           = "jarvis_prefs";
-    private static final String KEY_HIS         = "history_v2";
-    private static final String SPEAK_URL       = "https://jarvis-ai-seven-dun.vercel.app/api/speak";
+    private static final int    REQUEST_GALLERY  = 200;
+    private static final int    REQUEST_CAMERA   = 201;
+    private static final String PREFS            = "jarvis_prefs";
+    private static final String KEY_HIS          = "history_v2";
+    private static final String SPEAK_URL        = "https://jarvis-ai-seven-dun.vercel.app/api/speak";
 
     private OrbView      orbView;
     private TextView     tvStatus;
@@ -87,8 +87,8 @@ public class MainActivity extends AppCompatActivity {
     private boolean      isSpeaking = false;
 
     private final OkHttpClient httpClient = new OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
         .build();
 
     private SpeechRecognizer speechRec;
@@ -98,16 +98,12 @@ public class MainActivity extends AppCompatActivity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Gson    gson        = new Gson();
 
-    // ── onCreate ──────────────────────────────────────────────────────────────
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
-            WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         getWindow().getDecorView().setSystemUiVisibility(
-            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY |
-            View.SYSTEM_UI_FLAG_FULLSCREEN |
-            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
         setContentView(R.layout.activity_main);
 
         orbView         = findViewById(R.id.orb_view);
@@ -145,23 +141,32 @@ public class MainActivity extends AppCompatActivity {
         if (history.isEmpty()) {
             addJarvisMsg("Good day, sir. J.A.R.V.I.S online. All systems nominal. How may I assist you?");
             mainHandler.postDelayed(() ->
-                speak("Good day, sir. J.A.R.V.I.S online. All systems nominal. How may I assist you?"),
-                1500);
+                speak("Good day, sir. J.A.R.V.I.S online. All systems nominal. How may I assist you?"), 1500);
         }
     }
 
-    // ── TTS fallback (Android native, en-GB) ──────────────────────────────────
+    // ── Android native TTS init ───────────────────────────────────────────────
     private void initTts() {
         androidTts = new TextToSpeech(this, status -> {
             if (status != TextToSpeech.SUCCESS) return;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                for (android.speech.tts.Voice voice : androidTts.getVoices()) {
+                    if (voice.getLocale().getLanguage().equals("en")
+                            && voice.getLocale().getCountry().equals("GB")
+                            && !voice.isNetworkConnectionRequired()) {
+                        androidTts.setVoice(voice);
+                        break;
+                    }
+                }
+            }
             androidTts.setLanguage(new Locale("en", "GB"));
-            androidTts.setPitch(0.75f);
-            androidTts.setSpeechRate(0.90f);
+            androidTts.setPitch(0.85f);
+            androidTts.setSpeechRate(0.92f);
             ttsReady = true;
         });
     }
 
-    // ── speak(): sentence-chunked streaming via Vercel → Deepgram Zeus ────────
+    // ── Main speak entry point ────────────────────────────────────────────────
     private void speak(String text) {
         if (text == null || text.trim().isEmpty()) return;
 
@@ -183,19 +188,16 @@ public class MainActivity extends AppCompatActivity {
         isSpeaking = true;
         stopMediaPlayer();
 
-        // Split into ~300-char sentence chunks, stream sequentially.
-        // First chunk plays in ~3s. No character limit — reads everything.
         List<String> chunks = splitSentences(cleaned);
-        streamChunks(chunks, 0);
+        tryServerTts(chunks, 0, cleaned);
     }
 
-    /** Split text into ~300-char sentence groups for pipelined TTS streaming. */
     private List<String> splitSentences(String text) {
         List<String> chunks = new ArrayList<>();
         String[] sentences = text.split("(?<=[.!?])\\s+");
         StringBuilder current = new StringBuilder();
         for (String sentence : sentences) {
-            if (current.length() + sentence.length() > 300 && current.length() > 0) {
+            if (current.length() + sentence.length() > 280 && current.length() > 0) {
                 chunks.add(current.toString().trim());
                 current = new StringBuilder();
             }
@@ -206,8 +208,7 @@ public class MainActivity extends AppCompatActivity {
         return chunks;
     }
 
-    /** Fetch TTS audio for chunk[index], play it at lowered pitch, then move to next. */
-    private void streamChunks(List<String> chunks, int index) {
+    private void tryServerTts(List<String> chunks, int index, String fullText) {
         if (!isSpeaking || index >= chunks.size()) {
             isSpeaking = false;
             mainHandler.post(() -> setState(OrbView.OrbState.IDLE));
@@ -218,65 +219,77 @@ public class MainActivity extends AppCompatActivity {
             try {
                 JSONObject jo = new JSONObject();
                 jo.put("text", chunk);
-                String jsonBody = jo.toString();
-                okhttp3.RequestBody body = okhttp3.RequestBody.create(
-                    jsonBody.getBytes("UTF-8"),
+                okhttp3.RequestBody reqBody = okhttp3.RequestBody.create(
+                    jo.toString().getBytes("UTF-8"),
                     okhttp3.MediaType.parse("application/json; charset=utf-8")
                 );
                 Request req = new Request.Builder()
                     .url(SPEAK_URL)
-                    .post(body)
+                    .post(reqBody)
                     .build();
+
                 try (Response resp = httpClient.newCall(req).execute()) {
-                    if (resp.isSuccessful() && resp.body() != null) {
+                    if (resp.code() == 200 && resp.body() != null) {
                         byte[] audio = resp.body().bytes();
                         if (audio.length > 500) {
-                            File tmp = File.createTempFile(
-                                "jarvis_c" + index + "_", ".mp3", getCacheDir());
+                            File tmp = File.createTempFile("jarvis_" + index + "_", ".mp3", getCacheDir());
                             java.nio.file.Files.write(tmp.toPath(), audio);
                             mainHandler.post(() -> {
                                 try {
+                                    stopMediaPlayer();
                                     mediaPlayer = new MediaPlayer();
                                     mediaPlayer.setDataSource(tmp.getAbsolutePath());
                                     mediaPlayer.prepare();
-                                    // Lower pitch for deeper JARVIS voice (0.80 = 20% deeper)
                                     mediaPlayer.setPlaybackParams(
-                                        mediaPlayer.getPlaybackParams().setPitch(0.80f));
+                                        mediaPlayer.getPlaybackParams().setPitch(0.85f));
                                     mediaPlayer.setOnCompletionListener(mp -> {
                                         mp.release();
                                         mediaPlayer = null;
                                         tmp.delete();
-                                        streamChunks(chunks, index + 1);
+                                        tryServerTts(chunks, index + 1, fullText);
                                     });
                                     mediaPlayer.setOnErrorListener((mp, w, e) -> {
                                         mp.release();
                                         mediaPlayer = null;
                                         tmp.delete();
-                                        streamChunks(chunks, index + 1);
+                                        tryServerTts(chunks, index + 1, fullText);
                                         return true;
                                     });
                                     mediaPlayer.start();
                                 } catch (Exception e) {
-                                    streamChunks(chunks, index + 1);
+                                    mainHandler.post(() -> fallbackTts(joinFrom(chunks, index)));
                                 }
                             });
                             return;
                         }
                     }
+                    // 204 or any non-200 → fall back to native TTS
                 }
             } catch (Exception ignored) {}
-            // Skip failed chunk, continue with next
-            streamChunks(chunks, index + 1);
+
+            // Server failed — use Android native TTS for all remaining text
+            String remaining = joinFrom(chunks, index);
+            mainHandler.post(() -> fallbackTts(remaining));
         }).start();
     }
 
+    private String joinFrom(List<String> chunks, int fromIndex) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = fromIndex; i < chunks.size(); i++) {
+            if (sb.length() > 0) sb.append(" ");
+            sb.append(chunks.get(i));
+        }
+        return sb.toString();
+    }
+
+    // ── Android native TTS fallback — unlimited, free, always works ──────────
     private void fallbackTts(String text) {
         if (!ttsReady || androidTts == null) {
             isSpeaking = false;
             setState(OrbView.OrbState.IDLE);
             return;
         }
-        androidTts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis");
+        androidTts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis_fallback");
         mainHandler.postDelayed(new Runnable() {
             @Override public void run() {
                 if (androidTts != null && androidTts.isSpeaking()) {
@@ -286,7 +299,7 @@ public class MainActivity extends AppCompatActivity {
                     setState(OrbView.OrbState.IDLE);
                 }
             }
-        }, 400);
+        }, 500);
     }
 
     private void stopMediaPlayer() {
@@ -322,8 +335,7 @@ public class MainActivity extends AppCompatActivity {
             String ts = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
             File photo = File.createTempFile("JARVIS_" + ts, ".jpg",
                 getExternalFilesDir(Environment.DIRECTORY_PICTURES));
-            cameraImageUri = FileProvider.getUriForFile(
-                this, getPackageName() + ".provider", photo);
+            cameraImageUri = FileProvider.getUriForFile(this, getPackageName() + ".provider", photo);
             intent.putExtra(MediaStore.EXTRA_OUTPUT, cameraImageUri);
             startActivityForResult(intent, REQUEST_CAMERA);
         } catch (IOException e) {
@@ -343,7 +355,7 @@ public class MainActivity extends AppCompatActivity {
         if (res != RESULT_OK) return;
         Uri uri = null;
         if (req == REQUEST_CAMERA && cameraImageUri != null) uri = cameraImageUri;
-        else if (req == REQUEST_GALLERY && data != null)     uri = data.getData();
+        else if (req == REQUEST_GALLERY && data != null)    uri = data.getData();
         if (uri != null) encodeImageAsync(uri);
     }
 
@@ -433,8 +445,7 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onResults(Bundle results) {
                 isListening = false;
                 mainHandler.post(() -> tvOrbHint.setText("TAP TO SPEAK"));
-                ArrayList<String> m =
-                    results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                ArrayList<String> m = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                 if (m != null && !m.isEmpty() && !m.get(0).trim().isEmpty())
                     mainHandler.post(() -> askJarvis(m.get(0).trim()));
                 else
@@ -444,8 +455,7 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onEvent(int t, Bundle b) {}
         });
         Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
         i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
         speechRec.startListening(i);

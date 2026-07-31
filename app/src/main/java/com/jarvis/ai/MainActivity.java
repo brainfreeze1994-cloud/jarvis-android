@@ -556,3 +556,4 @@ public class MainActivity extends AppCompatActivity {
         if (androidTts != null) { androidTts.stop(); androidTts.shutdown(); }
         super.onDestroy();
     }
+}    

@@ -580,6 +580,7 @@ public class MainActivity extends AppCompatActivity {
         currentState = state;
         orbView.setState(state);
         final String[] labels = {"STANDBY", "LISTENING…", "PROCESSING…", "SPEAKING…", "WAKE"};
+        final String clean = cleanForTts(text);  // ← final allows lambdas to capture it
         tvStatus.setText(labels[state.ordinal()]);
     }
 

@@ -3,10 +3,10 @@ package com.jarvis.ai;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -17,13 +17,12 @@ import android.provider.MediaStore;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.Voice;
 import android.util.Base64;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
-import android.webkit.JavascriptInterface;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -50,11 +49,11 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
-import okhttp3.RequestBody;
 import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity {
@@ -70,10 +69,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView     tvOrbHint;
     private RecyclerView recycler;
     private EditText     etInput;
-    private ImageButton  btnMic;
-    private ImageButton  btnSend;
-    private ImageButton  btnClear;
-    private ImageButton  btnAttach;
+    private ImageButton  btnMic, btnSend, btnClear, btnAttach;
     private ImageView    ivAttachPreview;
 
     private final List<Message>     messages = new ArrayList<>();
@@ -85,14 +81,14 @@ public class MainActivity extends AppCompatActivity {
     private String pendingImageBase64;
     private String pendingImageUriStr;
 
-    private WebView ttsWebView;
-    private boolean isSpeaking = false;
-    private boolean ttsReady   = false;
+    private MediaPlayer  mediaPlayer;
+    private TextToSpeech androidTts;
+    private boolean      ttsReady   = false;
+    private boolean      isSpeaking = false;
 
     private final OkHttpClient httpClient = new OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(90, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
         .build();
 
     private SpeechRecognizer speechRec;
@@ -105,17 +101,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        getWindow().setFlags(
-            WindowManager.LayoutParams.FLAG_FULLSCREEN,
-            WindowManager.LayoutParams.FLAG_FULLSCREEN
-        );
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         getWindow().getDecorView().setSystemUiVisibility(
-            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY |
-            View.SYSTEM_UI_FLAG_FULLSCREEN        |
-            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-        );
-
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
         setContentView(R.layout.activity_main);
 
         orbView         = findViewById(R.id.orb_view);
@@ -137,7 +125,7 @@ public class MainActivity extends AppCompatActivity {
 
         requestPermissions();
         loadHistory();
-        initWebViewTts();
+        initTts();
 
         orbView.setOnClickListener(v -> toggleListening());
         btnMic.setOnClickListener(v -> toggleListening());
@@ -145,130 +133,157 @@ public class MainActivity extends AppCompatActivity {
         btnClear.setOnClickListener(v -> confirmClear());
         btnAttach.setOnClickListener(v -> showAttachDialog());
         ivAttachPreview.setOnClickListener(v -> clearAttachment());
-        etInput.setOnEditorActionListener((v, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_SEND) { sendText(); return true; }
+        etInput.setOnEditorActionListener((v, id, e) -> {
+            if (id == EditorInfo.IME_ACTION_SEND) { sendText(); return true; }
             return false;
         });
 
         if (history.isEmpty()) {
             addJarvisMsg("Good day, sir. J.A.R.V.I.S online. All systems nominal. How may I assist you?");
             mainHandler.postDelayed(() ->
-                speak("Good day, sir. J.A.R.V.I.S online. All systems nominal. How may I assist you?"), 2000);
+                speak("Good day, sir. J.A.R.V.I.S online. All systems nominal. How may I assist you?"), 1500);
         }
     }
 
-    // ── WebView TTS ──────────────────────────────────────────────────────────
-    private void initWebViewTts() {
-        ttsWebView = new WebView(this);
-        WebSettings ws = ttsWebView.getSettings();
-        ws.setJavaScriptEnabled(true);
-        ws.setMediaPlaybackRequiresUserGesture(false);
-
-        ttsWebView.addJavascriptInterface(new Object() {
-            @JavascriptInterface
-            public void onDone() {
-                mainHandler.post(() -> {
-                    isSpeaking = false;
-                    setState(OrbView.OrbState.IDLE);
-                });
+    // ── TTS init ─────────────────────────────────────────────────────────────
+    private void initTts() {
+        androidTts = new TextToSpeech(this, status -> {
+            if (status != TextToSpeech.SUCCESS) return;
+            androidTts.setPitch(0.75f);
+            androidTts.setSpeechRate(0.90f);
+            Set<Voice> voices = androidTts.getVoices();
+            Voice best = null;
+            if (voices != null) {
+                for (Voice v : voices) {
+                    String l = v.getLocale() != null ? v.getLocale().toLanguageTag().toLowerCase() : "";
+                    if (l.startsWith("en-gb")) { best = v; break; }
+                }
+                if (best == null) {
+                    for (Voice v : voices) {
+                        String n = v.getName().toLowerCase();
+                        if (n.contains("en-gb") || n.contains("en_gb")) { best = v; break; }
+                    }
+                }
             }
-            @JavascriptInterface
-            public void onReady() {
-                mainHandler.post(() -> ttsReady = true);
-            }
-        }, "Android");
-
-        ttsWebView.loadDataWithBaseURL(
-            "https://jarvis-ai-seven-dun.vercel.app",
-            "<html><body><script>" +
-            "window.speechSynthesis.onvoiceschanged=function(){Android.onReady();};" +
-            "if(speechSynthesis.getVoices().length>0){Android.onReady();}" +
-            "</script></body></html>",
-            "text/html", "UTF-8", null);
+            if (best != null) androidTts.setVoice(best);
+            else androidTts.setLanguage(new Locale("en", "GB"));
+            ttsReady = true;
+        });
     }
 
+    // ── Speak: StreamElements Brian MP3 → fallback Android TTS ───────────────
     private void speak(String text) {
         if (text == null || text.trim().isEmpty()) return;
 
         String plain = text
-            .replaceAll("```[\\s\\S]*?```",          "code block.")
-            .replaceAll("`([^`]+)`",                  "$1")
-            .replaceAll("\\*\\*(.*?)\\*\\*",          "$1")
-            .replaceAll("\\*(.*?)\\*",                "$1")
-            .replaceAll("#{1,6}\\s",                  "")
+            .replaceAll("```[\\s\\S]*?```", "code block.")
+            .replaceAll("`([^`]+)`", "$1")
+            .replaceAll("\\*\\*(.*?)\\*\\*", "$1")
+            .replaceAll("\\*(.*?)\\*", "$1")
+            .replaceAll("#{1,6}\\s", "")
             .replaceAll("\\[([^\\]]+)\\]\\([^)]+\\)", "$1")
-            .replaceAll("(?m)^\\s*[-*+]\\s",          "")
-            .replaceAll("(?m)^\\s*\\d+\\.\\s",        "")
-            .replaceAll("\\n{3,}",                    "\n\n")
+            .replaceAll("(?m)^\\s*[-*+]\\s", "")
+            .replaceAll("(?m)^\\s*\\d+\\.\\s", "")
+            .replaceAll("\\n{3,}", "\n\n")
             .trim();
 
         if (plain.isEmpty()) return;
-
         setState(OrbView.OrbState.SPEAKING);
         isSpeaking = true;
+        stopMediaPlayer();
 
-        String escaped = plain
-            .replace("\\", "\\\\")
-            .replace("'", "\\'")
-            .replace("\n", " ")
-            .replace("\r", "");
+        final String finalText = plain;
+        new Thread(() -> {
+            boolean ok = false;
+            try {
+                String encoded = java.net.URLEncoder.encode(finalText, "UTF-8");
+                Request req = new Request.Builder()
+                    .url("https://api.streamelements.com/kappa/v2/speech?voice=Brian&text=" + encoded)
+                    .get().build();
+                try (Response resp = httpClient.newCall(req).execute()) {
+                    if (resp.isSuccessful() && resp.body() != null) {
+                        byte[] audio = resp.body().bytes();
+                        if (audio.length > 1000) {
+                            File tmp = File.createTempFile("jarvis_tts_", ".mp3", getCacheDir());
+                            java.nio.file.Files.write(tmp.toPath(), audio);
+                            mainHandler.post(() -> {
+                                try {
+                                    mediaPlayer = new MediaPlayer();
+                                    mediaPlayer.setDataSource(tmp.getAbsolutePath());
+                                    mediaPlayer.prepare();
+                                    mediaPlayer.setOnCompletionListener(mp -> {
+                                        isSpeaking = false;
+                                        setState(OrbView.OrbState.IDLE);
+                                        mp.release(); mediaPlayer = null; tmp.delete();
+                                    });
+                                    mediaPlayer.setOnErrorListener((mp, w, e) -> {
+                                        isSpeaking = false;
+                                        setState(OrbView.OrbState.IDLE);
+                                        mp.release(); mediaPlayer = null; tmp.delete();
+                                        fallbackTts(finalText);
+                                        return true;
+                                    });
+                                    mediaPlayer.start();
+                                } catch (Exception e) {
+                                    fallbackTts(finalText);
+                                }
+                            });
+                            ok = true;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+            if (!ok) mainHandler.post(() -> fallbackTts(finalText));
+        }).start();
+    }
 
-        String js = "javascript:(function(){" +
-            "speechSynthesis.cancel();" +
-            "var u=new SpeechSynthesisUtterance('" + escaped + "');" +
-            "u.lang='en-GB';" +
-            "u.pitch=0.80;" +
-            "u.rate=0.88;" +
-            "var voices=speechSynthesis.getVoices();" +
-            "var best=null;" +
-            "for(var i=0;i<voices.length;i++){" +
-            "  if(voices[i].name==='Google UK English Male'){best=voices[i];break;}" +
-            "}" +
-            "if(!best){for(var i=0;i<voices.length;i++){" +
-            "  var n=voices[i].name.toLowerCase(),l=voices[i].lang.toLowerCase();" +
-            "  if((l.includes('en-gb')||n.includes('uk')||n.includes('british'))&&" +
-            "     (n.includes('male')||n.includes('daniel')||n.includes('george')||n.includes('oliver'))){" +
-            "    best=voices[i];break;" +
-            "  }" +
-            "}}" +
-            "if(!best){for(var i=0;i<voices.length;i++){" +
-            "  if(voices[i].lang.toLowerCase().startsWith('en-gb')){best=voices[i];break;}" +
-            "}}" +
-            "if(best)u.voice=best;" +
-            "u.onend=function(){Android.onDone();};" +
-            "u.onerror=function(){Android.onDone();};" +
-            "speechSynthesis.speak(u);" +
-            "})();";
+    private void fallbackTts(String text) {
+        if (!ttsReady || androidTts == null) {
+            isSpeaking = false; setState(OrbView.OrbState.IDLE); return;
+        }
+        setState(OrbView.OrbState.SPEAKING);
+        isSpeaking = true;
+        androidTts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis");
+        mainHandler.postDelayed(new Runnable() {
+            @Override public void run() {
+                if (androidTts != null && androidTts.isSpeaking()) mainHandler.postDelayed(this, 400);
+                else { isSpeaking = false; setState(OrbView.OrbState.IDLE); }
+            }
+        }, 400);
+    }
 
-        mainHandler.post(() -> ttsWebView.loadUrl(js));
+    private void stopMediaPlayer() {
+        if (mediaPlayer != null) {
+            try { mediaPlayer.stop(); mediaPlayer.release(); } catch (Exception ignored) {}
+            mediaPlayer = null;
+        }
     }
 
     private void stopSpeaking() {
-        if (ttsWebView != null) ttsWebView.loadUrl("javascript:speechSynthesis.cancel();");
+        stopMediaPlayer();
+        if (androidTts != null && androidTts.isSpeaking()) androidTts.stop();
         isSpeaking = false;
         setState(OrbView.OrbState.IDLE);
     }
 
-    // ── Attachment ───────────────────────────────────────────────────────────
+    // ── Attachment ────────────────────────────────────────────────────────────
     private void showAttachDialog() {
         new AlertDialog.Builder(this)
             .setTitle("Attach image")
             .setItems(new String[]{"Take photo", "Choose from gallery"}, (d, which) -> {
-                if (which == 0) openCamera();
-                else            openGallery();
+                if (which == 0) openCamera(); else openGallery();
             }).show();
     }
 
     private void openCamera() {
         Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         if (intent.resolveActivity(getPackageManager()) == null) {
-            Toast.makeText(this, "No camera app found", Toast.LENGTH_SHORT).show();
-            return;
+            Toast.makeText(this, "No camera app found", Toast.LENGTH_SHORT).show(); return;
         }
         try {
-            String ts    = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-            File   dir   = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
-            File   photo = File.createTempFile("JARVIS_" + ts, ".jpg", dir);
+            String ts = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+            File photo = File.createTempFile("JARVIS_" + ts, ".jpg",
+                getExternalFilesDir(Environment.DIRECTORY_PICTURES));
             cameraImageUri = FileProvider.getUriForFile(this, getPackageName() + ".provider", photo);
             intent.putExtra(MediaStore.EXTRA_OUTPUT, cameraImageUri);
             startActivityForResult(intent, REQUEST_CAMERA);
@@ -278,19 +293,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void openGallery() {
-        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.setType("image/*");
-        startActivityForResult(Intent.createChooser(intent, "Select image"), REQUEST_GALLERY);
+        Intent i = new Intent(Intent.ACTION_GET_CONTENT); i.setType("image/*");
+        startActivityForResult(Intent.createChooser(i, "Select image"), REQUEST_GALLERY);
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode != RESULT_OK) return;
-        Uri imageUri = null;
-        if      (requestCode == REQUEST_CAMERA  && cameraImageUri != null) imageUri = cameraImageUri;
-        else if (requestCode == REQUEST_GALLERY && data != null)            imageUri = data.getData();
-        if (imageUri != null) encodeImageAsync(imageUri);
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (res != RESULT_OK) return;
+        Uri uri = null;
+        if (req == REQUEST_CAMERA && cameraImageUri != null) uri = cameraImageUri;
+        else if (req == REQUEST_GALLERY && data != null)    uri = data.getData();
+        if (uri != null) encodeImageAsync(uri);
     }
 
     private void encodeImageAsync(Uri uri) {
@@ -301,7 +315,7 @@ public class MainActivity extends AppCompatActivity {
                 if (bmp == null) throw new IOException("Cannot decode bitmap");
                 int w = bmp.getWidth(), h = bmp.getHeight(), maxPx = 1024;
                 if (w > maxPx || h > maxPx) {
-                    float s = Math.min((float) maxPx / w, (float) maxPx / h);
+                    float s = Math.min((float)maxPx/w, (float)maxPx/h);
                     bmp = Bitmap.createScaledBitmap(bmp, (int)(w*s), (int)(h*s), true);
                 }
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -321,13 +335,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void clearAttachment() {
-        pendingImageBase64 = null;
-        pendingImageUriStr = null;
+        pendingImageBase64 = null; pendingImageUriStr = null;
         ivAttachPreview.setImageDrawable(null);
         ivAttachPreview.setVisibility(View.GONE);
     }
 
-    // ── Speech Recognition ───────────────────────────────────────────────────
+    // ── Speech recognition ────────────────────────────────────────────────────
     private void toggleListening() {
         if (isSpeaking) { stopSpeaking(); return; }
         if (isListening) stopListening(); else startListening();
@@ -341,8 +354,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            Toast.makeText(this, "Speech recognition not available", Toast.LENGTH_LONG).show();
-            return;
+            Toast.makeText(this, "Speech recognition not available", Toast.LENGTH_LONG).show(); return;
         }
         if (speechRec != null) { try { speechRec.destroy(); } catch (Exception ignored) {} speechRec = null; }
         speechRec = SpeechRecognizer.createSpeechRecognizer(this);
@@ -358,8 +370,7 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onError(int error) {
                 isListening = false;
                 mainHandler.post(() -> {
-                    setState(OrbView.OrbState.IDLE);
-                    tvOrbHint.setText("TAP TO SPEAK");
+                    setState(OrbView.OrbState.IDLE); tvOrbHint.setText("TAP TO SPEAK");
                     if (error != SpeechRecognizer.ERROR_NO_MATCH
                         && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT
                         && error != SpeechRecognizer.ERROR_RECOGNIZER_BUSY)
@@ -369,30 +380,28 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onResults(Bundle results) {
                 isListening = false;
                 mainHandler.post(() -> tvOrbHint.setText("TAP TO SPEAK"));
-                ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                if (matches != null && !matches.isEmpty()) {
-                    String t = matches.get(0).trim();
-                    if (!t.isEmpty()) mainHandler.post(() -> askJarvis(t));
-                } else mainHandler.post(() -> setState(OrbView.OrbState.IDLE));
+                ArrayList<String> m = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                if (m != null && !m.isEmpty() && !m.get(0).trim().isEmpty())
+                    mainHandler.post(() -> askJarvis(m.get(0).trim()));
+                else mainHandler.post(() -> setState(OrbView.OrbState.IDLE));
             }
             @Override public void onPartialResults(Bundle p) {}
             @Override public void onEvent(int t, Bundle b) {}
         });
-        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
-        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
-        speechRec.startListening(intent);
+        Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+        i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+        speechRec.startListening(i);
     }
 
     private void stopListening() {
         isListening = false;
         if (speechRec != null) try { speechRec.stopListening(); } catch (Exception ignored) {}
-        setState(OrbView.OrbState.IDLE);
-        tvOrbHint.setText("TAP TO SPEAK");
+        setState(OrbView.OrbState.IDLE); tvOrbHint.setText("TAP TO SPEAK");
     }
 
-    // ── Chat ─────────────────────────────────────────────────────────────────
+    // ── Chat ──────────────────────────────────────────────────────────────────
     private void sendText() {
         String text = etInput.getText().toString().trim();
         if (text.isEmpty() && pendingImageBase64 == null) return;
@@ -473,9 +482,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // ── Memory ───────────────────────────────────────────────────────────────
+    // ── Memory ────────────────────────────────────────────────────────────────
     private void saveHistory() {
-        List<HistoryItem> toSave = history.size() > 80 ? history.subList(history.size() - 80, history.size()) : history;
+        List<HistoryItem> toSave = history.size() > 80
+            ? history.subList(history.size()-80, history.size()) : history;
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_HIS, gson.toJson(toSave)).apply();
     }
 
@@ -487,29 +497,26 @@ public class MainActivity extends AppCompatActivity {
             List<HistoryItem> saved = gson.fromJson(json, type);
             if (saved == null) return;
             history.addAll(saved);
-            List<HistoryItem> visible = saved.size() > 20 ? saved.subList(saved.size() - 20, saved.size()) : saved;
-            for (HistoryItem item : visible) {
-                int t = "user".equals(item.role) ? Message.TYPE_USER : Message.TYPE_JARVIS;
-                messages.add(new Message(t, item.text));
-            }
-            if (!messages.isEmpty()) { adapter.notifyDataSetChanged(); recycler.scrollToPosition(messages.size() - 1); }
+            List<HistoryItem> vis = saved.size() > 20
+                ? saved.subList(saved.size()-20, saved.size()) : saved;
+            for (HistoryItem item : vis)
+                messages.add(new Message("user".equals(item.role) ? Message.TYPE_USER : Message.TYPE_JARVIS, item.text));
+            if (!messages.isEmpty()) { adapter.notifyDataSetChanged(); recycler.scrollToPosition(messages.size()-1); }
         } catch (Exception ignored) {}
     }
 
     private void confirmClear() {
         new AlertDialog.Builder(this)
-            .setTitle("Clear Memory")
-            .setMessage("Wipe all conversation history?")
+            .setTitle("Clear Memory").setMessage("Wipe all conversation history?")
             .setPositiveButton("Clear", (d, w) -> {
                 history.clear(); messages.clear();
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(KEY_HIS).apply();
                 adapter.notifyDataSetChanged();
                 addJarvisMsg("Memory wiped, sir. Starting fresh.");
-            })
-            .setNegativeButton("Cancel", null).show();
+            }).setNegativeButton("Cancel", null).show();
     }
 
-    // ── State ────────────────────────────────────────────────────────────────
+    // ── State ─────────────────────────────────────────────────────────────────
     private void setState(OrbView.OrbState state) {
         currentState = state;
         orbView.setState(state);
@@ -517,7 +524,7 @@ public class MainActivity extends AppCompatActivity {
         tvStatus.setText(labels[state.ordinal()]);
     }
 
-    // ── Permissions ──────────────────────────────────────────────────────────
+    // ── Permissions ───────────────────────────────────────────────────────────
     private void requestPermissions() {
         List<String> needed = new ArrayList<>();
         needed.add(Manifest.permission.RECORD_AUDIO);
@@ -529,12 +536,12 @@ public class MainActivity extends AppCompatActivity {
         List<String> toReq = new ArrayList<>();
         for (String p : needed)
             if (ContextCompat.checkSelfPermission(this, p) != PackageManager.PERMISSION_GRANTED) toReq.add(p);
-        if (!toReq.isEmpty()) ActivityCompat.requestPermissions(this, toReq.toArray(new String[0]), PERM_CODE);
+        if (!toReq.isEmpty())
+            ActivityCompat.requestPermissions(this, toReq.toArray(new String[0]), PERM_CODE);
     }
 
-    @Override
-    public void onRequestPermissionsResult(int code, @NonNull String[] perms, @NonNull int[] results) {
-        super.onRequestPermissionsResult(code, perms, results);
+    @Override public void onRequestPermissionsResult(int c, @NonNull String[] p, @NonNull int[] r) {
+        super.onRequestPermissionsResult(c, p, r);
     }
 
     @Override protected void onPause() {
@@ -546,7 +553,6 @@ public class MainActivity extends AppCompatActivity {
     @Override protected void onDestroy() {
         stopSpeaking();
         if (speechRec != null) try { speechRec.destroy(); } catch (Exception ignored) {}
-        if (ttsWebView != null) { ttsWebView.destroy(); ttsWebView = null; }
+        if (androidTts != null) { androidTts.stop(); androidTts.shutdown(); }
         super.onDestroy();
     }
-}

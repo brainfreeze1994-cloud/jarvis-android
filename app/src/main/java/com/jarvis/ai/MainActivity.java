@@ -18,7 +18,6 @@ import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
-import android.speech.tts.Voice;
 import android.util.Base64;
 import android.view.View;
 import android.view.WindowManager;
@@ -49,7 +48,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.OkHttpClient;
@@ -125,101 +123,7 @@ public class MainActivity extends AppCompatActivity {
 
         requestPermissions();
         loadHistory();
-      private void initTts() {
-    // Fallback only — Google Translate TTS is primary
-    androidTts = new TextToSpeech(this, status -> {
-        if (status != TextToSpeech.SUCCESS) return;
-        androidTts.setLanguage(new Locale("en", "GB"));
-        androidTts.setPitch(0.80f);
-        androidTts.setSpeechRate(0.90f);
-        ttsReady = true;
-    });
-}
-Replace speak() with:
-
-private void speak(String text) {
-    if (text == null || text.trim().isEmpty()) return;
-
-    String plain = text
-        .replaceAll("```[\\s\\S]*?```", "code block.")
-        .replaceAll("`([^`]+)`", "$1")
-        .replaceAll("\\*\\*(.*?)\\*\\*", "$1")
-        .replaceAll("\\*(.*?)\\*", "$1")
-        .replaceAll("#{1,6}\\s", "")
-        .replaceAll("\\[([^\\]]+)\\]\\([^)]+\\)", "$1")
-        .replaceAll("(?m)^\\s*[-*+]\\s", "")
-        .replaceAll("(?m)^\\s*\\d+\\.\\s", "")
-        .replaceAll("\\n+", " ")
-        .trim();
-
-    if (plain.isEmpty()) return;
-    setState(OrbView.OrbState.SPEAKING);
-    isSpeaking = true;
-    stopMediaPlayer();
-
-    // Split into chunks of max 180 chars at word boundary
-    List<String> chunks = new ArrayList<>();
-    while (plain.length() > 180) {
-        int cut = plain.lastIndexOf(' ', 180);
-        if (cut < 50) cut = 180;
-        chunks.add(plain.substring(0, cut).trim());
-        plain = plain.substring(cut).trim();
-    }
-    if (!plain.isEmpty()) chunks.add(plain);
-
-    playChunks(chunks, 0);
-}
-
-private void playChunks(List<String> chunks, int index) {
-    if (index >= chunks.size()) {
-        isSpeaking = false;
-        setState(OrbView.OrbState.IDLE);
-        return;
-    }
-    final String chunk = chunks.get(index);
-    new Thread(() -> {
-        try {
-            String encoded = java.net.URLEncoder.encode(chunk, "UTF-8");
-            // Google Translate TTS — natural British English voice
-            String url = "https://translate.google.com/translate_tts"
-                + "?ie=UTF-8&q=" + encoded + "&tl=en-GB&client=tw-ob";
-            Request req = new Request.Builder()
-                .url(url)
-                .addHeader("User-Agent", "Mozilla/5.0")
-                .get().build();
-            try (Response resp = httpClient.newCall(req).execute()) {
-                if (resp.isSuccessful() && resp.body() != null) {
-                    byte[] audio = resp.body().bytes();
-                    if (audio.length > 500) {
-                        File tmp = File.createTempFile("jarvis_chunk_", ".mp3", getCacheDir());
-                        java.nio.file.Files.write(tmp.toPath(), audio);
-                        mainHandler.post(() -> {
-                            try {
-                                mediaPlayer = new MediaPlayer();
-                                mediaPlayer.setDataSource(tmp.getAbsolutePath());
-                                mediaPlayer.prepare();
-                                mediaPlayer.setOnCompletionListener(mp -> {
-                                    mp.release(); mediaPlayer = null; tmp.delete();
-                                    playChunks(chunks, index + 1);
-                                });
-                                mediaPlayer.setOnErrorListener((mp, w, e) -> {
-                                    mp.release(); mediaPlayer = null; tmp.delete();
-                                    playChunks(chunks, index + 1);
-                                    return true;
-                                });
-                                mediaPlayer.start();
-                            } catch (Exception e) {
-                                fallbackTts(chunk);
-                            }
-                        });
-                        return;
-                    }
-                }
-            }
-        } catch (Exception ignored) {}
-        mainHandler.post(() -> fallbackTts(chunk));
-    }).start();
-}
+        initTts();
 
         orbView.setOnClickListener(v -> toggleListening());
         btnMic.setOnClickListener(v -> toggleListening());
@@ -239,37 +143,19 @@ private void playChunks(List<String> chunks, int index) {
         }
     }
 
-    // ── TTS init ─────────────────────────────────────────────────────────────
     private void initTts() {
         androidTts = new TextToSpeech(this, status -> {
             if (status != TextToSpeech.SUCCESS) return;
-            androidTts.setPitch(0.75f);
+            androidTts.setLanguage(new Locale("en", "GB"));
+            androidTts.setPitch(0.80f);
             androidTts.setSpeechRate(0.90f);
-            Set<Voice> voices = androidTts.getVoices();
-            Voice best = null;
-            if (voices != null) {
-                for (Voice v : voices) {
-                    String l = v.getLocale() != null ? v.getLocale().toLanguageTag().toLowerCase() : "";
-                    if (l.startsWith("en-gb")) { best = v; break; }
-                }
-                if (best == null) {
-                    for (Voice v : voices) {
-                        String n = v.getName().toLowerCase();
-                        if (n.contains("en-gb") || n.contains("en_gb")) { best = v; break; }
-                    }
-                }
-            }
-            if (best != null) androidTts.setVoice(best);
-            else androidTts.setLanguage(new Locale("en", "GB"));
             ttsReady = true;
         });
     }
 
-    // ── Speak: StreamElements Brian MP3 → fallback Android TTS ───────────────
     private void speak(String text) {
         if (text == null || text.trim().isEmpty()) return;
-
-        String plain = text
+        String cleaned = text
             .replaceAll("```[\\s\\S]*?```", "code block.")
             .replaceAll("`([^`]+)`", "$1")
             .replaceAll("\\*\\*(.*?)\\*\\*", "$1")
@@ -278,27 +164,45 @@ private void playChunks(List<String> chunks, int index) {
             .replaceAll("\\[([^\\]]+)\\]\\([^)]+\\)", "$1")
             .replaceAll("(?m)^\\s*[-*+]\\s", "")
             .replaceAll("(?m)^\\s*\\d+\\.\\s", "")
-            .replaceAll("\\n{3,}", "\n\n")
+            .replaceAll("\\n+", " ")
             .trim();
-
-        if (plain.isEmpty()) return;
+        if (cleaned.isEmpty()) return;
+        List<String> chunks = new ArrayList<>();
+        String remaining = cleaned;
+        while (remaining.length() > 180) {
+            int cut = remaining.lastIndexOf(' ', 180);
+            if (cut < 50) cut = 180;
+            chunks.add(remaining.substring(0, cut).trim());
+            remaining = remaining.substring(cut).trim();
+        }
+        if (!remaining.isEmpty()) chunks.add(remaining);
         setState(OrbView.OrbState.SPEAKING);
         isSpeaking = true;
         stopMediaPlayer();
+        playChunks(chunks, 0);
+    }
 
-        final String finalText = plain;
+    private void playChunks(List<String> chunks, int index) {
+        if (index >= chunks.size()) {
+            isSpeaking = false;
+            setState(OrbView.OrbState.IDLE);
+            return;
+        }
+        final String chunk = chunks.get(index);
         new Thread(() -> {
-            boolean ok = false;
             try {
-                String encoded = java.net.URLEncoder.encode(finalText, "UTF-8");
+                String encoded = java.net.URLEncoder.encode(chunk, "UTF-8");
+                String url = "https://translate.google.com/translate_tts"
+                    + "?ie=UTF-8&q=" + encoded + "&tl=en-GB&client=tw-ob";
                 Request req = new Request.Builder()
-                    .url("https://api.streamelements.com/kappa/v2/speech?voice=Brian&text=" + encoded)
+                    .url(url)
+                    .addHeader("User-Agent", "Mozilla/5.0")
                     .get().build();
                 try (Response resp = httpClient.newCall(req).execute()) {
                     if (resp.isSuccessful() && resp.body() != null) {
                         byte[] audio = resp.body().bytes();
-                        if (audio.length > 1000) {
-                            File tmp = File.createTempFile("jarvis_tts_", ".mp3", getCacheDir());
+                        if (audio.length > 500) {
+                            File tmp = File.createTempFile("jarvis_chunk_", ".mp3", getCacheDir());
                             java.nio.file.Files.write(tmp.toPath(), audio);
                             mainHandler.post(() -> {
                                 try {
@@ -306,28 +210,25 @@ private void playChunks(List<String> chunks, int index) {
                                     mediaPlayer.setDataSource(tmp.getAbsolutePath());
                                     mediaPlayer.prepare();
                                     mediaPlayer.setOnCompletionListener(mp -> {
-                                        isSpeaking = false;
-                                        setState(OrbView.OrbState.IDLE);
                                         mp.release(); mediaPlayer = null; tmp.delete();
+                                        playChunks(chunks, index + 1);
                                     });
                                     mediaPlayer.setOnErrorListener((mp, w, e) -> {
-                                        isSpeaking = false;
-                                        setState(OrbView.OrbState.IDLE);
                                         mp.release(); mediaPlayer = null; tmp.delete();
-                                        fallbackTts(finalText);
+                                        playChunks(chunks, index + 1);
                                         return true;
                                     });
                                     mediaPlayer.start();
                                 } catch (Exception e) {
-                                    fallbackTts(finalText);
+                                    mainHandler.post(() -> fallbackTts(chunk));
                                 }
                             });
-                            ok = true;
+                            return;
                         }
                     }
                 }
             } catch (Exception ignored) {}
-            if (!ok) mainHandler.post(() -> fallbackTts(finalText));
+            mainHandler.post(() -> fallbackTts(chunk));
         }).start();
     }
 
@@ -335,8 +236,6 @@ private void playChunks(List<String> chunks, int index) {
         if (!ttsReady || androidTts == null) {
             isSpeaking = false; setState(OrbView.OrbState.IDLE); return;
         }
-        setState(OrbView.OrbState.SPEAKING);
-        isSpeaking = true;
         androidTts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis");
         mainHandler.postDelayed(new Runnable() {
             @Override public void run() {
@@ -360,7 +259,6 @@ private void playChunks(List<String> chunks, int index) {
         setState(OrbView.OrbState.IDLE);
     }
 
-    // ── Attachment ────────────────────────────────────────────────────────────
     private void showAttachDialog() {
         new AlertDialog.Builder(this)
             .setTitle("Attach image")
@@ -376,8 +274,7 @@ private void playChunks(List<String> chunks, int index) {
         }
         try {
             String ts = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-            File photo = File.createTempFile("JARVIS_" + ts, ".jpg",
-                getExternalFilesDir(Environment.DIRECTORY_PICTURES));
+            File photo = File.createTempFile("JARVIS_" + ts, ".jpg", getExternalFilesDir(Environment.DIRECTORY_PICTURES));
             cameraImageUri = FileProvider.getUriForFile(this, getPackageName() + ".provider", photo);
             intent.putExtra(MediaStore.EXTRA_OUTPUT, cameraImageUri);
             startActivityForResult(intent, REQUEST_CAMERA);
@@ -409,8 +306,8 @@ private void playChunks(List<String> chunks, int index) {
                 if (bmp == null) throw new IOException("Cannot decode bitmap");
                 int w = bmp.getWidth(), h = bmp.getHeight(), maxPx = 1024;
                 if (w > maxPx || h > maxPx) {
-                    float s = Math.min((float)maxPx/w, (float)maxPx/h);
-                    bmp = Bitmap.createScaledBitmap(bmp, (int)(w*s), (int)(h*s), true);
+                    float s = Math.min((float) maxPx / w, (float) maxPx / h);
+                    bmp = Bitmap.createScaledBitmap(bmp, (int)(w * s), (int)(h * s), true);
                 }
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 bmp.compress(Bitmap.CompressFormat.JPEG, 80, baos);
@@ -434,7 +331,6 @@ private void playChunks(List<String> chunks, int index) {
         ivAttachPreview.setVisibility(View.GONE);
     }
 
-    // ── Speech recognition ────────────────────────────────────────────────────
     private void toggleListening() {
         if (isSpeaking) { stopSpeaking(); return; }
         if (isListening) stopListening(); else startListening();
@@ -495,7 +391,6 @@ private void playChunks(List<String> chunks, int index) {
         setState(OrbView.OrbState.IDLE); tvOrbHint.setText("TAP TO SPEAK");
     }
 
-    // ── Chat ──────────────────────────────────────────────────────────────────
     private void sendText() {
         String text = etInput.getText().toString().trim();
         if (text.isEmpty() && pendingImageBase64 == null) return;
@@ -576,10 +471,8 @@ private void playChunks(List<String> chunks, int index) {
         }
     }
 
-    // ── Memory ────────────────────────────────────────────────────────────────
     private void saveHistory() {
-        List<HistoryItem> toSave = history.size() > 80
-            ? history.subList(history.size()-80, history.size()) : history;
+        List<HistoryItem> toSave = history.size() > 80 ? history.subList(history.size()-80, history.size()) : history;
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_HIS, gson.toJson(toSave)).apply();
     }
 
@@ -591,8 +484,7 @@ private void playChunks(List<String> chunks, int index) {
             List<HistoryItem> saved = gson.fromJson(json, type);
             if (saved == null) return;
             history.addAll(saved);
-            List<HistoryItem> vis = saved.size() > 20
-                ? saved.subList(saved.size()-20, saved.size()) : saved;
+            List<HistoryItem> vis = saved.size() > 20 ? saved.subList(saved.size()-20, saved.size()) : saved;
             for (HistoryItem item : vis)
                 messages.add(new Message("user".equals(item.role) ? Message.TYPE_USER : Message.TYPE_JARVIS, item.text));
             if (!messages.isEmpty()) { adapter.notifyDataSetChanged(); recycler.scrollToPosition(messages.size()-1); }
@@ -610,7 +502,6 @@ private void playChunks(List<String> chunks, int index) {
             }).setNegativeButton("Cancel", null).show();
     }
 
-    // ── State ─────────────────────────────────────────────────────────────────
     private void setState(OrbView.OrbState state) {
         currentState = state;
         orbView.setState(state);
@@ -618,7 +509,6 @@ private void playChunks(List<String> chunks, int index) {
         tvStatus.setText(labels[state.ordinal()]);
     }
 
-    // ── Permissions ───────────────────────────────────────────────────────────
     private void requestPermissions() {
         List<String> needed = new ArrayList<>();
         needed.add(Manifest.permission.RECORD_AUDIO);
@@ -650,4 +540,4 @@ private void playChunks(List<String> chunks, int index) {
         if (androidTts != null) { androidTts.stop(); androidTts.shutdown(); }
         super.onDestroy();
     }
-}    
+}

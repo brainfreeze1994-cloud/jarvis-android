@@ -125,7 +125,101 @@ public class MainActivity extends AppCompatActivity {
 
         requestPermissions();
         loadHistory();
-        initTts();
+      private void initTts() {
+    // Fallback only — Google Translate TTS is primary
+    androidTts = new TextToSpeech(this, status -> {
+        if (status != TextToSpeech.SUCCESS) return;
+        androidTts.setLanguage(new Locale("en", "GB"));
+        androidTts.setPitch(0.80f);
+        androidTts.setSpeechRate(0.90f);
+        ttsReady = true;
+    });
+}
+Replace speak() with:
+
+private void speak(String text) {
+    if (text == null || text.trim().isEmpty()) return;
+
+    String plain = text
+        .replaceAll("```[\\s\\S]*?```", "code block.")
+        .replaceAll("`([^`]+)`", "$1")
+        .replaceAll("\\*\\*(.*?)\\*\\*", "$1")
+        .replaceAll("\\*(.*?)\\*", "$1")
+        .replaceAll("#{1,6}\\s", "")
+        .replaceAll("\\[([^\\]]+)\\]\\([^)]+\\)", "$1")
+        .replaceAll("(?m)^\\s*[-*+]\\s", "")
+        .replaceAll("(?m)^\\s*\\d+\\.\\s", "")
+        .replaceAll("\\n+", " ")
+        .trim();
+
+    if (plain.isEmpty()) return;
+    setState(OrbView.OrbState.SPEAKING);
+    isSpeaking = true;
+    stopMediaPlayer();
+
+    // Split into chunks of max 180 chars at word boundary
+    List<String> chunks = new ArrayList<>();
+    while (plain.length() > 180) {
+        int cut = plain.lastIndexOf(' ', 180);
+        if (cut < 50) cut = 180;
+        chunks.add(plain.substring(0, cut).trim());
+        plain = plain.substring(cut).trim();
+    }
+    if (!plain.isEmpty()) chunks.add(plain);
+
+    playChunks(chunks, 0);
+}
+
+private void playChunks(List<String> chunks, int index) {
+    if (index >= chunks.size()) {
+        isSpeaking = false;
+        setState(OrbView.OrbState.IDLE);
+        return;
+    }
+    final String chunk = chunks.get(index);
+    new Thread(() -> {
+        try {
+            String encoded = java.net.URLEncoder.encode(chunk, "UTF-8");
+            // Google Translate TTS — natural British English voice
+            String url = "https://translate.google.com/translate_tts"
+                + "?ie=UTF-8&q=" + encoded + "&tl=en-GB&client=tw-ob";
+            Request req = new Request.Builder()
+                .url(url)
+                .addHeader("User-Agent", "Mozilla/5.0")
+                .get().build();
+            try (Response resp = httpClient.newCall(req).execute()) {
+                if (resp.isSuccessful() && resp.body() != null) {
+                    byte[] audio = resp.body().bytes();
+                    if (audio.length > 500) {
+                        File tmp = File.createTempFile("jarvis_chunk_", ".mp3", getCacheDir());
+                        java.nio.file.Files.write(tmp.toPath(), audio);
+                        mainHandler.post(() -> {
+                            try {
+                                mediaPlayer = new MediaPlayer();
+                                mediaPlayer.setDataSource(tmp.getAbsolutePath());
+                                mediaPlayer.prepare();
+                                mediaPlayer.setOnCompletionListener(mp -> {
+                                    mp.release(); mediaPlayer = null; tmp.delete();
+                                    playChunks(chunks, index + 1);
+                                });
+                                mediaPlayer.setOnErrorListener((mp, w, e) -> {
+                                    mp.release(); mediaPlayer = null; tmp.delete();
+                                    playChunks(chunks, index + 1);
+                                    return true;
+                                });
+                                mediaPlayer.start();
+                            } catch (Exception e) {
+                                fallbackTts(chunk);
+                            }
+                        });
+                        return;
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        mainHandler.post(() -> fallbackTts(chunk));
+    }).start();
+}
 
         orbView.setOnClickListener(v -> toggleListening());
         btnMic.setOnClickListener(v -> toggleListening());

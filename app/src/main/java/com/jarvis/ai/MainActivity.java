@@ -6,7 +6,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
@@ -39,10 +38,10 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Type;
@@ -59,10 +58,10 @@ import okhttp3.OkHttpClient;
 public class MainActivity extends AppCompatActivity {
 
     private static final int    PERM_CODE       = 101;
-    private static final int    REQUEST_GALLERY = 200;
-    private static final int    REQUEST_CAMERA  = 201;
-    private static final String PREFS           = "jarvis_prefs";
-    private static final String KEY_HIS         = "history_v2";
+    private static final int    REQUEST_GALLERY  = 200;
+    private static final int    REQUEST_CAMERA   = 201;
+    private static final String PREFS            = "jarvis_prefs";
+    private static final String KEY_HIS          = "history_v2";
 
     private OrbView      orbView;
     private TextView     tvStatus;
@@ -81,9 +80,8 @@ public class MainActivity extends AppCompatActivity {
     private String pendingImageBase64;
     private String pendingImageUriStr;
 
-    // TTS — Edge TTS (server, British Male Ryan) primary, Android native fallback
     private TextToSpeech tts;
-    private boolean      ttsReady  = false;
+    private boolean      ttsReady   = false;
     private boolean      isSpeaking = false;
     private MediaPlayer  ttsPlayer  = null;
 
@@ -149,7 +147,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // ── TTS init (Android native — fallback only) ─────────────────────────────
     private void initTts() {
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
@@ -171,8 +168,9 @@ public class MainActivity extends AppCompatActivity {
                 if (!v.getLocale().getLanguage().equals("en")) continue;
                 boolean isFemale = name.contains("female") || name.contains("woman")
                     || name.contains("girl") || name.contains("zira") || name.contains("hazel")
-                    || name.contains("susan") || name.contains("kate") || name.contains("en-gb-x-gbc")
-                    || name.contains("en-gb-x-gbd") || name.contains("samantha");
+                    || name.contains("susan") || name.contains("kate")
+                    || name.contains("en-gb-x-gbc") || name.contains("en-gb-x-gbd")
+                    || name.contains("samantha");
                 if (isFemale) continue;
                 boolean isBritish = v.getLocale().getCountry().equals("GB");
                 boolean isMale = name.contains("male") || name.contains("daniel")
@@ -209,9 +207,8 @@ public class MainActivity extends AppCompatActivity {
         ttsReady = true;
     }
 
-    // ── Clean markdown for speech ─────────────────────────────────────────────
-    private String cleanForTts(String text) {
-        return text
+    private String cleanForTts(String rawText) {
+        return rawText
             .replaceAll("```[\\s\\S]*?```", "code block.")
             .replaceAll("`([^`]+)`", "$1")
             .replaceAll("\\*\\*(.*?)\\*\\*", "$1")
@@ -224,43 +221,43 @@ public class MainActivity extends AppCompatActivity {
             .trim();
     }
 
-    // ── Speak — Edge TTS server first, Android native fallback ────────────────
-    private void speak(String text) {
-        if (text == null || text.trim().isEmpty()) return;
-        String clean = cleanForTts(text);
+    private void speak(String inputText) {
+        if (inputText == null || inputText.trim().isEmpty()) return;
+        final String clean = cleanForTts(inputText);
         if (clean.isEmpty()) return;
         isSpeaking = true;
         setState(OrbView.OrbState.SPEAKING);
-
         new Thread(() -> {
             try {
-                org.json.JSONObject body = new org.json.JSONObject();
-                body.put("text", clean);
+                org.json.JSONObject jsonBody = new org.json.JSONObject();
+                jsonBody.put("text", clean);
                 okhttp3.RequestBody reqBody = okhttp3.RequestBody.create(
-                    body.toString(), okhttp3.MediaType.parse("application/json"));
+                    jsonBody.toString(), okhttp3.MediaType.parse("application/json"));
                 okhttp3.Request request = new okhttp3.Request.Builder()
                     .url("https://jarvis-ai-seven-dun.vercel.app/api/speak")
                     .post(reqBody).build();
                 try (okhttp3.Response response = httpClient.newCall(request).execute()) {
                     if (response.code() == 200 && response.body() != null) {
                         byte[] audioBytes = response.body().bytes();
-                        mainHandler.post(() -> playAudioBytes(audioBytes));
+                        mainHandler.post(() -> playAudioBytes(audioBytes, clean));
                         return;
                     }
                 }
             } catch (Exception e) {
                 android.util.Log.w("JARVIS_TTS", "Edge TTS failed: " + e.getMessage());
             }
-            // Fallback to Android native TTS
             mainHandler.post(() -> speakNative(clean));
         }).start();
     }
 
-    private void playAudioBytes(byte[] audioBytes) {
+    private void playAudioBytes(byte[] audioBytes, String fallbackText) {
         try {
-            if (ttsPlayer != null) { try { ttsPlayer.release(); } catch (Exception ignored) {} }
-            java.io.File tmpFile = java.io.File.createTempFile("tts_", ".mp3", getCacheDir());
-            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(tmpFile)) {
+            if (ttsPlayer != null) {
+                try { ttsPlayer.release(); } catch (Exception ignored) {}
+                ttsPlayer = null;
+            }
+            File tmpFile = File.createTempFile("tts_", ".mp3", getCacheDir());
+            try (FileOutputStream fos = new FileOutputStream(tmpFile)) {
                 fos.write(audioBytes);
             }
             ttsPlayer = new MediaPlayer();
@@ -273,24 +270,26 @@ public class MainActivity extends AppCompatActivity {
                 tmpFile.delete();
             });
             ttsPlayer.setOnErrorListener((mp, what, extra) -> {
-                mp.release(); ttsPlayer = null; tmpFile.delete();
-                speakNative(clean);
+                mp.release();
+                ttsPlayer = null;
+                tmpFile.delete();
+                speakNative(fallbackText);
                 return true;
             });
             ttsPlayer.prepare();
             ttsPlayer.start();
         } catch (Exception e) {
             android.util.Log.e("JARVIS_TTS", "Playback error: " + e.getMessage());
-            speakNative(clean);
+            speakNative(fallbackText);
         }
     }
 
-    private void speakNative(String clean) {
+    private void speakNative(String textToSpeak) {
         if (!ttsReady || tts == null) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
+            tts.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
         } else {
-            tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null);
+            tts.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null);
         }
     }
 
@@ -304,7 +303,6 @@ public class MainActivity extends AppCompatActivity {
         setState(OrbView.OrbState.IDLE);
     }
 
-    // ── Attachment ────────────────────────────────────────────────────────────
     private void showAttachDialog() {
         new AlertDialog.Builder(this)
             .setTitle("Attach image")
@@ -367,7 +365,7 @@ public class MainActivity extends AppCompatActivity {
                     pendingImageUriStr = uri.toString();
                     ivAttachPreview.setImageURI(uri);
                     ivAttachPreview.setVisibility(View.VISIBLE);
-                    Toast.makeText(this, "Image attached — tap to remove", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Image attached - tap to remove", Toast.LENGTH_SHORT).show();
                 });
             } catch (Exception e) {
                 mainHandler.post(() ->
@@ -383,7 +381,6 @@ public class MainActivity extends AppCompatActivity {
         ivAttachPreview.setVisibility(View.GONE);
     }
 
-    // ── Speech recognition ────────────────────────────────────────────────────
     private void toggleListening() {
         if (isSpeaking) { stopSpeaking(); return; }
         if (isListening) stopListening(); else startListening();
@@ -401,14 +398,17 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "Speech recognition not available", Toast.LENGTH_LONG).show();
             return;
         }
-        if (speechRec != null) { try { speechRec.destroy(); } catch (Exception ignored) {} speechRec = null; }
+        if (speechRec != null) {
+            try { speechRec.destroy(); } catch (Exception ignored) {}
+            speechRec = null;
+        }
         speechRec = SpeechRecognizer.createSpeechRecognizer(this);
         speechRec.setRecognitionListener(new RecognitionListener() {
             @Override public void onReadyForSpeech(Bundle p) {
                 isListening = true;
                 mainHandler.post(() -> {
                     setState(OrbView.OrbState.LISTENING);
-                    tvOrbHint.setText("LISTENING — TAP TO STOP");
+                    tvOrbHint.setText("LISTENING - TAP TO STOP");
                 });
             }
             @Override public void onBeginningOfSpeech() {}
@@ -453,7 +453,6 @@ public class MainActivity extends AppCompatActivity {
         tvOrbHint.setText("TAP TO SPEAK");
     }
 
-    // ── Chat ──────────────────────────────────────────────────────────────────
     private void sendText() {
         String text = etInput.getText().toString().trim();
         if (text.isEmpty() && pendingImageBase64 == null) return;
@@ -534,7 +533,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // ── Memory ────────────────────────────────────────────────────────────────
     private void saveHistory() {
         List<HistoryItem> toSave = history.size() > 80
             ? history.subList(history.size() - 80, history.size()) : history;
@@ -567,7 +565,8 @@ public class MainActivity extends AppCompatActivity {
             .setTitle("Clear Memory")
             .setMessage("Wipe all conversation history?")
             .setPositiveButton("Clear", (d, w) -> {
-                history.clear(); messages.clear();
+                history.clear();
+                messages.clear();
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(KEY_HIS).apply();
                 adapter.notifyDataSetChanged();
                 addJarvisMsg("Memory wiped, sir. Starting fresh.");
@@ -575,16 +574,13 @@ public class MainActivity extends AppCompatActivity {
             .setNegativeButton("Cancel", null).show();
     }
 
-    // ── State ─────────────────────────────────────────────────────────────────
     private void setState(OrbView.OrbState state) {
         currentState = state;
         orbView.setState(state);
-        final String[] labels = {"STANDBY", "LISTENING…", "PROCESSING…", "SPEAKING…", "WAKE"};
-        final String clean = cleanForTts(text);  // ← final allows lambdas to capture it
+        final String[] labels = {"STANDBY", "LISTENING...", "PROCESSING...", "SPEAKING...", "WAKE"};
         tvStatus.setText(labels[state.ordinal()]);
     }
 
-    // ── Permissions ───────────────────────────────────────────────────────────
     private void requestPermissions() {
         List<String> needed = new ArrayList<>();
         needed.add(Manifest.permission.RECORD_AUDIO);

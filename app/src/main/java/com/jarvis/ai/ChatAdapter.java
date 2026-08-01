@@ -94,7 +94,7 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
 
         if (h.tvMsg != null) h.tvMsg.setText(m.text);
         if (h.tvAvatar != null) {
-            h.tvAvatar.setText(m.type == Message.TYPE_USER ? "YOU" : "AI");
+           h.tvAvatar.setText(m.type == Message.TYPE_USER ? "YOU" : "HNR");
         }
     }
 

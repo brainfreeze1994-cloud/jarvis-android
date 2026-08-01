@@ -26,6 +26,7 @@ import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
@@ -33,6 +34,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
+import androidx.core.widget.NestedScrollView;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -57,19 +59,22 @@ import okhttp3.OkHttpClient;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final int    PERM_CODE       = 101;
-    private static final int    REQUEST_GALLERY  = 200;
-    private static final int    REQUEST_CAMERA   = 201;
-    private static final String PREFS            = "jarvis_prefs";
-    private static final String KEY_HIS          = "history_v2";
+    private static final int    PERM_CODE      = 101;
+    private static final int    REQUEST_GALLERY = 200;
+    private static final int    REQUEST_CAMERA  = 201;
+    private static final String PREFS           = "jarvis_prefs";
+    private static final String KEY_HIS         = "history_v2";
 
-    private OrbView      orbView;
-    private TextView     tvStatus;
-    private TextView     tvOrbHint;
-    private RecyclerView recycler;
-    private EditText     etInput;
-    private ImageButton  btnMic, btnSend, btnClear, btnAttach;
-    private ImageView    ivAttachPreview;
+    private OrbView          orbView;
+    private TextView         tvStatus;
+    private TextView         tvOrbHint;
+    private RecyclerView     recycler;
+    private EditText         etInput;
+    private ImageButton      btnMic, btnSend, btnClear, btnAttach;
+    private ImageView        ivAttachPreview;
+    private LinearLayout     orbSection;
+    private LinearLayout     chipsRow1, chipsRow2, chipsRow3;
+    private NestedScrollView scrollMain;
 
     private final List<Message>     messages = new ArrayList<>();
     private final List<HistoryItem> history  = new ArrayList<>();
@@ -80,7 +85,6 @@ public class MainActivity extends AppCompatActivity {
     private String pendingImageBase64;
     private String pendingImageUriStr;
 
-    // TTS
     private TextToSpeech tts;
     private boolean      ttsReady   = false;
     private boolean      isSpeaking = false;
@@ -119,12 +123,18 @@ public class MainActivity extends AppCompatActivity {
         btnClear        = findViewById(R.id.btn_clear);
         btnAttach       = findViewById(R.id.btn_attach);
         ivAttachPreview = findViewById(R.id.iv_attach_preview);
+        orbSection      = findViewById(R.id.orb_section);
+        chipsRow1       = findViewById(R.id.chips_row1);
+        chipsRow2       = findViewById(R.id.chips_row2);
+        chipsRow3       = findViewById(R.id.chips_row3);
+        scrollMain      = findViewById(R.id.scroll_main);
 
         adapter = new ChatAdapter(messages);
         LinearLayoutManager llm = new LinearLayoutManager(this);
-        llm.setStackFromEnd(true);
+        llm.setStackFromEnd(false);
         recycler.setLayoutManager(llm);
         recycler.setAdapter(adapter);
+        recycler.setNestedScrollingEnabled(false);
 
         requestPermissions();
         loadHistory();
@@ -141,15 +151,40 @@ public class MainActivity extends AppCompatActivity {
             return false;
         });
 
+        setupChip(R.id.chip1, "What's the weather in Dubai?");
+        setupChip(R.id.chip2, "Generate image of a warrior");
+        setupChip(R.id.chip3, "Write me a Python script");
+        setupChip(R.id.chip4, "Tell me something fascinating");
+        setupChip(R.id.chip5, "Latest tech news today");
+        setupChip(R.id.chip6, "Explain quantum computing");
+
         if (history.isEmpty()) {
-           addJarvisMsg("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?");
+            addJarvisMsg("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?");
             mainHandler.postDelayed(() ->
                 speak("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?", "warm"), 2000);
-
+        } else {
+            hideWelcome();
         }
     }
 
-    // ── TTS init ──────────────────────────────────────────────────────────────
+    private void setupChip(int chipId, String text) {
+        android.widget.Button chip = findViewById(chipId);
+        if (chip != null) {
+            chip.setOnClickListener(v -> {
+                hideWelcome();
+                askJarvis(text);
+            });
+        }
+    }
+
+    private void hideWelcome() {
+        if (orbSection != null) orbSection.setVisibility(View.GONE);
+        if (chipsRow1  != null) chipsRow1.setVisibility(View.GONE);
+        if (chipsRow2  != null) chipsRow2.setVisibility(View.GONE);
+        if (chipsRow3  != null) chipsRow3.setVisibility(View.GONE);
+    }
+
+    // ── TTS ───────────────────────────────────────────────────────────────────
     private void initTts() {
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
@@ -210,7 +245,6 @@ public class MainActivity extends AppCompatActivity {
         ttsReady = true;
     }
 
-    // ── Extract / strip emotion tag ───────────────────────────────────────────
     private String extractEmotion(String text) {
         if (text == null) return "neutral";
         java.util.regex.Matcher m = java.util.regex.Pattern
@@ -223,23 +257,32 @@ public class MainActivity extends AppCompatActivity {
         return text.replaceAll("\\[EMOTION:\\w+\\]\\s*", "").trim();
     }
 
-    // ── Clean markdown for TTS ────────────────────────────────────────────────
+    // ── Strip ALL non-speech noise before TTS reads ───────────────────────────
     private String cleanForTts(String text) {
+        if (text == null) return "";
         return text
             .replaceAll("\\[EMOTION:\\w+\\]", "")
-            .replaceAll("```[\\s\\S]*?```", "code block.")
+            .replaceAll("```[\\s\\S]*?```", "")
             .replaceAll("`([^`]+)`", "$1")
             .replaceAll("\\*\\*(.*?)\\*\\*", "$1")
             .replaceAll("\\*(.*?)\\*", "$1")
-            .replaceAll("#{1,6}\\s", "")
+            .replaceAll("__(.*?)__", "$1")
+            .replaceAll("_(.*?)_", "$1")
+            .replaceAll("(?m)^#{1,6}\\s*", "")
             .replaceAll("\\[([^\\]]+)\\]\\([^)]+\\)", "$1")
-            .replaceAll("(?m)^\\s*[-*+]\\s", " ")
-            .replaceAll("(?m)^\\s*\\d+\\.\\s", " ")
-            .replaceAll("\\n+", " ")
+            .replaceAll("\\[[^\\]]*\\]", "")
+            .replaceAll("\\{[^}]*\\}", "")
+            .replaceAll("<[^>]*>", "")
+            .replaceAll("https?://\\S+", "")
+            .replaceAll("[|^~`#@]", "")
+            .replaceAll("(?m)^\\s*[-*+]\\s+", "")
+            .replaceAll("(?m)^\\s*\\d+[.)\\s]+", "")
+            .replaceAll("-{2,}", "")
+            .replaceAll("[\\r\\n]+", " ")
+            .replaceAll("\\s{2,}", " ")
             .trim();
     }
 
-    // ── Speak ─────────────────────────────────────────────────────────────────
     private void speak(String text) { speak(text, "neutral"); }
 
     private void speak(String rawText, String emotion) {
@@ -261,7 +304,6 @@ public class MainActivity extends AppCompatActivity {
                 okhttp3.Request request = new okhttp3.Request.Builder()
                     .url("https://jarvis-ai-seven-dun.vercel.app/api/speak")
                     .post(reqBody).build();
-
                 try (okhttp3.Response response = httpClient.newCall(request).execute()) {
                     if (response.code() == 200 && response.body() != null) {
                         byte[] audioBytes = response.body().bytes();
@@ -270,13 +312,13 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             } catch (Exception e) {
-                android.util.Log.w("JARVIS_TTS", "Edge TTS failed: " + e.getMessage());
+                android.util.Log.w("HENRY_TTS", "Server TTS failed: " + e.getMessage());
             }
             mainHandler.post(() -> speakNative(clean));
         }).start();
     }
 
-    private void playAudioBytes(byte[] audioBytes, String fallbackText) {
+    private void playAudioBytes(byte[] audioBytes, final String fallbackText) {
         try {
             if (ttsPlayer != null) {
                 try { ttsPlayer.release(); } catch (Exception ignored) {}
@@ -305,7 +347,7 @@ public class MainActivity extends AppCompatActivity {
             ttsPlayer.prepare();
             ttsPlayer.start();
         } catch (Exception e) {
-            android.util.Log.e("JARVIS_TTS", "Playback error: " + e.getMessage());
+            android.util.Log.e("HENRY_TTS", "Playback error: " + e.getMessage());
             speakNative(fallbackText);
         }
     }
@@ -346,7 +388,7 @@ public class MainActivity extends AppCompatActivity {
         }
         try {
             String ts = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-            File photo = File.createTempFile("JARVIS_" + ts, ".jpg",
+            File photo = File.createTempFile("HENRY_" + ts, ".jpg",
                 getExternalFilesDir(Environment.DIRECTORY_PICTURES));
             cameraImageUri = FileProvider.getUriForFile(this, getPackageName() + ".provider", photo);
             intent.putExtra(MediaStore.EXTRA_OUTPUT, cameraImageUri);
@@ -408,7 +450,7 @@ public class MainActivity extends AppCompatActivity {
         ivAttachPreview.setVisibility(View.GONE);
     }
 
-    // ── Speech recognition ────────────────────────────────────────────────────
+    // ── Voice ─────────────────────────────────────────────────────────────────
     private void toggleListening() {
         if (isSpeaking) { stopSpeaking(); return; }
         if (isListening) stopListening(); else startListening();
@@ -436,7 +478,7 @@ public class MainActivity extends AppCompatActivity {
                 isListening = true;
                 mainHandler.post(() -> {
                     setState(OrbView.OrbState.LISTENING);
-                    tvOrbHint.setText("LISTENING — TAP TO STOP");
+                    if (tvOrbHint != null) tvOrbHint.setText("LISTENING — TAP TO STOP");
                 });
             }
             @Override public void onBeginningOfSpeech() {}
@@ -447,7 +489,7 @@ public class MainActivity extends AppCompatActivity {
                 isListening = false;
                 mainHandler.post(() -> {
                     setState(OrbView.OrbState.IDLE);
-                    tvOrbHint.setText("TAP TO SPEAK");
+                    if (tvOrbHint != null) tvOrbHint.setText("WHAT CAN I DO FOR YOU, SIR?");
                     if (error != SpeechRecognizer.ERROR_NO_MATCH
                         && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT
                         && error != SpeechRecognizer.ERROR_RECOGNIZER_BUSY)
@@ -457,10 +499,10 @@ public class MainActivity extends AppCompatActivity {
             }
             @Override public void onResults(Bundle results) {
                 isListening = false;
-                mainHandler.post(() -> tvOrbHint.setText("TAP TO SPEAK"));
+                mainHandler.post(() -> { if (tvOrbHint != null) tvOrbHint.setText("WHAT CAN I DO FOR YOU, SIR?"); });
                 ArrayList<String> m = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                 if (m != null && !m.isEmpty() && !m.get(0).trim().isEmpty())
-                    mainHandler.post(() -> askJarvis(m.get(0).trim()));
+                    mainHandler.post(() -> { hideWelcome(); askJarvis(m.get(0).trim()); });
                 else
                     mainHandler.post(() -> setState(OrbView.OrbState.IDLE));
             }
@@ -478,7 +520,7 @@ public class MainActivity extends AppCompatActivity {
         isListening = false;
         if (speechRec != null) try { speechRec.stopListening(); } catch (Exception ignored) {}
         setState(OrbView.OrbState.IDLE);
-        tvOrbHint.setText("TAP TO SPEAK");
+        if (tvOrbHint != null) tvOrbHint.setText("WHAT CAN I DO FOR YOU, SIR?");
     }
 
     // ── Chat ──────────────────────────────────────────────────────────────────
@@ -488,6 +530,7 @@ public class MainActivity extends AppCompatActivity {
         if (currentState == OrbView.OrbState.THINKING) return;
         if (text.isEmpty()) text = "Analyse this image and describe what you see in detail.";
         etInput.setText("");
+        hideWelcome();
         askJarvis(text);
     }
 
@@ -497,7 +540,7 @@ public class MainActivity extends AppCompatActivity {
         if (pendingImageUriStr != null) {
             messages.add(new Message(Message.TYPE_IMAGE, null, pendingImageUriStr));
             adapter.notifyItemInserted(messages.size() - 1);
-            recycler.scrollToPosition(messages.size() - 1);
+            scrollToBottom();
         }
         saveHistory();
         setState(OrbView.OrbState.THINKING);
@@ -516,7 +559,7 @@ public class MainActivity extends AppCompatActivity {
                     if (imageUrl != null && !imageUrl.isEmpty()) {
                         messages.add(new Message(Message.TYPE_URL_IMAGE, cleanReply, null, imageUrl));
                         adapter.notifyItemInserted(messages.size() - 1);
-                        recycler.scrollToPosition(messages.size() - 1);
+                        scrollToBottom();
                         speak("Here is your generated image, sir.", "proud");
                     } else {
                         addJarvisMsg(cleanReply);
@@ -540,20 +583,27 @@ public class MainActivity extends AppCompatActivity {
     private void addUserMsg(String text) {
         messages.add(new Message(Message.TYPE_USER, text));
         adapter.notifyItemInserted(messages.size() - 1);
-        recycler.scrollToPosition(messages.size() - 1);
+        scrollToBottom();
     }
 
     private void addJarvisMsg(String text) {
         messages.add(new Message(Message.TYPE_JARVIS, text));
         adapter.notifyItemInserted(messages.size() - 1);
-        recycler.scrollToPosition(messages.size() - 1);
+        scrollToBottom();
+    }
+
+    private void scrollToBottom() {
+        recycler.post(() -> {
+            if (scrollMain != null)
+                scrollMain.post(() -> scrollMain.fullScroll(View.FOCUS_DOWN));
+        });
     }
 
     private void showTyping() {
         messages.add(new Message(Message.TYPE_TYPING, ""));
         typingPos = messages.size() - 1;
         adapter.notifyItemInserted(typingPos);
-        recycler.scrollToPosition(typingPos);
+        scrollToBottom();
     }
 
     private void hideTyping() {
@@ -587,7 +637,7 @@ public class MainActivity extends AppCompatActivity {
                     "user".equals(item.role) ? Message.TYPE_USER : Message.TYPE_JARVIS, item.text));
             if (!messages.isEmpty()) {
                 adapter.notifyDataSetChanged();
-                recycler.scrollToPosition(messages.size() - 1);
+                scrollToBottom();
             }
         } catch (Exception ignored) {}
     }
@@ -601,12 +651,14 @@ public class MainActivity extends AppCompatActivity {
                 messages.clear();
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(KEY_HIS).apply();
                 adapter.notifyDataSetChanged();
-                addJarvisMsg("Memory wiped, sir. Starting fresh.");
+                if (orbSection != null) orbSection.setVisibility(View.VISIBLE);
+                if (chipsRow1  != null) chipsRow1.setVisibility(View.VISIBLE);
+                if (chipsRow2  != null) chipsRow2.setVisibility(View.VISIBLE);
+                if (chipsRow3  != null) chipsRow3.setVisibility(View.VISIBLE);
             })
             .setNegativeButton("Cancel", null).show();
     }
 
-    // ── State ─────────────────────────────────────────────────────────────────
     private void setState(OrbView.OrbState state) {
         currentState = state;
         orbView.setState(state);
@@ -614,7 +666,6 @@ public class MainActivity extends AppCompatActivity {
         tvStatus.setText(labels[state.ordinal()]);
     }
 
-    // ── Permissions ───────────────────────────────────────────────────────────
     private void requestPermissions() {
         List<String> needed = new ArrayList<>();
         needed.add(Manifest.permission.RECORD_AUDIO);

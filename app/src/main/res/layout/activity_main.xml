@@ -23,8 +23,8 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="J.A.R.V.I.S"
-            android:textColor="#93c5fd"
+            android:text="H.E.N.R.Y"
+            android:textColor="#c9a84c"
             android:textSize="18sp"
             android:letterSpacing="0.3"
             android:fontFamily="sans-serif-medium"/>
@@ -85,7 +85,7 @@
 
     </LinearLayout>
 
-    <!-- Chat -->
+    <!-- Chat RecyclerView -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_chat"
         android:layout_width="match_parent"
@@ -113,16 +113,34 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- Attachment preview thumbnail (hidden until image attached) -->
-        <ImageView
-            android:id="@+id/iv_attach_preview"
-            android:layout_width="72dp"
-            android:layout_height="72dp"
-            android:scaleType="centerCrop"
-            android:background="@drawable/bg_input_box"
-            android:visibility="gone"
-            android:layout_marginBottom="6dp"
-            android:contentDescription="Attached image — tap to remove"/>
+        <!-- Attachment preview -->
+        <FrameLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp">
+
+            <ImageView
+                android:id="@+id/iv_attach_preview"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:scaleType="centerCrop"
+                android:background="@drawable/bg_input_box"
+                android:visibility="gone"
+                android:contentDescription="Attached image — tap to remove"/>
+
+            <TextView
+                android:id="@+id/tv_remove_attach"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:text="x"
+                android:textColor="#ffffff"
+                android:textSize="10sp"
+                android:gravity="center"
+                android:background="#cc3b82f6"
+                android:visibility="gone"
+                android:layout_gravity="top|end"/>
+
+        </FrameLayout>
 
         <!-- Input row -->
         <LinearLayout
@@ -153,7 +171,7 @@
                 android:textColor="#e2e8f0"
                 android:textColorHint="#64748b"
                 android:textSize="15sp"
-                android:hint="Ask JARVIS anything…"
+                android:hint="Ask HENRY anything…"
                 android:maxLines="4"
                 android:inputType="textMultiLine|textCapSentences"
                 android:imeOptions="actionSend"/>

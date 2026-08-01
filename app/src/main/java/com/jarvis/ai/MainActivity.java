@@ -142,9 +142,10 @@ public class MainActivity extends AppCompatActivity {
         });
 
         if (history.isEmpty()) {
-            addJarvisMsg("Good day, sir. J.A.R.V.I.S online. All systems nominal. How may I assist you?");
+           addJarvisMsg("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?");
             mainHandler.postDelayed(() ->
-                speak("Good day, sir. J.A.R.V.I.S online. All systems nominal. How may I assist you?", "warm"), 2000);
+                speak("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?", "warm"), 2000);
+
         }
     }
 

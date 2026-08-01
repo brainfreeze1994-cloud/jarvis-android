@@ -5,24 +5,69 @@
     android:viewportWidth="200"
     android:viewportHeight="200">
 
-    <path android:pathData="M100,12 A88,88 0 1,1 99.999,12 Z"
-        android:strokeColor="#1e3a5f" android:strokeWidth="2" android:fillColor="#00000000"/>
-    <path android:pathData="M100,24 A76,76 0 1,1 99.999,24 Z"
-        android:strokeColor="#3b82f6" android:strokeWidth="1.5" android:fillColor="#00000000" android:strokeAlpha="0.6"/>
-    <path android:pathData="M100,38 A62,62 0 1,1 99.999,38 Z"
-        android:strokeColor="#1e3a5f" android:strokeWidth="1" android:fillColor="#00000000"/>
+    <!-- Outer ring -->
+    <path
+        android:pathData="M100,12 A88,88 0 1,1 99.999,12 Z"
+        android:strokeColor="#1e3a5f"
+        android:strokeWidth="2"
+        android:fillColor="#00000000"/>
 
-    <path android:pathData="M100,38 L100,162"
-        android:strokeColor="#3b82f6" android:strokeWidth="1" android:strokeAlpha="0.4" android:fillColor="#00000000"/>
-    <path android:pathData="M46,69 L154,131"
-        android:strokeColor="#3b82f6" android:strokeWidth="1" android:strokeAlpha="0.4" android:fillColor="#00000000"/>
-    <path android:pathData="M46,131 L154,69"
-        android:strokeColor="#3b82f6" android:strokeWidth="1" android:strokeAlpha="0.4" android:fillColor="#00000000"/>
+    <!-- Dashed rotating ring -->
+    <path
+        android:pathData="M100,24 A76,76 0 1,1 99.999,24 Z"
+        android:strokeColor="#3b82f6"
+        android:strokeWidth="1.5"
+        android:fillColor="#00000000"
+        android:strokeAlpha="0.6"/>
 
-    <path android:pathData="M100,56 A44,44 0 1,1 99.999,56 Z" android:fillColor="#1d4ed8"/>
-    <path android:pathData="M100,70 A30,30 0 1,1 99.999,70 Z"
-        android:strokeColor="#93c5fd" android:strokeWidth="1.5" android:fillColor="#00000000" android:strokeAlpha="0.7"/>
-    <path android:pathData="M100,90 A10,10 0 1,1 99.999,90 Z"
-        android:fillColor="#bfdbfe" android:fillAlpha="0.9"/>
+    <!-- Inner ring -->
+    <path
+        android:pathData="M100,38 A62,62 0 1,1 99.999,38 Z"
+        android:strokeColor="#1e3a5f"
+        android:strokeWidth="1"
+        android:fillColor="#00000000"/>
+
+    <!-- Vertical line -->
+    <path
+        android:pathData="M100,38 L100,162"
+        android:strokeColor="#3b82f6"
+        android:strokeWidth="1"
+        android:strokeAlpha="0.4"
+        android:fillColor="#00000000"/>
+
+    <!-- Diagonal line 1 -->
+    <path
+        android:pathData="M46,69 L154,131"
+        android:strokeColor="#3b82f6"
+        android:strokeWidth="1"
+        android:strokeAlpha="0.4"
+        android:fillColor="#00000000"/>
+
+    <!-- Diagonal line 2 -->
+    <path
+        android:pathData="M46,131 L154,69"
+        android:strokeColor="#3b82f6"
+        android:strokeWidth="1"
+        android:strokeAlpha="0.4"
+        android:fillColor="#00000000"/>
+
+    <!-- Core circle -->
+    <path
+        android:pathData="M100,56 A44,44 0 1,1 99.999,56 Z"
+        android:fillColor="#1d4ed8"/>
+
+    <!-- Inner glow ring -->
+    <path
+        android:pathData="M100,70 A30,30 0 1,1 99.999,70 Z"
+        android:strokeColor="#93c5fd"
+        android:strokeWidth="1.5"
+        android:fillColor="#00000000"
+        android:strokeAlpha="0.7"/>
+
+    <!-- Center dot -->
+    <path
+        android:pathData="M100,90 A10,10 0 1,1 99.999,90 Z"
+        android:fillColor="#bfdbfe"
+        android:fillAlpha="0.9"/>
 
 </vector>

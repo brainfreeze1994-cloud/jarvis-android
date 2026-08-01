@@ -3,47 +3,38 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:gravity="end"
-    android:padding="4dp">
-
-    <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginStart="64dp"
-        android:layout_marginEnd="8dp">
-
-        <ImageView
-            android:id="@+id/iv_image"
-            android:layout_width="200dp"
-            android:layout_height="150dp"
-            android:scaleType="centerCrop"
-            android:background="@drawable/bg_bubble_user"
-            android:clipToOutline="true"/>
-
-        <TextView
-            android:id="@+id/tv_message"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/bg_bubble_user"
-            android:textColor="#93c5fd"
-            android:textSize="13sp"
-            android:padding="8dp"
-            android:layout_marginTop="2dp"
-            android:visibility="gone"/>
-
-    </LinearLayout>
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp"
+    android:paddingTop="3dp"
+    android:paddingBottom="3dp">
 
     <TextView
         android:id="@+id/tv_avatar"
-        android:layout_width="30dp"
-        android:layout_height="30dp"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
         android:gravity="center"
-        android:text="YOU"
-        android:textColor="#93c5fd"
-        android:textSize="7sp"
+        android:text="HNR"
+        android:textColor="#c9a84c"
+        android:textSize="6sp"
+        android:letterSpacing="0.05"
         android:fontFamily="sans-serif-medium"
-        android:background="@drawable/bg_avatar_user"
-        android:layout_marginTop="2dp"/>
+        android:background="@drawable/bg_avatar"
+        android:layout_marginTop="4dp"
+        android:layout_marginEnd="8dp"/>
+
+    <TextView
+        android:id="@+id/tv_message"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginEnd="40dp"
+        android:background="@drawable/bg_bubble_jarvis"
+        android:textColor="#c9a84c"
+        android:textSize="14sp"
+        android:lineSpacingMultiplier="1.5"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"/>
 
 </LinearLayout>

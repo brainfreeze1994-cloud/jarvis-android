@@ -80,6 +80,7 @@ public class MainActivity extends AppCompatActivity {
     private String pendingImageBase64;
     private String pendingImageUriStr;
 
+    // TTS
     private TextToSpeech tts;
     private boolean      ttsReady   = false;
     private boolean      isSpeaking = false;
@@ -143,10 +144,11 @@ public class MainActivity extends AppCompatActivity {
         if (history.isEmpty()) {
             addJarvisMsg("Good day, sir. J.A.R.V.I.S online. All systems nominal. How may I assist you?");
             mainHandler.postDelayed(() ->
-                speak("Good day, sir. J.A.R.V.I.S online. All systems nominal. How may I assist you?"), 2000);
+                speak("Good day, sir. J.A.R.V.I.S online. All systems nominal. How may I assist you?", "warm"), 2000);
         }
     }
 
+    // ── TTS init ──────────────────────────────────────────────────────────────
     private void initTts() {
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
@@ -207,8 +209,23 @@ public class MainActivity extends AppCompatActivity {
         ttsReady = true;
     }
 
-    private String cleanForTts(String rawText) {
-        return rawText
+    // ── Extract emotion tag ───────────────────────────────────────────────────
+    private String extractEmotion(String text) {
+        if (text == null) return "neutral";
+        java.util.regex.Matcher m = java.util.regex.Pattern
+            .compile("\\[EMOTION:(\\w+)\\]").matcher(text);
+        return m.find() ? m.group(1).toLowerCase() : "neutral";
+    }
+
+    private String stripEmotionTag(String text) {
+        if (text == null) return "";
+        return text.replaceAll("\\[EMOTION:\\w+\\]\\s*", "").trim();
+    }
+
+    // ── Clean markdown ────────────────────────────────────────────────────────
+    private String cleanForTts(String text) {
+        return text
+            .replaceAll("\\[EMOTION:\\w+\\]", "")
             .replaceAll("```[\\s\\S]*?```", "code block.")
             .replaceAll("`([^`]+)`", "$1")
             .replaceAll("\\*\\*(.*?)\\*\\*", "$1")
@@ -221,21 +238,31 @@ public class MainActivity extends AppCompatActivity {
             .trim();
     }
 
-    private void speak(String inputText) {
-        if (inputText == null || inputText.trim().isEmpty()) return;
-        final String clean = cleanForTts(inputText);
+    // ── Speak with emotion ────────────────────────────────────────────────────
+    private void speak(String text) {
+        speak(text, "neutral");
+    }
+
+    private void speak(String rawText, String emotion) {
+        if (rawText == null || rawText.trim().isEmpty()) return;
+        final String clean = cleanForTts(rawText);
+        final String emo   = (emotion != null && !emotion.isEmpty()) ? emotion : "neutral";
         if (clean.isEmpty()) return;
+
         isSpeaking = true;
         setState(OrbView.OrbState.SPEAKING);
+
         new Thread(() -> {
             try {
-                org.json.JSONObject jsonBody = new org.json.JSONObject();
-                jsonBody.put("text", clean);
+                org.json.JSONObject body = new org.json.JSONObject();
+                body.put("text", clean);
+                body.put("emotion", emo);
                 okhttp3.RequestBody reqBody = okhttp3.RequestBody.create(
-                    jsonBody.toString(), okhttp3.MediaType.parse("application/json"));
+                    body.toString(), okhttp3.MediaType.parse("application/json"));
                 okhttp3.Request request = new okhttp3.Request.Builder()
                     .url("https://jarvis-ai-seven-dun.vercel.app/api/speak")
                     .post(reqBody).build();
+
                 try (okhttp3.Response response = httpClient.newCall(request).execute()) {
                     if (response.code() == 200 && response.body() != null) {
                         byte[] audioBytes = response.body().bytes();
@@ -250,6 +277,7 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
+    // ── Play MP3 bytes ────────────────────────────────────────────────────────
     private void playAudioBytes(byte[] audioBytes, String fallbackText) {
         try {
             if (ttsPlayer != null) {
@@ -284,12 +312,13 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void speakNative(String textToSpeak) {
+    // ── Android native TTS fallback ───────────────────────────────────────────
+    private void speakNative(String clean) {
         if (!ttsReady || tts == null) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            tts.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
+            tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
         } else {
-            tts.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null);
+            tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null);
         }
     }
 
@@ -303,6 +332,7 @@ public class MainActivity extends AppCompatActivity {
         setState(OrbView.OrbState.IDLE);
     }
 
+    // ── Attachment ────────────────────────────────────────────────────────────
     private void showAttachDialog() {
         new AlertDialog.Builder(this)
             .setTitle("Attach image")
@@ -365,7 +395,7 @@ public class MainActivity extends AppCompatActivity {
                     pendingImageUriStr = uri.toString();
                     ivAttachPreview.setImageURI(uri);
                     ivAttachPreview.setVisibility(View.VISIBLE);
-                    Toast.makeText(this, "Image attached - tap to remove", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Image attached — tap to remove", Toast.LENGTH_SHORT).show();
                 });
             } catch (Exception e) {
                 mainHandler.post(() ->
@@ -381,6 +411,7 @@ public class MainActivity extends AppCompatActivity {
         ivAttachPreview.setVisibility(View.GONE);
     }
 
+    // ── Speech recognition ────────────────────────────────────────────────────
     private void toggleListening() {
         if (isSpeaking) { stopSpeaking(); return; }
         if (isListening) stopListening(); else startListening();
@@ -408,7 +439,7 @@ public class MainActivity extends AppCompatActivity {
                 isListening = true;
                 mainHandler.post(() -> {
                     setState(OrbView.OrbState.LISTENING);
-                    tvOrbHint.setText("LISTENING - TAP TO STOP");
+                    tvOrbHint.setText("LISTENING — TAP TO STOP");
                 });
             }
             @Override public void onBeginningOfSpeech() {}
@@ -453,6 +484,7 @@ public class MainActivity extends AppCompatActivity {
         tvOrbHint.setText("TAP TO SPEAK");
     }
 
+    // ── Chat ──────────────────────────────────────────────────────────────────
     private void sendText() {
         String text = etInput.getText().toString().trim();
         if (text.isEmpty() && pendingImageBase64 == null) return;
@@ -481,15 +513,17 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onSuccess(String reply, String imageUrl) {
                 mainHandler.post(() -> {
                     hideTyping();
-                    history.add(new HistoryItem("model", reply));
+                    final String emotion    = extractEmotion(reply);
+                    final String cleanReply = stripEmotionTag(reply);
+                    history.add(new HistoryItem("model", cleanReply));
                     if (imageUrl != null && !imageUrl.isEmpty()) {
-                        messages.add(new Message(Message.TYPE_URL_IMAGE, reply, null, imageUrl));
+                        messages.add(new Message(Message.TYPE_URL_IMAGE, cleanReply, null, imageUrl));
                         adapter.notifyItemInserted(messages.size() - 1);
                         recycler.scrollToPosition(messages.size() - 1);
-                        speak("Here is your generated image, sir.");
+                        speak("Here is your generated image, sir.", "proud");
                     } else {
-                        addJarvisMsg(reply);
-                        speak(reply);
+                        addJarvisMsg(cleanReply);
+                        speak(cleanReply, emotion);
                     }
                     saveHistory();
                     btnSend.setEnabled(true);
@@ -533,6 +567,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // ── Memory ────────────────────────────────────────────────────────────────
     private void saveHistory() {
         List<HistoryItem> toSave = history.size() > 80
             ? history.subList(history.size() - 80, history.size()) : history;
@@ -574,13 +609,15 @@ public class MainActivity extends AppCompatActivity {
             .setNegativeButton("Cancel", null).show();
     }
 
+    // ── State ─────────────────────────────────────────────────────────────────
     private void setState(OrbView.OrbState state) {
         currentState = state;
         orbView.setState(state);
-        final String[] labels = {"STANDBY", "LISTENING...", "PROCESSING...", "SPEAKING...", "WAKE"};
+        final String[] labels = {"STANDBY", "LISTENING…", "PROCESSING…", "SPEAKING…", "WAKE"};
         tvStatus.setText(labels[state.ordinal()]);
     }
 
+    // ── Permissions ───────────────────────────────────────────────────────────
     private void requestPermissions() {
         List<String> needed = new ArrayList<>();
         needed.add(Manifest.permission.RECORD_AUDIO);

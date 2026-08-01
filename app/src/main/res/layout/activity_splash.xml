@@ -2,20 +2,25 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#070d1a"
+    android:background="#0d0d0d"
     android:gravity="center">
 
-    <!-- Arc reactor orb -->
+    <View
+        android:id="@+id/splash_top_line"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#c9a84c"
+        android:layout_alignParentTop="true"/>
+
     <ImageView
         android:id="@+id/splash_orb"
-        android:layout_width="180dp"
-        android:layout_height="180dp"
+        android:layout_width="160dp"
+        android:layout_height="160dp"
         android:layout_centerInParent="true"
-        android:layout_marginBottom="40dp"
-        android:src="@drawable/ic_orb"
+        android:layout_marginBottom="48dp"
+        android:src="@mipmap/ic_launcher"
         android:contentDescription="HENRY Orb" />
 
-    <!-- H.E.N.R.Y title -->
     <TextView
         android:id="@+id/splash_title"
         android:layout_width="wrap_content"
@@ -23,13 +28,12 @@
         android:layout_below="@id/splash_orb"
         android:layout_centerHorizontal="true"
         android:text="H.E.N.R.Y"
-        android:textSize="32sp"
+        android:textSize="30sp"
         android:textColor="#c9a84c"
         android:letterSpacing="0.3"
         android:fontFamily="sans-serif-medium"
         android:visibility="invisible" />
 
-    <!-- Subtitle -->
     <TextView
         android:id="@+id/splash_subtitle"
         android:layout_width="wrap_content"
@@ -38,12 +42,11 @@
         android:layout_centerHorizontal="true"
         android:layout_marginTop="8dp"
         android:text="HIGHLY ENHANCED NEURAL REASONING FOR YOU"
-        android:textSize="9sp"
-        android:textColor="#64748b"
-        android:letterSpacing="0.2"
+        android:textSize="8sp"
+        android:textColor="#4a4030"
+        android:letterSpacing="0.15"
         android:visibility="invisible" />
 
-    <!-- Bottom version text -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -52,6 +55,12 @@
         android:layout_marginBottom="32dp"
         android:text="v1.0.0"
         android:textSize="11sp"
-        android:textColor="#334155" />
+        android:textColor="#2a2318" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#1a1508"
+        android:layout_alignParentBottom="true"/>
 
 </RelativeLayout>

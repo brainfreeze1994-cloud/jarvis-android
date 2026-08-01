@@ -1,4 +1,4 @@
-name: Build JARVIS APK
+name: Build HENRY APK
 
 on:
   push:
@@ -19,8 +19,8 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      -  name: Setup Android SDK
-         uses: android-actions/setup-android@v3.2.1
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3.2.1
 
       - name: Set local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties
@@ -30,24 +30,26 @@ jobs:
           pip install Pillow -q
           python3 generate_icons.py
 
-      - name: Install Gradle
+      - name: Download Gradle Wrapper JAR
         run: |
-          wget -q https://services.gradle.org/distributions/gradle-8.6-bin.zip
-          unzip -q gradle-8.6-bin.zip -d /opt/gradle
-          echo "/opt/gradle/gradle-8.6/bin" >> $GITHUB_PATH
+          mkdir -p gradle/wrapper
+          curl -L -o gradle/wrapper/gradle-wrapper.jar \
+            "https://github.com/gradle/gradle/raw/v8.6.0/gradle/wrapper/gradle-wrapper.jar"
+
+      - name: Grant gradlew permission
+        run: chmod +x gradlew
 
       - name: Build Debug APK
-        run: |
-          gradle assembleDebug --no-daemon 2>&1 | tee build_output.txt
-          if [ ! -f app/build/outputs/apk/debug/app-debug.apk ]; then
-            echo "=== FULL ERROR ==="
-            grep -A5 "FAILURE\|error:\|Error" build_output.txt | head -50
-            exit 1
-          fi
+        run: ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: JARVIS-Android-APK
+          name: HENRY-Android-APK
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+
+      - name: Show APK info
+        run: |
+          echo "✅ HENRY APK built successfully!"
+          ls -lh app/build/outputs/apk/debug/app-debug.apk

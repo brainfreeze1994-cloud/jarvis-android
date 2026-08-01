@@ -59,21 +59,22 @@ import okhttp3.OkHttpClient;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final int    PERM_CODE       = 101;
-    private static final int    REQUEST_GALLERY  = 200;
-    private static final int    REQUEST_CAMERA   = 201;
-    private static final String PREFS            = "jarvis_prefs";
-    private static final String KEY_HIS          = "history_v2";
+    private static final int    PERM_CODE      = 101;
+    private static final int    REQUEST_GALLERY = 200;
+    private static final int    REQUEST_CAMERA  = 201;
+    private static final String PREFS           = "jarvis_prefs";
+    private static final String KEY_HIS         = "history_v2";
+    private static final String CRASH_FILE      = "henry_crash.txt";
 
-    private OrbView         orbView;
-    private TextView        tvStatus;
-    private TextView        tvOrbHint;
-    private RecyclerView    recycler;
-    private EditText        etInput;
-    private ImageButton     btnMic, btnSend, btnClear, btnAttach;
-    private ImageView       ivAttachPreview;
-    private LinearLayout    orbSection;
-    private LinearLayout    chipsRow1, chipsRow2, chipsRow3;
+    private OrbView          orbView;
+    private TextView         tvStatus;
+    private TextView         tvOrbHint;
+    private RecyclerView     recycler;
+    private EditText         etInput;
+    private ImageButton      btnMic, btnSend, btnClear, btnAttach;
+    private ImageView        ivAttachPreview;
+    private LinearLayout     orbSection;
+    private LinearLayout     chipsRow1, chipsRow2, chipsRow3;
     private NestedScrollView scrollMain;
 
     private final List<Message>     messages = new ArrayList<>();
@@ -85,17 +86,11 @@ public class MainActivity extends AppCompatActivity {
     private String pendingImageBase64;
     private String pendingImageUriStr;
 
-    // TTS
     private TextToSpeech tts;
     private boolean      ttsReady   = false;
     private boolean      isSpeaking = false;
-    private MediaPlayer  ttsPlayer  = null;
 
-    private final OkHttpClient httpClient = new OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(90, TimeUnit.SECONDS)
-        .build();
-
+    private OkHttpClient     httpClient;
     private SpeechRecognizer speechRec;
     private boolean          isListening = false;
 
@@ -107,27 +102,59 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // On crash: save error to prefs so next launch can show it
-        Thread.setDefaultUncaughtExceptionHandler((t, ex) -> {
+        // File-based crash handler — fsynced before killProcess
+        final java.io.File crashFile = new java.io.File(getFilesDir(), CRASH_FILE);
+        Thread.setDefaultUncaughtExceptionHandler((thread, ex) -> {
             try {
-                String trace = android.util.Log.getStackTraceString(ex);
-                getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-                    .putString("last_crash", ex.getClass().getSimpleName() + ": " + ex.getMessage() + "\n\n" + trace)
-                    .apply();
+                String msg = ex.getClass().getSimpleName() + ": " + ex.getMessage()
+                           + "\n\n" + android.util.Log.getStackTraceString(ex);
+                java.io.FileOutputStream fos = new java.io.FileOutputStream(crashFile, false);
+                fos.write(msg.getBytes("UTF-8"));
+                fos.flush();
+                fos.getFD().sync();
+                fos.close();
             } catch (Exception ignored) {}
             android.os.Process.killProcess(android.os.Process.myPid());
         });
 
-        // Show crash from previous launch if any
-        String lastCrash = getSharedPreferences(PREFS, MODE_PRIVATE).getString("last_crash", null);
-        if (lastCrash != null) {
-            getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove("last_crash").apply();
-            new AlertDialog.Builder(this)
-                .setTitle("Previous Crash (share with developer)")
-                .setMessage(lastCrash)
-                .setPositiveButton("OK", null)
-                .show();
+        // Show crash from previous launch
+        if (crashFile.exists()) {
+            try {
+                java.io.FileInputStream fis = new java.io.FileInputStream(crashFile);
+                byte[] data = new byte[(int) crashFile.length()];
+                fis.read(data); fis.close();
+                String lastCrash = new String(data, "UTF-8");
+                crashFile.delete();
+                new AlertDialog.Builder(this)
+                    .setTitle("HENRY Crash Report")
+                    .setMessage(lastCrash)
+                    .setPositiveButton("OK", null)
+                    .show();
+            } catch (Exception ignored) {}
         }
+
+        try {
+            startApp();
+        } catch (Throwable t) {
+            String msg = t.getClass().getSimpleName() + ": " + t.getMessage()
+                       + "\n\n" + android.util.Log.getStackTraceString(t);
+            try {
+                new AlertDialog.Builder(this)
+                    .setTitle("HENRY Startup Error")
+                    .setMessage(msg)
+                    .setPositiveButton("OK", null)
+                    .show();
+            } catch (Exception ignored) {
+                Toast.makeText(this, "Fatal: " + t.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private void startApp() {
+        httpClient = new OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(90, TimeUnit.SECONDS)
+            .build();
 
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
             WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -135,6 +162,7 @@ public class MainActivity extends AppCompatActivity {
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY |
             View.SYSTEM_UI_FLAG_FULLSCREEN |
             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
+
         setContentView(R.layout.activity_main);
 
         orbView         = findViewById(R.id.orb_view);
@@ -160,22 +188,23 @@ public class MainActivity extends AppCompatActivity {
         recycler.setAdapter(adapter);
         recycler.setNestedScrollingEnabled(false);
 
-        requestPermissions();
+        requestPerms();
         loadHistory();
         initTts();
 
-        orbView.setOnClickListener(v -> toggleListening());
-        btnMic.setOnClickListener(v -> toggleListening());
-        btnSend.setOnClickListener(v -> sendText());
-        btnClear.setOnClickListener(v -> confirmClear());
-        btnAttach.setOnClickListener(v -> showAttachDialog());
-        ivAttachPreview.setOnClickListener(v -> clearAttachment());
-        etInput.setOnEditorActionListener((v, id, e) -> {
-            if (id == EditorInfo.IME_ACTION_SEND) { sendText(); return true; }
-            return false;
-        });
+        if (orbView         != null) orbView.setOnClickListener(v -> toggleListening());
+        if (btnMic          != null) btnMic.setOnClickListener(v -> toggleListening());
+        if (btnSend         != null) btnSend.setOnClickListener(v -> sendText());
+        if (btnClear        != null) btnClear.setOnClickListener(v -> confirmClear());
+        if (btnAttach       != null) btnAttach.setOnClickListener(v -> showAttachDialog());
+        if (ivAttachPreview != null) ivAttachPreview.setOnClickListener(v -> clearAttachment());
+        if (etInput != null) {
+            etInput.setOnEditorActionListener((v, id, e) -> {
+                if (id == EditorInfo.IME_ACTION_SEND) { sendText(); return true; }
+                return false;
+            });
+        }
 
-        // Suggestion chips — cast to View (safe for both Button and TextView)
         setupChip(R.id.chip1, "What's the weather in Dubai?");
         setupChip(R.id.chip2, "Generate image of a warrior");
         setupChip(R.id.chip3, "Write me a Python script");
@@ -186,7 +215,8 @@ public class MainActivity extends AppCompatActivity {
         if (history.isEmpty()) {
             addJarvisMsg("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?");
             mainHandler.postDelayed(() ->
-                speak("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?", "warm"), 2000);
+                speak("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?"),
+                2000);
         } else {
             hideWelcome();
         }
@@ -194,19 +224,14 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupChip(int chipId, String text) {
         View chip = findViewById(chipId);
-        if (chip != null) {
-            chip.setOnClickListener(v -> {
-                hideWelcome();
-                askJarvis(text);
-            });
-        }
+        if (chip != null) chip.setOnClickListener(v -> { hideWelcome(); askJarvis(text); });
     }
 
     private void hideWelcome() {
-        if (orbSection != null)  orbSection.setVisibility(View.GONE);
-        if (chipsRow1  != null)  chipsRow1.setVisibility(View.GONE);
-        if (chipsRow2  != null)  chipsRow2.setVisibility(View.GONE);
-        if (chipsRow3  != null)  chipsRow3.setVisibility(View.GONE);
+        if (orbSection != null) orbSection.setVisibility(View.GONE);
+        if (chipsRow1  != null) chipsRow1.setVisibility(View.GONE);
+        if (chipsRow2  != null) chipsRow2.setVisibility(View.GONE);
+        if (chipsRow3  != null) chipsRow3.setVisibility(View.GONE);
     }
 
     // ── TTS ───────────────────────────────────────────────────────────────────
@@ -215,6 +240,7 @@ public class MainActivity extends AppCompatActivity {
             if (status == TextToSpeech.SUCCESS) {
                 pickBestMaleVoice();
             } else {
+                // Retry without specifying engine
                 tts = new TextToSpeech(this, s2 -> {
                     if (s2 == TextToSpeech.SUCCESS) pickBestMaleVoice();
                 });
@@ -236,11 +262,11 @@ public class MainActivity extends AppCompatActivity {
                     || name.contains("samantha");
                 if (isFemale) continue;
                 boolean isBritish = v.getLocale().getCountry().equals("GB");
-                boolean isMale = name.contains("male") || name.contains("daniel")
+                boolean isMale    = name.contains("male")  || name.contains("daniel")
                     || name.contains("george") || name.contains("oliver")
-                    || name.contains("harry") || name.contains("james")
+                    || name.contains("harry")  || name.contains("james")
                     || name.contains("en-gb-x-gba") || name.contains("en-gb-x-gbb");
-                boolean isNeural = name.contains("neural") || name.contains("wavenet")
+                boolean isNeural  = name.contains("neural") || name.contains("wavenet")
                     || name.contains("enhanced") || name.contains("local")
                     || v.getQuality() >= android.speech.tts.Voice.QUALITY_HIGH;
                 int score = 0;
@@ -260,10 +286,16 @@ public class MainActivity extends AppCompatActivity {
             tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                 @Override public void onStart(String id) {}
                 @Override public void onDone(String id) {
-                    mainHandler.post(() -> { isSpeaking = false; setState(OrbView.OrbState.IDLE); });
+                    mainHandler.post(() -> {
+                        isSpeaking = false;
+                        setState(OrbView.OrbState.IDLE);
+                    });
                 }
                 @Override public void onError(String id) {
-                    mainHandler.post(() -> { isSpeaking = false; setState(OrbView.OrbState.IDLE); });
+                    mainHandler.post(() -> {
+                        isSpeaking = false;
+                        setState(OrbView.OrbState.IDLE);
+                    });
                 }
             });
         }
@@ -273,8 +305,8 @@ public class MainActivity extends AppCompatActivity {
     // ── Emotion helpers ───────────────────────────────────────────────────────
     private String extractEmotion(String text) {
         if (text == null) return "neutral";
-        java.util.regex.Matcher m = java.util.regex.Pattern
-            .compile("\\[EMOTION:(\\w+)\\]").matcher(text);
+        java.util.regex.Matcher m =
+            java.util.regex.Pattern.compile("\\[EMOTION:(\\w+)\\]").matcher(text);
         return m.find() ? m.group(1).toLowerCase() : "neutral";
     }
 
@@ -283,7 +315,6 @@ public class MainActivity extends AppCompatActivity {
         return text.replaceAll("\\[EMOTION:\\w+\\]\\s*", "").trim();
     }
 
-    // ── TTS text cleaner ──────────────────────────────────────────────────────
     private String cleanForTts(String text) {
         if (text == null) return "";
         return text
@@ -309,78 +340,15 @@ public class MainActivity extends AppCompatActivity {
             .trim();
     }
 
-    // ── Speak ─────────────────────────────────────────────────────────────────
+    // ── Speak — instant on-device, zero network delay ─────────────────────────
     private void speak(String text) { speak(text, "neutral"); }
 
     private void speak(String rawText, String emotion) {
         if (rawText == null || rawText.trim().isEmpty()) return;
         final String clean = cleanForTts(rawText);
-        final String emo   = (emotion != null && !emotion.isEmpty()) ? emotion : "neutral";
         if (clean.isEmpty()) return;
-
         isSpeaking = true;
         setState(OrbView.OrbState.SPEAKING);
-
-        new Thread(() -> {
-            try {
-                org.json.JSONObject body = new org.json.JSONObject();
-                body.put("text", clean);
-                body.put("emotion", emo);
-                okhttp3.RequestBody reqBody = okhttp3.RequestBody.create(
-                    body.toString(), okhttp3.MediaType.parse("application/json"));
-                okhttp3.Request request = new okhttp3.Request.Builder()
-                    .url("https://jarvis-ai-seven-dun.vercel.app/api/speak")
-                    .post(reqBody).build();
-
-                try (okhttp3.Response response = httpClient.newCall(request).execute()) {
-                    if (response.code() == 200 && response.body() != null) {
-                        byte[] audioBytes = response.body().bytes();
-                        mainHandler.post(() -> playAudioBytes(audioBytes, clean));
-                        return;
-                    }
-                }
-            } catch (Exception e) {
-                android.util.Log.w("HENRY_TTS", "Server TTS failed: " + e.getMessage());
-            }
-            mainHandler.post(() -> speakNative(clean));
-        }).start();
-    }
-
-    private void playAudioBytes(byte[] audioBytes, final String fallbackText) {
-        try {
-            if (ttsPlayer != null) {
-                try { ttsPlayer.release(); } catch (Exception ignored) {}
-                ttsPlayer = null;
-            }
-            File tmpFile = File.createTempFile("tts_", ".mp3", getCacheDir());
-            try (FileOutputStream fos = new FileOutputStream(tmpFile)) {
-                fos.write(audioBytes);
-            }
-            ttsPlayer = new MediaPlayer();
-            ttsPlayer.setDataSource(tmpFile.getAbsolutePath());
-            ttsPlayer.setOnCompletionListener(mp -> {
-                isSpeaking = false;
-                setState(OrbView.OrbState.IDLE);
-                mp.release();
-                ttsPlayer = null;
-                tmpFile.delete();
-            });
-            ttsPlayer.setOnErrorListener((mp, what, extra) -> {
-                mp.release();
-                ttsPlayer = null;
-                tmpFile.delete();
-                speakNative(fallbackText);
-                return true;
-            });
-            ttsPlayer.prepare();
-            ttsPlayer.start();
-        } catch (Exception e) {
-            android.util.Log.e("HENRY_TTS", "Playback error: " + e.getMessage());
-            speakNative(fallbackText);
-        }
-    }
-
-    private void speakNative(String clean) {
         if (!ttsReady || tts == null) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
@@ -391,10 +359,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void stopSpeaking() {
         isSpeaking = false;
-        if (ttsPlayer != null) {
-            try { ttsPlayer.stop(); ttsPlayer.release(); } catch (Exception ignored) {}
-            ttsPlayer = null;
-        }
         if (tts != null && tts.isSpeaking()) tts.stop();
         setState(OrbView.OrbState.IDLE);
     }
@@ -418,7 +382,8 @@ public class MainActivity extends AppCompatActivity {
             String ts = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
             File photo = File.createTempFile("HENRY_" + ts, ".jpg",
                 getExternalFilesDir(Environment.DIRECTORY_PICTURES));
-            cameraImageUri = FileProvider.getUriForFile(this, getPackageName() + ".provider", photo);
+            cameraImageUri = FileProvider.getUriForFile(
+                this, getPackageName() + ".provider", photo);
             intent.putExtra(MediaStore.EXTRA_OUTPUT, cameraImageUri);
             startActivityForResult(intent, REQUEST_CAMERA);
         } catch (IOException e) {
@@ -451,7 +416,7 @@ public class MainActivity extends AppCompatActivity {
                 int w = bmp.getWidth(), h = bmp.getHeight(), maxPx = 1024;
                 if (w > maxPx || h > maxPx) {
                     float s = Math.min((float) maxPx / w, (float) maxPx / h);
-                    bmp = Bitmap.createScaledBitmap(bmp, (int)(w * s), (int)(h * s), true);
+                    bmp = Bitmap.createScaledBitmap(bmp, (int)(w*s), (int)(h*s), true);
                 }
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 bmp.compress(Bitmap.CompressFormat.JPEG, 80, baos);
@@ -460,8 +425,10 @@ public class MainActivity extends AppCompatActivity {
                 mainHandler.post(() -> {
                     pendingImageBase64 = b64;
                     pendingImageUriStr = uri.toString();
-                    ivAttachPreview.setImageURI(uri);
-                    ivAttachPreview.setVisibility(View.VISIBLE);
+                    if (ivAttachPreview != null) {
+                        ivAttachPreview.setImageURI(uri);
+                        ivAttachPreview.setVisibility(View.VISIBLE);
+                    }
                     Toast.makeText(this, "Image attached — tap to remove", Toast.LENGTH_SHORT).show();
                 });
             } catch (Exception e) {
@@ -474,8 +441,10 @@ public class MainActivity extends AppCompatActivity {
     private void clearAttachment() {
         pendingImageBase64 = null;
         pendingImageUriStr = null;
-        ivAttachPreview.setImageDrawable(null);
-        ivAttachPreview.setVisibility(View.GONE);
+        if (ivAttachPreview != null) {
+            ivAttachPreview.setImageDrawable(null);
+            ivAttachPreview.setVisibility(View.GONE);
+        }
     }
 
     // ── Voice ─────────────────────────────────────────────────────────────────
@@ -530,7 +499,8 @@ public class MainActivity extends AppCompatActivity {
                 mainHandler.post(() -> {
                     if (tvOrbHint != null) tvOrbHint.setText("WHAT CAN I DO FOR YOU, SIR?");
                 });
-                ArrayList<String> m = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                ArrayList<String> m =
+                    results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                 if (m != null && !m.isEmpty() && !m.get(0).trim().isEmpty())
                     mainHandler.post(() -> { hideWelcome(); askJarvis(m.get(0).trim()); });
                 else
@@ -555,6 +525,7 @@ public class MainActivity extends AppCompatActivity {
 
     // ── Chat ──────────────────────────────────────────────────────────────────
     private void sendText() {
+        if (etInput == null) return;
         String text = etInput.getText().toString().trim();
         if (text.isEmpty() && pendingImageBase64 == null) return;
         if (currentState == OrbView.OrbState.THINKING) return;
@@ -575,7 +546,7 @@ public class MainActivity extends AppCompatActivity {
         saveHistory();
         setState(OrbView.OrbState.THINKING);
         showTyping();
-        btnSend.setEnabled(false);
+        if (btnSend != null) btnSend.setEnabled(false);
         String imageB64 = pendingImageBase64;
         clearAttachment();
 
@@ -583,11 +554,12 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onSuccess(String reply, String imageUrl) {
                 mainHandler.post(() -> {
                     hideTyping();
-                    final String emotion    = extractEmotion(reply);
-                    final String cleanReply = stripEmotionTag(reply);
+                    String emotion    = extractEmotion(reply);
+                    String cleanReply = stripEmotionTag(reply);
                     history.add(new HistoryItem("model", cleanReply));
                     if (imageUrl != null && !imageUrl.isEmpty()) {
-                        messages.add(new Message(Message.TYPE_URL_IMAGE, cleanReply, null, imageUrl));
+                        messages.add(new Message(
+                            Message.TYPE_URL_IMAGE, cleanReply, null, imageUrl));
                         adapter.notifyItemInserted(messages.size() - 1);
                         scrollToBottom();
                         speak("Here is your generated image, sir.", "proud");
@@ -596,14 +568,14 @@ public class MainActivity extends AppCompatActivity {
                         speak(cleanReply, emotion);
                     }
                     saveHistory();
-                    btnSend.setEnabled(true);
+                    if (btnSend != null) btnSend.setEnabled(true);
                 });
             }
             @Override public void onError(String error) {
                 mainHandler.post(() -> {
                     hideTyping();
                     addJarvisMsg("My apologies, sir. I encountered an error: " + error);
-                    btnSend.setEnabled(true);
+                    if (btnSend != null) btnSend.setEnabled(true);
                     setState(OrbView.OrbState.IDLE);
                 });
             }
@@ -624,7 +596,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void scrollToBottom() {
         recycler.post(() -> {
-            if (scrollMain != null) scrollMain.post(() -> scrollMain.fullScroll(View.FOCUS_DOWN));
+            if (scrollMain != null)
+                scrollMain.post(() -> scrollMain.fullScroll(View.FOCUS_DOWN));
         });
     }
 
@@ -663,7 +636,8 @@ public class MainActivity extends AppCompatActivity {
                 ? saved.subList(saved.size() - 20, saved.size()) : saved;
             for (HistoryItem item : vis)
                 messages.add(new Message(
-                    "user".equals(item.role) ? Message.TYPE_USER : Message.TYPE_JARVIS, item.text));
+                    "user".equals(item.role) ? Message.TYPE_USER : Message.TYPE_JARVIS,
+                    item.text));
             if (!messages.isEmpty()) {
                 adapter.notifyDataSetChanged();
                 scrollToBottom();
@@ -691,13 +665,15 @@ public class MainActivity extends AppCompatActivity {
     // ── State ─────────────────────────────────────────────────────────────────
     private void setState(OrbView.OrbState state) {
         currentState = state;
-        orbView.setState(state);
-        final String[] labels = {"STANDBY", "LISTENING…", "PROCESSING…", "SPEAKING…", "WAKE"};
-        tvStatus.setText(labels[state.ordinal()]);
+        if (orbView  != null) orbView.setState(state);
+        if (tvStatus != null) {
+            final String[] labels = {"STANDBY", "LISTENING…", "PROCESSING…", "SPEAKING…", "WAKE"};
+            tvStatus.setText(labels[state.ordinal()]);
+        }
     }
 
     // ── Permissions ───────────────────────────────────────────────────────────
-    private void requestPermissions() {
+    private void requestPerms() {
         List<String> needed = new ArrayList<>();
         needed.add(Manifest.permission.RECORD_AUDIO);
         needed.add(Manifest.permission.CAMERA);

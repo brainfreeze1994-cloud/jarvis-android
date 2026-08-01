@@ -84,8 +84,6 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
                         }
                     } catch (Exception ignored) {}
                 }).start();
-
-                // Tap image to open full size in browser
                 h.ivImage.setOnClickListener(v -> {
                     Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                     v.getContext().startActivity(intent);

@@ -158,10 +158,22 @@ public class MainActivity extends AppCompatActivity {
         setupChip(R.id.chip5, "Latest tech news today");
         setupChip(R.id.chip6, "Explain quantum computing");
 
-        if (history.isEmpty()) {
+            if (history.isEmpty()) {
             addJarvisMsg("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?");
             mainHandler.postDelayed(() ->
                 speak("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?", "warm"), 2000);
+        } else {
+            hideWelcome();
+        }
+        } catch (Exception e) {
+            android.util.Log.e("HENRY_CRASH", "onCreate failed", e);
+            new AlertDialog.Builder(this)
+                .setTitle("Launch Error")
+                .setMessage(e.getClass().getSimpleName() + ":\n" + e.getMessage())
+                .setPositiveButton("OK", null)
+                .show();
+        }
+    }
         } else {
             hideWelcome();
         }

@@ -59,21 +59,21 @@ import okhttp3.OkHttpClient;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final int    PERM_CODE      = 101;
-    private static final int    REQUEST_GALLERY = 200;
-    private static final int    REQUEST_CAMERA  = 201;
-    private static final String PREFS           = "jarvis_prefs";
-    private static final String KEY_HIS         = "history_v2";
+    private static final int    PERM_CODE       = 101;
+    private static final int    REQUEST_GALLERY  = 200;
+    private static final int    REQUEST_CAMERA   = 201;
+    private static final String PREFS            = "jarvis_prefs";
+    private static final String KEY_HIS          = "history_v2";
 
-    private OrbView          orbView;
-    private TextView         tvStatus;
-    private TextView         tvOrbHint;
-    private RecyclerView     recycler;
-    private EditText         etInput;
-    private ImageButton      btnMic, btnSend, btnClear, btnAttach;
-    private ImageView        ivAttachPreview;
-    private LinearLayout     orbSection;
-    private LinearLayout     chipsRow1, chipsRow2, chipsRow3;
+    private OrbView         orbView;
+    private TextView        tvStatus;
+    private TextView        tvOrbHint;
+    private RecyclerView    recycler;
+    private EditText        etInput;
+    private ImageButton     btnMic, btnSend, btnClear, btnAttach;
+    private ImageView       ivAttachPreview;
+    private LinearLayout    orbSection;
+    private LinearLayout    chipsRow1, chipsRow2, chipsRow3;
     private NestedScrollView scrollMain;
 
     private final List<Message>     messages = new ArrayList<>();
@@ -85,6 +85,7 @@ public class MainActivity extends AppCompatActivity {
     private String pendingImageBase64;
     private String pendingImageUriStr;
 
+    // TTS
     private TextToSpeech tts;
     private boolean      ttsReady   = false;
     private boolean      isSpeaking = false;
@@ -105,14 +106,14 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-             getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
             WindowManager.LayoutParams.FLAG_FULLSCREEN);
         getWindow().getDecorView().setSystemUiVisibility(
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY |
             View.SYSTEM_UI_FLAG_FULLSCREEN |
             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
-        try {
-            setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_main);
 
         orbView         = findViewById(R.id.orb_view);
         tvStatus        = findViewById(R.id.tv_status);
@@ -159,22 +160,10 @@ public class MainActivity extends AppCompatActivity {
         setupChip(R.id.chip5, "Latest tech news today");
         setupChip(R.id.chip6, "Explain quantum computing");
 
-            if (history.isEmpty()) {
+        if (history.isEmpty()) {
             addJarvisMsg("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?");
             mainHandler.postDelayed(() ->
                 speak("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?", "warm"), 2000);
-        } else {
-            hideWelcome();
-        }
-        } catch (Exception e) {
-            android.util.Log.e("HENRY_CRASH", "onCreate failed", e);
-            new AlertDialog.Builder(this)
-                .setTitle("Launch Error")
-                .setMessage(e.getClass().getSimpleName() + ":\n" + e.getMessage())
-                .setPositiveButton("OK", null)
-                .show();
-        }
-    }
         } else {
             hideWelcome();
         }
@@ -183,21 +172,17 @@ public class MainActivity extends AppCompatActivity {
     private void setupChip(int chipId, String text) {
         android.widget.Button chip = findViewById(chipId);
         if (chip != null) {
-            chip.setOnClickListener(v -> {
-                hideWelcome();
-                askJarvis(text);
-            });
+            chip.setOnClickListener(v -> { hideWelcome(); askJarvis(text); });
         }
     }
 
     private void hideWelcome() {
-        if (orbSection != null) orbSection.setVisibility(View.GONE);
-        if (chipsRow1  != null) chipsRow1.setVisibility(View.GONE);
-        if (chipsRow2  != null) chipsRow2.setVisibility(View.GONE);
-        if (chipsRow3  != null) chipsRow3.setVisibility(View.GONE);
+        if (orbSection != null)  orbSection.setVisibility(View.GONE);
+        if (chipsRow1  != null)  chipsRow1.setVisibility(View.GONE);
+        if (chipsRow2  != null)  chipsRow2.setVisibility(View.GONE);
+        if (chipsRow3  != null)  chipsRow3.setVisibility(View.GONE);
     }
 
-    // ── TTS ───────────────────────────────────────────────────────────────────
     private void initTts() {
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
@@ -270,7 +255,6 @@ public class MainActivity extends AppCompatActivity {
         return text.replaceAll("\\[EMOTION:\\w+\\]\\s*", "").trim();
     }
 
-    // ── Strip ALL non-speech noise before TTS reads ───────────────────────────
     private String cleanForTts(String text) {
         if (text == null) return "";
         return text
@@ -317,6 +301,7 @@ public class MainActivity extends AppCompatActivity {
                 okhttp3.Request request = new okhttp3.Request.Builder()
                     .url("https://jarvis-ai-seven-dun.vercel.app/api/speak")
                     .post(reqBody).build();
+
                 try (okhttp3.Response response = httpClient.newCall(request).execute()) {
                     if (response.code() == 200 && response.body() != null) {
                         byte[] audioBytes = response.body().bytes();
@@ -325,7 +310,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             } catch (Exception e) {
-                android.util.Log.w("HENRY_TTS", "Server TTS failed: " + e.getMessage());
+                android.util.Log.w("HENRY_TTS", "Edge TTS failed: " + e.getMessage());
             }
             mainHandler.post(() -> speakNative(clean));
         }).start();
@@ -384,7 +369,6 @@ public class MainActivity extends AppCompatActivity {
         setState(OrbView.OrbState.IDLE);
     }
 
-    // ── Attachment ────────────────────────────────────────────────────────────
     private void showAttachDialog() {
         new AlertDialog.Builder(this)
             .setTitle("Attach image")
@@ -463,7 +447,6 @@ public class MainActivity extends AppCompatActivity {
         ivAttachPreview.setVisibility(View.GONE);
     }
 
-    // ── Voice ─────────────────────────────────────────────────────────────────
     private void toggleListening() {
         if (isSpeaking) { stopSpeaking(); return; }
         if (isListening) stopListening(); else startListening();
@@ -536,7 +519,6 @@ public class MainActivity extends AppCompatActivity {
         if (tvOrbHint != null) tvOrbHint.setText("WHAT CAN I DO FOR YOU, SIR?");
     }
 
-    // ── Chat ──────────────────────────────────────────────────────────────────
     private void sendText() {
         String text = etInput.getText().toString().trim();
         if (text.isEmpty() && pendingImageBase64 == null) return;
@@ -607,8 +589,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void scrollToBottom() {
         recycler.post(() -> {
-            if (scrollMain != null)
-                scrollMain.post(() -> scrollMain.fullScroll(View.FOCUS_DOWN));
+            if (scrollMain != null) scrollMain.post(() -> scrollMain.fullScroll(View.FOCUS_DOWN));
         });
     }
 
@@ -627,7 +608,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // ── Memory ────────────────────────────────────────────────────────────────
     private void saveHistory() {
         List<HistoryItem> toSave = history.size() > 80
             ? history.subList(history.size() - 80, history.size()) : history;
@@ -664,10 +644,10 @@ public class MainActivity extends AppCompatActivity {
                 messages.clear();
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(KEY_HIS).apply();
                 adapter.notifyDataSetChanged();
-                if (orbSection != null) orbSection.setVisibility(View.VISIBLE);
-                if (chipsRow1  != null) chipsRow1.setVisibility(View.VISIBLE);
-                if (chipsRow2  != null) chipsRow2.setVisibility(View.VISIBLE);
-                if (chipsRow3  != null) chipsRow3.setVisibility(View.VISIBLE);
+                if (orbSection  != null) orbSection.setVisibility(View.VISIBLE);
+                if (chipsRow1   != null) chipsRow1.setVisibility(View.VISIBLE);
+                if (chipsRow2   != null) chipsRow2.setVisibility(View.VISIBLE);
+                if (chipsRow3   != null) chipsRow3.setVisibility(View.VISIBLE);
             })
             .setNegativeButton("Cancel", null).show();
     }

@@ -209,7 +209,7 @@ public class MainActivity extends AppCompatActivity {
         ttsReady = true;
     }
 
-    // ── Extract emotion tag ───────────────────────────────────────────────────
+    // ── Extract / strip emotion tag ───────────────────────────────────────────
     private String extractEmotion(String text) {
         if (text == null) return "neutral";
         java.util.regex.Matcher m = java.util.regex.Pattern
@@ -222,7 +222,7 @@ public class MainActivity extends AppCompatActivity {
         return text.replaceAll("\\[EMOTION:\\w+\\]\\s*", "").trim();
     }
 
-    // ── Clean markdown ────────────────────────────────────────────────────────
+    // ── Clean markdown for TTS ────────────────────────────────────────────────
     private String cleanForTts(String text) {
         return text
             .replaceAll("\\[EMOTION:\\w+\\]", "")
@@ -238,10 +238,8 @@ public class MainActivity extends AppCompatActivity {
             .trim();
     }
 
-    // ── Speak with emotion ────────────────────────────────────────────────────
-    private void speak(String text) {
-        speak(text, "neutral");
-    }
+    // ── Speak ─────────────────────────────────────────────────────────────────
+    private void speak(String text) { speak(text, "neutral"); }
 
     private void speak(String rawText, String emotion) {
         if (rawText == null || rawText.trim().isEmpty()) return;
@@ -277,7 +275,6 @@ public class MainActivity extends AppCompatActivity {
         }).start();
     }
 
-    // ── Play MP3 bytes ────────────────────────────────────────────────────────
     private void playAudioBytes(byte[] audioBytes, String fallbackText) {
         try {
             if (ttsPlayer != null) {
@@ -312,7 +309,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // ── Android native TTS fallback ───────────────────────────────────────────
     private void speakNative(String clean) {
         if (!ttsReady || tts == null) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {

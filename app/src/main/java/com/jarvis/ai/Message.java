@@ -12,16 +12,27 @@ public class Message {
     public final String imageUri;  // for TYPE_IMAGE (local uri)
     public final String imageUrl;  // for TYPE_URL_IMAGE (http url)
 
+    // Text message
     public Message(int type, String text) {
-        this.type = type; this.text = text;
-        this.imageUri = null; this.imageUrl = null;
+        this.type     = type;
+        this.text     = text;
+        this.imageUri = null;
+        this.imageUrl = null;
     }
+
+    // Local image message
     public Message(int type, String text, String imageUri) {
-        this.type = type; this.text = text;
-        this.imageUri = imageUri; this.imageUrl = null;
+        this.type     = type;
+        this.text     = text;
+        this.imageUri = imageUri;
+        this.imageUrl = null;
     }
+
+    // URL image message (AI generated)
     public Message(int type, String text, String imageUri, String imageUrl) {
-        this.type = type; this.text = text;
-        this.imageUri = imageUri; this.imageUrl = imageUrl;
+        this.type     = type;
+        this.text     = text;
+        this.imageUri = imageUri;
+        this.imageUrl = imageUrl;
     }
 }

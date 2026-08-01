@@ -5,21 +5,65 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <path android:pathData="M0,0h108v108h-108z" android:fillColor="#070d1a"/>
-    <path android:pathData="M54,10 A44,44 0 1,1 53.999,10 Z"
-        android:strokeColor="#1e3a5f" android:strokeWidth="1.5" android:fillColor="#00000000"/>
-    <path android:pathData="M54,18 A36,36 0 1,1 53.999,18 Z"
-        android:strokeColor="#3b82f6" android:strokeWidth="1" android:fillColor="#00000000" android:strokeAlpha="0.6"/>
-    <path android:pathData="M54,32 A22,22 0 1,1 53.999,32 Z" android:fillColor="#1d4ed8"/>
-    <path android:pathData="M54,39 A15,15 0 1,1 53.999,39 Z"
-        android:strokeColor="#93c5fd" android:strokeWidth="1" android:fillColor="#00000000" android:strokeAlpha="0.7"/>
-    <path android:pathData="M54,49 A5,5 0 1,1 53.999,49 Z" android:fillColor="#bfdbfe"/>
+    <!-- Dark background -->
+    <path
+        android:pathData="M0,0 L108,0 L108,108 L0,108 Z"
+        android:fillColor="#080704"/>
 
-    <path android:pathData="M54,10 L54,98"
-        android:strokeColor="#3b82f6" android:strokeWidth="0.8" android:strokeAlpha="0.3" android:fillColor="#00000000"/>
-    <path android:pathData="M16,32 L92,76"
-        android:strokeColor="#3b82f6" android:strokeWidth="0.8" android:strokeAlpha="0.3" android:fillColor="#00000000"/>
-    <path android:pathData="M16,76 L92,32"
-        android:strokeColor="#3b82f6" android:strokeWidth="0.8" android:strokeAlpha="0.3" android:fillColor="#00000000"/>
+    <!-- Gold outer ring -->
+    <path
+        android:pathData="M54,10 A44,44,0,1,1,53.99,10 Z"
+        android:fillColor="#00000000"
+        android:strokeColor="#c9a84c"
+        android:strokeWidth="3"/>
+
+    <!-- Gold inner ring -->
+    <path
+        android:pathData="M54,22 A32,32,0,1,1,53.99,22 Z"
+        android:fillColor="#00000000"
+        android:strokeColor="#7a5e1e"
+        android:strokeWidth="1.2"/>
+
+    <!-- Gold triangle: top=(54,28) bottomR=(76.5,71) bottomL=(31.5,71) -->
+    <path
+        android:pathData="M54,28 L76.5,71 L31.5,71 Z"
+        android:fillColor="#00000000"
+        android:strokeColor="#c9a84c"
+        android:strokeWidth="2.8"
+        android:strokeLineJoin="round"/>
+
+    <!-- Center dot -->
+    <path
+        android:pathData="M54,50 A4,4,0,1,1,53.99,50 Z"
+        android:fillColor="#c9a84c"/>
+
+    <!-- Top-left bracket -->
+    <path
+        android:pathData="M14,26 L14,14 L26,14"
+        android:fillColor="#00000000"
+        android:strokeColor="#c9a84c"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="square"/>
+    <!-- Top-right bracket -->
+    <path
+        android:pathData="M82,14 L94,14 L94,26"
+        android:fillColor="#00000000"
+        android:strokeColor="#c9a84c"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="square"/>
+    <!-- Bottom-left bracket -->
+    <path
+        android:pathData="M14,82 L14,94 L26,94"
+        android:fillColor="#00000000"
+        android:strokeColor="#c9a84c"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="square"/>
+    <!-- Bottom-right bracket -->
+    <path
+        android:pathData="M82,94 L94,94 L94,82"
+        android:fillColor="#00000000"
+        android:strokeColor="#c9a84c"
+        android:strokeWidth="2.2"
+        android:strokeLineCap="square"/>
 
 </vector>

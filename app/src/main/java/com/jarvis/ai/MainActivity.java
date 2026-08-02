@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
@@ -41,6 +42,9 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -55,19 +59,24 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final int    PERM_CODE       = 101;
+    private static final int    PERM_CODE        = 101;
     private static final int    REQUEST_GALLERY  = 200;
     private static final int    REQUEST_CAMERA   = 201;
     private static final String PREFS            = "jarvis_prefs";
     private static final String KEY_HIS          = "history_v2";
     private static final String KEY_VOICE        = "voice_choice";
     private static final String CRASH_FILE       = "henry_crash.txt";
+    private static final String SPEAK_URL        = "https://jarvis-ai-seven-dun.vercel.app/api/speak";
 
-    // Voice choices: accent + gender
+    // Voice choices
     private static final String VOICE_BRITISH_MALE    = "british_male";
     private static final String VOICE_BRITISH_FEMALE  = "british_female";
     private static final String VOICE_AMERICAN_MALE   = "american_male";
@@ -99,6 +108,7 @@ public class MainActivity extends AppCompatActivity {
     private String pendingImageBase64;
     private String pendingImageUriStr;
 
+    // TTS — Edge TTS (neural, via Vercel) + native TTS fallback
     private TextToSpeech tts;
     private boolean      ttsReady   = false;
     private boolean      isSpeaking = false;
@@ -124,9 +134,7 @@ public class MainActivity extends AppCompatActivity {
                            + "\n\n" + android.util.Log.getStackTraceString(ex);
                 java.io.FileOutputStream fos = new java.io.FileOutputStream(crashFile, false);
                 fos.write(msg.getBytes("UTF-8"));
-                fos.flush();
-                fos.getFD().sync();
-                fos.close();
+                fos.flush(); fos.getFD().sync(); fos.close();
             } catch (Exception ignored) {}
             android.os.Process.killProcess(android.os.Process.myPid());
         });
@@ -139,24 +147,19 @@ public class MainActivity extends AppCompatActivity {
                 String lastCrash = new String(data, "UTF-8");
                 crashFile.delete();
                 new AlertDialog.Builder(this)
-                    .setTitle("HENRY Crash Report")
-                    .setMessage(lastCrash)
-                    .setPositiveButton("OK", null)
-                    .show();
+                    .setTitle("HENRY Crash Report").setMessage(lastCrash)
+                    .setPositiveButton("OK", null).show();
             } catch (Exception ignored) {}
         }
 
-        try {
-            startApp();
-        } catch (Throwable t) {
+        try { startApp(); }
+        catch (Throwable t) {
             String msg = t.getClass().getSimpleName() + ": " + t.getMessage()
                        + "\n\n" + android.util.Log.getStackTraceString(t);
             try {
                 new AlertDialog.Builder(this)
-                    .setTitle("HENRY Startup Error")
-                    .setMessage(msg)
-                    .setPositiveButton("OK", null)
-                    .show();
+                    .setTitle("HENRY Startup Error").setMessage(msg)
+                    .setPositiveButton("OK", null).show();
             } catch (Exception ignored) {
                 Toast.makeText(this, "Fatal: " + t.getMessage(), Toast.LENGTH_LONG).show();
             }
@@ -207,7 +210,7 @@ public class MainActivity extends AppCompatActivity {
         loadHistory();
         currentVoice = getSharedPreferences(PREFS, MODE_PRIVATE)
             .getString(KEY_VOICE, VOICE_BRITISH_MALE);
-        initTts();
+        initNativeTts();
         updateVoiceButtonLabel();
 
         if (orbView   != null) orbView.setOnClickListener(v -> toggleListening());
@@ -235,7 +238,7 @@ public class MainActivity extends AppCompatActivity {
             addJarvisMsg("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?");
             mainHandler.postDelayed(() ->
                 speak("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?", "warm"),
-                2000);
+                1500);
         } else {
             hideWelcome();
         }
@@ -253,30 +256,52 @@ public class MainActivity extends AppCompatActivity {
         if (chipsRow3  != null) chipsRow3.setVisibility(View.GONE);
     }
 
-    // ── TTS ───────────────────────────────────────────────────────────────────
-    private void initTts() {
+    // ── Native TTS (offline fallback) ─────────────────────────────────────────
+    private void initNativeTts() {
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
-                applyVoice(currentVoice);
-            } else {
-                tts = new TextToSpeech(this, s2 -> {
-                    if (s2 == TextToSpeech.SUCCESS) applyVoice(currentVoice);
-                });
+                applyNativeVoice(currentVoice);
+                ttsReady = true;
             }
         }, "com.google.android.tts");
     }
 
-    // ── Voice Picker — 8 options (4 accents x 2 genders) ─────────────────────
+    private void applyNativeVoice(String voice) {
+        if (tts == null) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override public void onStart(String id) {}
+                @Override public void onDone(String id) {
+                    mainHandler.post(() -> { isSpeaking = false; setState(OrbView.OrbState.IDLE); });
+                }
+                @Override public void onError(String id) {
+                    mainHandler.post(() -> { isSpeaking = false; setState(OrbView.OrbState.IDLE); });
+                }
+            });
+        }
+        boolean isFrench = voice.startsWith("french");
+        boolean isMale   = voice.endsWith("_male");
+        if (isFrench) {
+            tts.setLanguage(Locale.FRENCH);
+            tts.setPitch(isMale ? 0.78f : 1.10f);
+        } else {
+            tts.setLanguage(new Locale("en", "GB"));
+            tts.setPitch(isMale ? 0.75f : 1.05f);
+        }
+        tts.setSpeechRate(isMale ? 0.90f : 0.93f);
+    }
+
+    // ── Voice Picker ──────────────────────────────────────────────────────────
     private void showVoicePicker() {
         final String[] labels = {
-            "\uD83C\uDDEC\uD83C\uDDE7  British   Male   \u2642",
-            "\uD83C\uDDEC\uD83C\uDDE7  British   Female \u2640",
-            "\uD83C\uDDFA\uD83C\uDDF8  American  Male   \u2642",
-            "\uD83C\uDDFA\uD83C\uDDF8  American  Female \u2640",
-            "\uD83C\uDDF5\uD83C\uDDED  Filipino  Male   \u2642",
-            "\uD83C\uDDF5\uD83C\uDDED  Filipino  Female \u2640",
-            "\uD83C\uDDEB\uD83C\uDDF7  French    Male   \u2642",
-            "\uD83C\uDDEB\uD83C\uDDF7  French    Female \u2640"
+            "\uD83C\uDDEC\uD83C\uDDE7  British   Male   \u2642  (Ryan · Neural)",
+            "\uD83C\uDDEC\uD83C\uDDE7  British   Female \u2640  (Sonia · Neural)",
+            "\uD83C\uDDFA\uD83C\uDDF8  American  Male   \u2642  (Guy · Neural)",
+            "\uD83C\uDDFA\uD83C\uDDF8  American  Female \u2640  (Aria · Neural)",
+            "\uD83C\uDDF5\uD83C\uDDED  Filipino  Male   \u2642  (James · Neural)",
+            "\uD83C\uDDF5\uD83C\uDDED  Filipino  Female \u2640  (Blessica · Neural)",
+            "\uD83C\uDDEB\uD83C\uDDF7  French    Male   \u2642  (Henri · Neural)",
+            "\uD83C\uDDEB\uD83C\uDDF7  French    Female \u2640  (Denise · Neural)"
         };
         final String[] voices = {
             VOICE_BRITISH_MALE,    VOICE_BRITISH_FEMALE,
@@ -301,16 +326,16 @@ public class MainActivity extends AppCompatActivity {
         final int[] selected = { current };
 
         new AlertDialog.Builder(this)
-            .setTitle("\u25C6  H.E.N.R.Y Voice")
+            .setTitle("\u25C6  H.E.N.R.Y Voice  (Microsoft Neural)")
             .setSingleChoiceItems(labels, current, (d, which) -> selected[0] = which)
             .setPositiveButton("Apply", (d, w) -> {
                 currentVoice = voices[selected[0]];
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                     .putString(KEY_VOICE, currentVoice).apply();
-                applyVoice(currentVoice);
+                applyNativeVoice(currentVoice);
                 if (btnVoice != null) btnVoice.setText(btnTexts[selected[0]]);
-                Toast.makeText(this, "Voice: " + labels[selected[0]].substring(4).trim(),
-                    Toast.LENGTH_SHORT).show();
+                speak("H.E.N.R.Y online, sir.", "neutral");
+                Toast.makeText(this, "Neural voice applied", Toast.LENGTH_SHORT).show();
             })
             .setNegativeButton("Cancel", null)
             .show();
@@ -328,192 +353,6 @@ public class MainActivity extends AppCompatActivity {
             case VOICE_FRENCH_FEMALE:   btnVoice.setText("\uD83C\uDDEB\uD83C\uDDF7 \u2640 VOICE"); break;
             default:                    btnVoice.setText("\uD83C\uDDEC\uD83C\uDDE7 \u2642 VOICE"); break;
         }
-    }
-
-    private void applyVoice(String voice) {
-        if (tts == null) return;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
-                @Override public void onStart(String id) {}
-                @Override public void onDone(String id) {
-                    mainHandler.post(() -> { isSpeaking = false; setState(OrbView.OrbState.IDLE); });
-                }
-                @Override public void onError(String id) {
-                    mainHandler.post(() -> { isSpeaking = false; setState(OrbView.OrbState.IDLE); });
-                }
-            });
-        }
-        switch (voice) {
-            case VOICE_BRITISH_MALE:    applyBritishMale();    break;
-            case VOICE_BRITISH_FEMALE:  applyBritishFemale();  break;
-            case VOICE_AMERICAN_MALE:   applyAmericanMale();   break;
-            case VOICE_AMERICAN_FEMALE: applyAmericanFemale(); break;
-            case VOICE_FILIPINO_MALE:   applyFilipinoMale();   break;
-            case VOICE_FILIPINO_FEMALE: applyFilipinoFemale(); break;
-            case VOICE_FRENCH_MALE:     applyFrenchMale();     break;
-            case VOICE_FRENCH_FEMALE:   applyFrenchFemale();   break;
-            default:                    applyBritishMale();    break;
-        }
-        ttsReady = true;
-    }
-
-    // ── British voices ────────────────────────────────────────────────────────
-    private void applyBritishMale() {
-        android.speech.tts.Voice best = findVoice("en", "GB",
-            new String[]{"daniel", "james", "oliver", "harry", "george", "male",
-                         "en-gb-x-gba", "en-gb-x-rjs", "en-gb-x-gbg"},
-            new String[]{"female", "woman", "girl", "kate", "serena", "hazel", "emily"});
-        if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
-            tts.setVoice(best);
-        else
-            tts.setLanguage(new Locale("en", "GB"));
-        tts.setPitch(0.75f);
-        tts.setSpeechRate(0.90f);
-    }
-
-    private void applyBritishFemale() {
-        android.speech.tts.Voice best = findVoice("en", "GB",
-            new String[]{"kate", "serena", "hazel", "emily", "female", "woman",
-                         "en-gb-x-gbd", "en-gb-x-gbc"},
-            new String[]{"daniel", "james", "oliver", "harry", "george", "male"});
-        if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
-            tts.setVoice(best);
-        else
-            tts.setLanguage(new Locale("en", "GB"));
-        tts.setPitch(1.05f);
-        tts.setSpeechRate(0.92f);
-    }
-
-    // ── American voices ───────────────────────────────────────────────────────
-    private void applyAmericanMale() {
-        android.speech.tts.Voice best = findVoice("en", "US",
-            new String[]{"david", "john", "mark", "guy", "male", "en-us-x-sfg", "en-us-x-iol", "en-us-x-tpd"},
-            new String[]{"female", "woman", "girl", "zira", "samantha", "salli", "hazel"});
-        if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
-            tts.setVoice(best);
-        else
-            tts.setLanguage(new Locale("en", "US"));
-        tts.setPitch(0.80f);
-        tts.setSpeechRate(0.90f);
-    }
-
-    private void applyAmericanFemale() {
-        android.speech.tts.Voice best = findVoice("en", "US",
-            new String[]{"samantha", "zira", "salli", "female", "woman", "en-us-x-sfg", "en-us-x-iob"},
-            new String[]{"david", "john", "mark", "guy", "male"});
-        if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
-            tts.setVoice(best);
-        else
-            tts.setLanguage(new Locale("en", "US"));
-        tts.setPitch(1.10f);
-        tts.setSpeechRate(0.92f);
-    }
-
-    // ── Filipino voices ───────────────────────────────────────────────────────
-    private void applyFilipinoMale() {
-        android.speech.tts.Voice best = findFilipinoVoice(false);
-        if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
-            tts.setVoice(best);
-        else {
-            tts.setLanguage(new Locale("en", "PH"));
-            mainHandler.post(() -> Toast.makeText(this,
-                "Filipino TTS not installed, using English-PH.", Toast.LENGTH_SHORT).show());
-        }
-        tts.setPitch(0.82f);
-        tts.setSpeechRate(0.92f);
-    }
-
-    private void applyFilipinoFemale() {
-        android.speech.tts.Voice best = findFilipinoVoice(true);
-        if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
-            tts.setVoice(best);
-        else {
-            tts.setLanguage(new Locale("en", "PH"));
-            mainHandler.post(() -> Toast.makeText(this,
-                "Filipino TTS not installed, using English-PH.", Toast.LENGTH_SHORT).show());
-        }
-        tts.setPitch(1.15f);
-        tts.setSpeechRate(0.95f);
-    }
-
-    private android.speech.tts.Voice findFilipinoVoice(boolean wantFemale) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP || tts.getVoices() == null)
-            return null;
-        android.speech.tts.Voice best = null;
-        int bestScore = -1;
-        for (android.speech.tts.Voice v : tts.getVoices()) {
-            String lang    = v.getLocale().getLanguage();
-            String country = v.getLocale().getCountry();
-            String name    = v.getName().toLowerCase();
-            boolean isFil  = lang.equals("fil") || lang.equals("tl")
-                || (lang.equals("en") && country.equals("PH"));
-            if (!isFil) continue;
-            boolean isFemale = name.contains("female") || name.contains("woman") || name.contains("girl");
-            boolean isMale   = name.contains("male") && !name.contains("female");
-            if (wantFemale && isMale)    continue;
-            if (!wantFemale && isFemale) continue;
-            int score = 0;
-            if (lang.equals("fil") || lang.equals("tl")) score += 15;
-            if (wantFemale ? isFemale : isMale) score += 10;
-            boolean isNeural = name.contains("neural") || name.contains("wavenet")
-                || name.contains("enhanced")
-                || v.getQuality() >= android.speech.tts.Voice.QUALITY_HIGH;
-            if (isNeural) score += 5;
-            if (score > bestScore) { bestScore = score; best = v; }
-        }
-        return best;
-    }
-
-    // ── French voices ─────────────────────────────────────────────────────────
-    private void applyFrenchMale() {
-        android.speech.tts.Voice best = findVoice("fr", "FR",
-            new String[]{"thomas", "nicolas", "pierre", "male", "fr-fr-x-vpm"},
-            new String[]{"female", "woman", "girl", "amelie", "juliette"});
-        if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
-            tts.setVoice(best);
-        else
-            tts.setLanguage(Locale.FRENCH);
-        tts.setPitch(0.80f);
-        tts.setSpeechRate(0.88f);
-    }
-
-    private void applyFrenchFemale() {
-        android.speech.tts.Voice best = findVoice("fr", "FR",
-            new String[]{"amelie", "juliette", "female", "woman", "fr-fr-x-vpm-network"},
-            new String[]{"thomas", "nicolas", "pierre", "male"});
-        if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
-            tts.setVoice(best);
-        else
-            tts.setLanguage(Locale.FRENCH);
-        tts.setPitch(1.12f);
-        tts.setSpeechRate(0.90f);
-    }
-
-    // ── Generic voice scorer ──────────────────────────────────────────────────
-    private android.speech.tts.Voice findVoice(String lang, String country,
-                                                String[] preferred, String[] excluded) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP || tts.getVoices() == null)
-            return null;
-        android.speech.tts.Voice best = null;
-        int bestScore = -1;
-        for (android.speech.tts.Voice v : tts.getVoices()) {
-            String vLang    = v.getLocale().getLanguage();
-            String vCountry = v.getLocale().getCountry();
-            String name     = v.getName().toLowerCase();
-            if (!vLang.equals(lang)) continue;
-            boolean isExcluded = false;
-            for (String ex : excluded) if (name.contains(ex)) { isExcluded = true; break; }
-            if (isExcluded) continue;
-            int score = 0;
-            if (vCountry.equals(country)) score += 20;
-            for (String pref : preferred) if (name.contains(pref)) { score += 15; break; }
-            boolean isNeural = name.contains("neural") || name.contains("wavenet")
-                || name.contains("enhanced") || name.contains("local")
-                || v.getQuality() >= android.speech.tts.Voice.QUALITY_HIGH;
-            if (isNeural) score += 10;
-            if (score > bestScore) { bestScore = score; best = v; }
-        }
-        return best;
     }
 
     // ── Emotion ───────────────────────────────────────────────────────────────
@@ -554,16 +393,46 @@ public class MainActivity extends AppCompatActivity {
             .trim();
     }
 
-    // ── Speak ─────────────────────────────────────────────────────────────────
+    // ── Speak — Edge TTS via Vercel, fallback to native ───────────────────────
     private void speak(String text) { speak(text, "neutral"); }
 
-    private void speak(String rawText, String emotion) {
+    private void speak(final String rawText, final String emotion) {
         if (rawText == null || rawText.trim().isEmpty()) return;
         final String clean = cleanForTts(rawText);
         if (clean.isEmpty()) return;
+
         isSpeaking = true;
         setState(OrbView.OrbState.SPEAKING);
-        speakNative(clean);
+
+        new Thread(() -> {
+            try {
+                JSONObject body = new JSONObject();
+                body.put("text", clean);
+                body.put("voice", currentVoice);
+
+                RequestBody rb = RequestBody.create(
+                    body.toString(),
+                    MediaType.get("application/json; charset=utf-8"));
+                Request req = new Request.Builder()
+                    .url(SPEAK_URL).post(rb)
+                    .addHeader("Content-Type", "application/json")
+                    .build();
+
+                try (Response resp = httpClient.newCall(req).execute()) {
+                    if (resp.isSuccessful() && resp.code() != 204
+                            && resp.body() != null) {
+                        byte[] audio = resp.body().bytes();
+                        if (audio.length > 0) {
+                            mainHandler.post(() -> playAudioBytes(audio, clean));
+                            return;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+
+            // Fallback: native TTS
+            mainHandler.post(() -> speakNative(clean));
+        }).start();
     }
 
     private void playAudioBytes(byte[] audioBytes, final String fallbackText) {
@@ -574,15 +443,19 @@ public class MainActivity extends AppCompatActivity {
             }
             File tmp = File.createTempFile("tts_", ".mp3", getCacheDir());
             try (FileOutputStream fos = new FileOutputStream(tmp)) { fos.write(audioBytes); }
+
             ttsPlayer = new MediaPlayer();
+            ttsPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
             ttsPlayer.setDataSource(tmp.getAbsolutePath());
             ttsPlayer.setOnCompletionListener(mp -> {
-                isSpeaking = false; setState(OrbView.OrbState.IDLE);
+                isSpeaking = false;
+                setState(OrbView.OrbState.IDLE);
                 mp.release(); ttsPlayer = null; tmp.delete();
             });
             ttsPlayer.setOnErrorListener((mp, what, extra) -> {
                 mp.release(); ttsPlayer = null; tmp.delete();
-                speakNative(fallbackText); return true;
+                speakNative(fallbackText);
+                return true;
             });
             ttsPlayer.prepare();
             ttsPlayer.start();
@@ -592,7 +465,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void speakNative(String clean) {
-        if (!ttsReady || tts == null) return;
+        if (!ttsReady || tts == null) {
+            isSpeaking = false;
+            setState(OrbView.OrbState.IDLE);
+            return;
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
         } else {
@@ -622,8 +499,7 @@ public class MainActivity extends AppCompatActivity {
     private void openCamera() {
         Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         if (intent.resolveActivity(getPackageManager()) == null) {
-            Toast.makeText(this, "No camera app found", Toast.LENGTH_SHORT).show();
-            return;
+            Toast.makeText(this, "No camera app found", Toast.LENGTH_SHORT).show(); return;
         }
         try {
             String ts = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
@@ -686,8 +562,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void clearAttachment() {
-        pendingImageBase64 = null;
-        pendingImageUriStr = null;
+        pendingImageBase64 = null; pendingImageUriStr = null;
         if (ivAttachPreview != null) {
             ivAttachPreview.setImageDrawable(null);
             ivAttachPreview.setVisibility(View.GONE);
@@ -884,10 +759,7 @@ public class MainActivity extends AppCompatActivity {
                 messages.add(new Message(
                     "user".equals(item.role) ? Message.TYPE_USER : Message.TYPE_JARVIS,
                     item.text));
-            if (!messages.isEmpty()) {
-                adapter.notifyDataSetChanged();
-                scrollToBottom();
-            }
+            if (!messages.isEmpty()) { adapter.notifyDataSetChanged(); scrollToBottom(); }
         } catch (Exception ignored) {}
     }
 
@@ -896,8 +768,7 @@ public class MainActivity extends AppCompatActivity {
             .setTitle("Clear Memory")
             .setMessage("Wipe all conversation history?")
             .setPositiveButton("Clear", (d, w) -> {
-                history.clear();
-                messages.clear();
+                history.clear(); messages.clear();
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(KEY_HIS).apply();
                 adapter.notifyDataSetChanged();
                 if (orbSection != null) orbSection.setVisibility(View.VISIBLE);

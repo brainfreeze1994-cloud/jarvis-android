@@ -64,15 +64,19 @@ public class MainActivity extends AppCompatActivity {
     private static final int    REQUEST_CAMERA   = 201;
     private static final String PREFS            = "jarvis_prefs";
     private static final String KEY_HIS          = "history_v2";
-    private static final String KEY_ACCENT       = "accent";
+    private static final String KEY_VOICE        = "voice_choice";
     private static final String CRASH_FILE       = "henry_crash.txt";
 
-    // Accent options
-    private static final String ACCENT_BRITISH  = "british";
-    private static final String ACCENT_AMERICAN = "american";
-    private static final String ACCENT_FILIPINO = "filipino";
-    private static final String ACCENT_FRENCH   = "french";
-    private String currentAccent = ACCENT_BRITISH;
+    // Voice choices: accent + gender
+    private static final String VOICE_BRITISH_MALE    = "british_male";
+    private static final String VOICE_BRITISH_FEMALE  = "british_female";
+    private static final String VOICE_AMERICAN_MALE   = "american_male";
+    private static final String VOICE_AMERICAN_FEMALE = "american_female";
+    private static final String VOICE_FILIPINO_MALE   = "filipino_male";
+    private static final String VOICE_FILIPINO_FEMALE = "filipino_female";
+    private static final String VOICE_FRENCH_MALE     = "french_male";
+    private static final String VOICE_FRENCH_FEMALE   = "french_female";
+    private String currentVoice = VOICE_BRITISH_MALE;
 
     private OrbView          orbView;
     private TextView         tvStatus;
@@ -113,7 +117,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // File-based crash handler — fsynced to disk BEFORE killProcess
         final java.io.File crashFile = new java.io.File(getFilesDir(), CRASH_FILE);
         Thread.setDefaultUncaughtExceptionHandler((thread, ex) -> {
             try {
@@ -128,7 +131,6 @@ public class MainActivity extends AppCompatActivity {
             android.os.Process.killProcess(android.os.Process.myPid());
         });
 
-        // Show crash from previous launch
         if (crashFile.exists()) {
             try {
                 java.io.FileInputStream fis = new java.io.FileInputStream(crashFile);
@@ -137,7 +139,7 @@ public class MainActivity extends AppCompatActivity {
                 String lastCrash = new String(data, "UTF-8");
                 crashFile.delete();
                 new AlertDialog.Builder(this)
-                    .setTitle("HENRY Crash Report — share with developer")
+                    .setTitle("HENRY Crash Report")
                     .setMessage(lastCrash)
                     .setPositiveButton("OK", null)
                     .show();
@@ -203,8 +205,8 @@ public class MainActivity extends AppCompatActivity {
 
         requestPerms();
         loadHistory();
-        currentAccent = getSharedPreferences(PREFS, MODE_PRIVATE)
-            .getString(KEY_ACCENT, ACCENT_BRITISH);
+        currentVoice = getSharedPreferences(PREFS, MODE_PRIVATE)
+            .getString(KEY_VOICE, VOICE_BRITISH_MALE);
         initTts();
         updateVoiceButtonLabel();
 
@@ -212,7 +214,7 @@ public class MainActivity extends AppCompatActivity {
         if (btnMic    != null) btnMic.setOnClickListener(v -> toggleListening());
         if (btnSend   != null) btnSend.setOnClickListener(v -> sendText());
         if (btnClear  != null) btnClear.setOnClickListener(v -> confirmClear());
-        if (btnVoice  != null) btnVoice.setOnClickListener(v -> showAccentPicker());
+        if (btnVoice  != null) btnVoice.setOnClickListener(v -> showVoicePicker());
         if (btnAttach != null) btnAttach.setOnClickListener(v -> showAttachDialog());
         if (ivAttachPreview != null) ivAttachPreview.setOnClickListener(v -> clearAttachment());
         if (etInput != null) {
@@ -255,64 +257,80 @@ public class MainActivity extends AppCompatActivity {
     private void initTts() {
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
-                applyAccentVoice(currentAccent);
+                applyVoice(currentVoice);
             } else {
                 tts = new TextToSpeech(this, s2 -> {
-                    if (s2 == TextToSpeech.SUCCESS) applyAccentVoice(currentAccent);
+                    if (s2 == TextToSpeech.SUCCESS) applyVoice(currentVoice);
                 });
             }
         }, "com.google.android.tts");
     }
 
-    // ── Voice Accent Picker ───────────────────────────────────────────────────
-    private void showAccentPicker() {
-        final String[] displayLabels = {
-            "\uD83C\uDDEC\uD83C\uDDE7  British Male  —  Daniel / en-GB",
-            "\uD83C\uDDFA\uD83C\uDDF8  American Male  —  Google US / en-US",
-            "\uD83C\uDDF5\uD83C\uDDED  Filipino  —  fil-PH / en-PH",
-            "\uD83C\uDDEB\uD83C\uDDF7  French Male  —  Thomas / fr-FR"
+    // ── Voice Picker — 8 options (4 accents x 2 genders) ─────────────────────
+    private void showVoicePicker() {
+        final String[] labels = {
+            "\uD83C\uDDEC\uD83C\uDDE7  British   Male   \u2642",
+            "\uD83C\uDDEC\uD83C\uDDE7  British   Female \u2640",
+            "\uD83C\uDDFA\uD83C\uDDF8  American  Male   \u2642",
+            "\uD83C\uDDFA\uD83C\uDDF8  American  Female \u2640",
+            "\uD83C\uDDF5\uD83C\uDDED  Filipino  Male   \u2642",
+            "\uD83C\uDDF5\uD83C\uDDED  Filipino  Female \u2640",
+            "\uD83C\uDDEB\uD83C\uDDF7  French    Male   \u2642",
+            "\uD83C\uDDEB\uD83C\uDDF7  French    Female \u2640"
         };
-        final String[] accents = { ACCENT_BRITISH, ACCENT_AMERICAN, ACCENT_FILIPINO, ACCENT_FRENCH };
-        final String[] btnLabels = {
-            "\uD83C\uDDEC\uD83C\uDDE7 VOICE",   // 🇬🇧
-            "\uD83C\uDDFA\uD83C\uDDF8 VOICE",   // 🇺🇸
-            "\uD83C\uDDF5\uD83C\uDDED VOICE",   // 🇵🇭
-            "\uD83C\uDDEB\uD83C\uDDF7 VOICE"    // 🇫🇷
+        final String[] voices = {
+            VOICE_BRITISH_MALE,    VOICE_BRITISH_FEMALE,
+            VOICE_AMERICAN_MALE,   VOICE_AMERICAN_FEMALE,
+            VOICE_FILIPINO_MALE,   VOICE_FILIPINO_FEMALE,
+            VOICE_FRENCH_MALE,     VOICE_FRENCH_FEMALE
+        };
+        final String[] btnTexts = {
+            "\uD83C\uDDEC\uD83C\uDDE7 \u2642 VOICE",
+            "\uD83C\uDDEC\uD83C\uDDE7 \u2640 VOICE",
+            "\uD83C\uDDFA\uD83C\uDDF8 \u2642 VOICE",
+            "\uD83C\uDDFA\uD83C\uDDF8 \u2640 VOICE",
+            "\uD83C\uDDF5\uD83C\uDDED \u2642 VOICE",
+            "\uD83C\uDDF5\uD83C\uDDED \u2640 VOICE",
+            "\uD83C\uDDEB\uD83C\uDDF7 \u2642 VOICE",
+            "\uD83C\uDDEB\uD83C\uDDF7 \u2640 VOICE"
         };
 
         int current = 0;
-        for (int i = 0; i < accents.length; i++)
-            if (accents[i].equals(currentAccent)) { current = i; break; }
+        for (int i = 0; i < voices.length; i++)
+            if (voices[i].equals(currentVoice)) { current = i; break; }
         final int[] selected = { current };
 
         new AlertDialog.Builder(this)
-            .setTitle("\u25C6  H.E.N.R.Y Voice Accent")
-            .setSingleChoiceItems(displayLabels, current, (d, which) -> selected[0] = which)
+            .setTitle("\u25C6  H.E.N.R.Y Voice")
+            .setSingleChoiceItems(labels, current, (d, which) -> selected[0] = which)
             .setPositiveButton("Apply", (d, w) -> {
-                currentAccent = accents[selected[0]];
+                currentVoice = voices[selected[0]];
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-                    .putString(KEY_ACCENT, currentAccent).apply();
-                applyAccentVoice(currentAccent);
-                if (btnVoice != null) btnVoice.setText(btnLabels[selected[0]]);
-                String shortName = displayLabels[selected[0]].split("  —")[0].substring(4).trim();
-                Toast.makeText(this, "Voice: " + shortName, Toast.LENGTH_SHORT).show();
+                    .putString(KEY_VOICE, currentVoice).apply();
+                applyVoice(currentVoice);
+                if (btnVoice != null) btnVoice.setText(btnTexts[selected[0]]);
+                Toast.makeText(this, "Voice: " + labels[selected[0]].substring(4).trim(),
+                    Toast.LENGTH_SHORT).show();
             })
             .setNegativeButton("Cancel", null)
             .show();
     }
 
-    /** Restore correct flag on the VOICE button after app restart */
     private void updateVoiceButtonLabel() {
         if (btnVoice == null) return;
-        switch (currentAccent) {
-            case ACCENT_AMERICAN: btnVoice.setText("\uD83C\uDDFA\uD83C\uDDF8 VOICE"); break;
-            case ACCENT_FILIPINO: btnVoice.setText("\uD83C\uDDF5\uD83C\uDDED VOICE"); break;
-            case ACCENT_FRENCH:   btnVoice.setText("\uD83C\uDDEB\uD83C\uDDF7 VOICE"); break;
-            default:              btnVoice.setText("\uD83C\uDDEC\uD83C\uDDE7 VOICE"); break;
+        switch (currentVoice) {
+            case VOICE_BRITISH_MALE:    btnVoice.setText("\uD83C\uDDEC\uD83C\uDDE7 \u2642 VOICE"); break;
+            case VOICE_BRITISH_FEMALE:  btnVoice.setText("\uD83C\uDDEC\uD83C\uDDE7 \u2640 VOICE"); break;
+            case VOICE_AMERICAN_FEMALE: btnVoice.setText("\uD83C\uDDFA\uD83C\uDDF8 \u2640 VOICE"); break;
+            case VOICE_FILIPINO_MALE:   btnVoice.setText("\uD83C\uDDF5\uD83C\uDDED \u2642 VOICE"); break;
+            case VOICE_FILIPINO_FEMALE: btnVoice.setText("\uD83C\uDDF5\uD83C\uDDED \u2640 VOICE"); break;
+            case VOICE_FRENCH_MALE:     btnVoice.setText("\uD83C\uDDEB\uD83C\uDDF7 \u2642 VOICE"); break;
+            case VOICE_FRENCH_FEMALE:   btnVoice.setText("\uD83C\uDDEB\uD83C\uDDF7 \u2640 VOICE"); break;
+            default:                    btnVoice.setText("\uD83C\uDDEC\uD83C\uDDE7 \u2642 VOICE"); break;
         }
     }
 
-    private void applyAccentVoice(String accent) {
+    private void applyVoice(String voice) {
         if (tts == null) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
@@ -325,31 +343,52 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
         }
-        switch (accent) {
-            case ACCENT_AMERICAN: applyAmericanVoice(); break;
-            case ACCENT_FILIPINO: applyFilipinoVoice(); break;
-            case ACCENT_FRENCH:   applyFrenchVoice();   break;
-            default:              applyBritishVoice();   break;
+        switch (voice) {
+            case VOICE_BRITISH_MALE:    applyBritishMale();    break;
+            case VOICE_BRITISH_FEMALE:  applyBritishFemale();  break;
+            case VOICE_AMERICAN_MALE:   applyAmericanMale();   break;
+            case VOICE_AMERICAN_FEMALE: applyAmericanFemale(); break;
+            case VOICE_FILIPINO_MALE:   applyFilipinoMale();   break;
+            case VOICE_FILIPINO_FEMALE: applyFilipinoFemale(); break;
+            case VOICE_FRENCH_MALE:     applyFrenchMale();     break;
+            case VOICE_FRENCH_FEMALE:   applyFrenchFemale();   break;
+            default:                    applyBritishMale();    break;
         }
         ttsReady = true;
     }
 
-    private void applyBritishVoice() {
+    // ── British voices ────────────────────────────────────────────────────────
+    private void applyBritishMale() {
         android.speech.tts.Voice best = findVoice("en", "GB",
-            new String[]{"daniel", "george", "oliver", "harry", "james", "en-gb-x-gba", "en-gb-x-gbb"},
-            new String[]{"female", "woman", "girl", "zira", "hazel", "susan", "kate", "en-gb-x-gbc", "en-gb-x-gbd", "samantha"});
+            new String[]{"daniel", "james", "oliver", "harry", "george", "male",
+                         "en-gb-x-gba", "en-gb-x-rjs", "en-gb-x-gbg"},
+            new String[]{"female", "woman", "girl", "kate", "serena", "hazel", "emily"});
         if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
             tts.setVoice(best);
         else
             tts.setLanguage(new Locale("en", "GB"));
         tts.setPitch(0.75f);
-        tts.setSpeechRate(0.88f);
+        tts.setSpeechRate(0.90f);
     }
 
-    private void applyAmericanVoice() {
+    private void applyBritishFemale() {
+        android.speech.tts.Voice best = findVoice("en", "GB",
+            new String[]{"kate", "serena", "hazel", "emily", "female", "woman",
+                         "en-gb-x-gbd", "en-gb-x-gbc"},
+            new String[]{"daniel", "james", "oliver", "harry", "george", "male"});
+        if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
+            tts.setVoice(best);
+        else
+            tts.setLanguage(new Locale("en", "GB"));
+        tts.setPitch(1.05f);
+        tts.setSpeechRate(0.92f);
+    }
+
+    // ── American voices ───────────────────────────────────────────────────────
+    private void applyAmericanMale() {
         android.speech.tts.Voice best = findVoice("en", "US",
-            new String[]{"john", "david", "mark", "guy", "male", "en-us-x-sfg", "en-us-x-iol", "en-us-x-tpd"},
-            new String[]{"female", "woman", "girl", "zira", "hazel", "susan", "samantha", "salli"});
+            new String[]{"david", "john", "mark", "guy", "male", "en-us-x-sfg", "en-us-x-iol", "en-us-x-tpd"},
+            new String[]{"female", "woman", "girl", "zira", "samantha", "salli", "hazel"});
         if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
             tts.setVoice(best);
         else
@@ -358,44 +397,78 @@ public class MainActivity extends AppCompatActivity {
         tts.setSpeechRate(0.90f);
     }
 
-    private void applyFilipinoVoice() {
-        android.speech.tts.Voice best = null;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && tts.getVoices() != null) {
-            int bestScore = -1;
-            for (android.speech.tts.Voice v : tts.getVoices()) {
-                String lang    = v.getLocale().getLanguage();
-                String country = v.getLocale().getCountry();
-                String name    = v.getName().toLowerCase();
-                boolean isFil  = lang.equals("fil") || lang.equals("tl")
-                    || (lang.equals("en") && country.equals("PH"));
-                if (!isFil) continue;
-                boolean isFemale = name.contains("female") || name.contains("woman") || name.contains("girl");
-                int score = 0;
-                if (!isFemale) score += 20;
-                if (lang.equals("fil") || lang.equals("tl")) score += 15;
-                if (name.contains("male")) score += 10;
-                boolean isNeural = name.contains("neural") || name.contains("wavenet")
-                    || name.contains("enhanced")
-                    || v.getQuality() >= android.speech.tts.Voice.QUALITY_HIGH;
-                if (isNeural) score += 5;
-                if (score > bestScore) { bestScore = score; best = v; }
-            }
-        }
+    private void applyAmericanFemale() {
+        android.speech.tts.Voice best = findVoice("en", "US",
+            new String[]{"samantha", "zira", "salli", "female", "woman", "en-us-x-sfg", "en-us-x-iob"},
+            new String[]{"david", "john", "mark", "guy", "male"});
+        if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
+            tts.setVoice(best);
+        else
+            tts.setLanguage(new Locale("en", "US"));
+        tts.setPitch(1.10f);
+        tts.setSpeechRate(0.92f);
+    }
+
+    // ── Filipino voices ───────────────────────────────────────────────────────
+    private void applyFilipinoMale() {
+        android.speech.tts.Voice best = findFilipinoVoice(false);
         if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
             tts.setVoice(best);
         else {
             tts.setLanguage(new Locale("en", "PH"));
             mainHandler.post(() -> Toast.makeText(this,
-                "Filipino TTS not installed. Using English-PH.", Toast.LENGTH_LONG).show());
+                "Filipino TTS not installed, using English-PH.", Toast.LENGTH_SHORT).show());
         }
-        tts.setPitch(0.85f);
+        tts.setPitch(0.82f);
         tts.setSpeechRate(0.92f);
     }
 
-    private void applyFrenchVoice() {
+    private void applyFilipinoFemale() {
+        android.speech.tts.Voice best = findFilipinoVoice(true);
+        if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
+            tts.setVoice(best);
+        else {
+            tts.setLanguage(new Locale("en", "PH"));
+            mainHandler.post(() -> Toast.makeText(this,
+                "Filipino TTS not installed, using English-PH.", Toast.LENGTH_SHORT).show());
+        }
+        tts.setPitch(1.15f);
+        tts.setSpeechRate(0.95f);
+    }
+
+    private android.speech.tts.Voice findFilipinoVoice(boolean wantFemale) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP || tts.getVoices() == null)
+            return null;
+        android.speech.tts.Voice best = null;
+        int bestScore = -1;
+        for (android.speech.tts.Voice v : tts.getVoices()) {
+            String lang    = v.getLocale().getLanguage();
+            String country = v.getLocale().getCountry();
+            String name    = v.getName().toLowerCase();
+            boolean isFil  = lang.equals("fil") || lang.equals("tl")
+                || (lang.equals("en") && country.equals("PH"));
+            if (!isFil) continue;
+            boolean isFemale = name.contains("female") || name.contains("woman") || name.contains("girl");
+            boolean isMale   = name.contains("male") && !name.contains("female");
+            if (wantFemale && isMale)    continue;
+            if (!wantFemale && isFemale) continue;
+            int score = 0;
+            if (lang.equals("fil") || lang.equals("tl")) score += 15;
+            if (wantFemale ? isFemale : isMale) score += 10;
+            boolean isNeural = name.contains("neural") || name.contains("wavenet")
+                || name.contains("enhanced")
+                || v.getQuality() >= android.speech.tts.Voice.QUALITY_HIGH;
+            if (isNeural) score += 5;
+            if (score > bestScore) { bestScore = score; best = v; }
+        }
+        return best;
+    }
+
+    // ── French voices ─────────────────────────────────────────────────────────
+    private void applyFrenchMale() {
         android.speech.tts.Voice best = findVoice("fr", "FR",
-            new String[]{"thomas", "nicolas", "male", "fr-fr-x"},
-            new String[]{"female", "woman", "girl"});
+            new String[]{"thomas", "nicolas", "pierre", "male", "fr-fr-x-vpm"},
+            new String[]{"female", "woman", "girl", "amelie", "juliette"});
         if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
             tts.setVoice(best);
         else
@@ -404,6 +477,19 @@ public class MainActivity extends AppCompatActivity {
         tts.setSpeechRate(0.88f);
     }
 
+    private void applyFrenchFemale() {
+        android.speech.tts.Voice best = findVoice("fr", "FR",
+            new String[]{"amelie", "juliette", "female", "woman", "fr-fr-x-vpm-network"},
+            new String[]{"thomas", "nicolas", "pierre", "male"});
+        if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
+            tts.setVoice(best);
+        else
+            tts.setLanguage(Locale.FRENCH);
+        tts.setPitch(1.12f);
+        tts.setSpeechRate(0.90f);
+    }
+
+    // ── Generic voice scorer ──────────────────────────────────────────────────
     private android.speech.tts.Voice findVoice(String lang, String country,
                                                 String[] preferred, String[] excluded) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP || tts.getVoices() == null)
@@ -636,7 +722,7 @@ public class MainActivity extends AppCompatActivity {
                 isListening = true;
                 mainHandler.post(() -> {
                     setState(OrbView.OrbState.LISTENING);
-                    if (tvOrbHint != null) tvOrbHint.setText("LISTENING — TAP TO STOP");
+                    if (tvOrbHint != null) tvOrbHint.setText("LISTENING \u2014 TAP TO STOP");
                 });
             }
             @Override public void onBeginningOfSpeech() {}
@@ -827,7 +913,7 @@ public class MainActivity extends AppCompatActivity {
         currentState = state;
         if (orbView  != null) orbView.setState(state);
         if (tvStatus != null) {
-            final String[] labels = {"STANDBY", "LISTENING…", "PROCESSING…", "SPEAKING…", "WAKE"};
+            final String[] labels = {"STANDBY", "LISTENING\u2026", "PROCESSING\u2026", "SPEAKING\u2026", "WAKE"};
             tvStatus.setText(labels[state.ordinal()]);
         }
     }

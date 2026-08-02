@@ -59,16 +59,25 @@ import okhttp3.OkHttpClient;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final int    PERM_CODE      = 101;
-    private static final int    REQUEST_GALLERY = 200;
-    private static final int    REQUEST_CAMERA  = 201;
-    private static final String PREFS           = "jarvis_prefs";
-    private static final String KEY_HIS         = "history_v2";
-    private static final String CRASH_FILE      = "henry_crash.txt";
+    private static final int    PERM_CODE       = 101;
+    private static final int    REQUEST_GALLERY  = 200;
+    private static final int    REQUEST_CAMERA   = 201;
+    private static final String PREFS            = "jarvis_prefs";
+    private static final String KEY_HIS          = "history_v2";
+    private static final String KEY_ACCENT       = "accent";
+    private static final String CRASH_FILE       = "henry_crash.txt";
+
+    // Accent options
+    private static final String ACCENT_BRITISH  = "british";
+    private static final String ACCENT_AMERICAN = "american";
+    private static final String ACCENT_FILIPINO = "filipino";
+    private static final String ACCENT_FRENCH   = "french";
+    private String currentAccent = ACCENT_BRITISH;
 
     private OrbView          orbView;
     private TextView         tvStatus;
     private TextView         tvOrbHint;
+    private TextView         btnVoice;
     private RecyclerView     recycler;
     private EditText         etInput;
     private ImageButton      btnMic, btnSend, btnClear, btnAttach;
@@ -89,6 +98,7 @@ public class MainActivity extends AppCompatActivity {
     private TextToSpeech tts;
     private boolean      ttsReady   = false;
     private boolean      isSpeaking = false;
+    private MediaPlayer  ttsPlayer  = null;
 
     private OkHttpClient     httpClient;
     private SpeechRecognizer speechRec;
@@ -98,11 +108,12 @@ public class MainActivity extends AppCompatActivity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Gson    gson        = new Gson();
 
+    // ── onCreate ──────────────────────────────────────────────────────────────
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // File-based crash handler — fsynced before killProcess
+        // File-based crash handler — fsynced to disk BEFORE killProcess
         final java.io.File crashFile = new java.io.File(getFilesDir(), CRASH_FILE);
         Thread.setDefaultUncaughtExceptionHandler((thread, ex) -> {
             try {
@@ -126,7 +137,7 @@ public class MainActivity extends AppCompatActivity {
                 String lastCrash = new String(data, "UTF-8");
                 crashFile.delete();
                 new AlertDialog.Builder(this)
-                    .setTitle("HENRY Crash Report")
+                    .setTitle("HENRY Crash Report — share with developer")
                     .setMessage(lastCrash)
                     .setPositiveButton("OK", null)
                     .show();
@@ -150,6 +161,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // ── startApp ──────────────────────────────────────────────────────────────
     private void startApp() {
         httpClient = new OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -168,6 +180,7 @@ public class MainActivity extends AppCompatActivity {
         orbView         = findViewById(R.id.orb_view);
         tvStatus        = findViewById(R.id.tv_status);
         tvOrbHint       = findViewById(R.id.tv_orb_hint);
+        btnVoice        = findViewById(R.id.btn_voice);
         recycler        = findViewById(R.id.recycler_chat);
         etInput         = findViewById(R.id.et_input);
         btnMic          = findViewById(R.id.btn_mic);
@@ -190,13 +203,17 @@ public class MainActivity extends AppCompatActivity {
 
         requestPerms();
         loadHistory();
+        currentAccent = getSharedPreferences(PREFS, MODE_PRIVATE)
+            .getString(KEY_ACCENT, ACCENT_BRITISH);
         initTts();
+        updateVoiceButtonLabel();
 
-        if (orbView         != null) orbView.setOnClickListener(v -> toggleListening());
-        if (btnMic          != null) btnMic.setOnClickListener(v -> toggleListening());
-        if (btnSend         != null) btnSend.setOnClickListener(v -> sendText());
-        if (btnClear        != null) btnClear.setOnClickListener(v -> confirmClear());
-        if (btnAttach       != null) btnAttach.setOnClickListener(v -> showAttachDialog());
+        if (orbView   != null) orbView.setOnClickListener(v -> toggleListening());
+        if (btnMic    != null) btnMic.setOnClickListener(v -> toggleListening());
+        if (btnSend   != null) btnSend.setOnClickListener(v -> sendText());
+        if (btnClear  != null) btnClear.setOnClickListener(v -> confirmClear());
+        if (btnVoice  != null) btnVoice.setOnClickListener(v -> showAccentPicker());
+        if (btnAttach != null) btnAttach.setOnClickListener(v -> showAttachDialog());
         if (ivAttachPreview != null) ivAttachPreview.setOnClickListener(v -> clearAttachment());
         if (etInput != null) {
             etInput.setOnEditorActionListener((v, id, e) -> {
@@ -215,7 +232,7 @@ public class MainActivity extends AppCompatActivity {
         if (history.isEmpty()) {
             addJarvisMsg("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?");
             mainHandler.postDelayed(() ->
-                speak("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?"),
+                speak("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?", "warm"),
                 2000);
         } else {
             hideWelcome();
@@ -238,71 +255,182 @@ public class MainActivity extends AppCompatActivity {
     private void initTts() {
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
-                pickBestMaleVoice();
+                applyAccentVoice(currentAccent);
             } else {
-                // Retry without specifying engine
                 tts = new TextToSpeech(this, s2 -> {
-                    if (s2 == TextToSpeech.SUCCESS) pickBestMaleVoice();
+                    if (s2 == TextToSpeech.SUCCESS) applyAccentVoice(currentAccent);
                 });
             }
         }, "com.google.android.tts");
     }
 
-    private void pickBestMaleVoice() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && tts.getVoices() != null) {
-            android.speech.tts.Voice best = null;
-            int bestScore = -1;
-            for (android.speech.tts.Voice v : tts.getVoices()) {
-                String name = v.getName().toLowerCase();
-                if (!v.getLocale().getLanguage().equals("en")) continue;
-                boolean isFemale = name.contains("female") || name.contains("woman")
-                    || name.contains("girl") || name.contains("zira") || name.contains("hazel")
-                    || name.contains("susan") || name.contains("kate")
-                    || name.contains("en-gb-x-gbc") || name.contains("en-gb-x-gbd")
-                    || name.contains("samantha");
-                if (isFemale) continue;
-                boolean isBritish = v.getLocale().getCountry().equals("GB");
-                boolean isMale    = name.contains("male")  || name.contains("daniel")
-                    || name.contains("george") || name.contains("oliver")
-                    || name.contains("harry")  || name.contains("james")
-                    || name.contains("en-gb-x-gba") || name.contains("en-gb-x-gbb");
-                boolean isNeural  = name.contains("neural") || name.contains("wavenet")
-                    || name.contains("enhanced") || name.contains("local")
-                    || v.getQuality() >= android.speech.tts.Voice.QUALITY_HIGH;
-                int score = 0;
-                if (isMale)    score += 30;
-                if (isBritish) score += 15;
-                if (isNeural)  score += 10;
-                if (score > bestScore) { bestScore = score; best = v; }
-            }
-            if (best != null) tts.setVoice(best);
-            else tts.setLanguage(new Locale("en", "GB"));
-        } else {
-            tts.setLanguage(new Locale("en", "GB"));
+    // ── Voice Accent Picker ───────────────────────────────────────────────────
+    private void showAccentPicker() {
+        final String[] displayLabels = {
+            "\uD83C\uDDEC\uD83C\uDDE7  British Male  —  Daniel / en-GB",
+            "\uD83C\uDDFA\uD83C\uDDF8  American Male  —  Google US / en-US",
+            "\uD83C\uDDF5\uD83C\uDDED  Filipino  —  fil-PH / en-PH",
+            "\uD83C\uDDEB\uD83C\uDDF7  French Male  —  Thomas / fr-FR"
+        };
+        final String[] accents = { ACCENT_BRITISH, ACCENT_AMERICAN, ACCENT_FILIPINO, ACCENT_FRENCH };
+        final String[] btnLabels = {
+            "\uD83C\uDDEC\uD83C\uDDE7 VOICE",   // 🇬🇧
+            "\uD83C\uDDFA\uD83C\uDDF8 VOICE",   // 🇺🇸
+            "\uD83C\uDDF5\uD83C\uDDED VOICE",   // 🇵🇭
+            "\uD83C\uDDEB\uD83C\uDDF7 VOICE"    // 🇫🇷
+        };
+
+        int current = 0;
+        for (int i = 0; i < accents.length; i++)
+            if (accents[i].equals(currentAccent)) { current = i; break; }
+        final int[] selected = { current };
+
+        new AlertDialog.Builder(this)
+            .setTitle("\u25C6  H.E.N.R.Y Voice Accent")
+            .setSingleChoiceItems(displayLabels, current, (d, which) -> selected[0] = which)
+            .setPositiveButton("Apply", (d, w) -> {
+                currentAccent = accents[selected[0]];
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putString(KEY_ACCENT, currentAccent).apply();
+                applyAccentVoice(currentAccent);
+                if (btnVoice != null) btnVoice.setText(btnLabels[selected[0]]);
+                String shortName = displayLabels[selected[0]].split("  —")[0].substring(4).trim();
+                Toast.makeText(this, "Voice: " + shortName, Toast.LENGTH_SHORT).show();
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    /** Restore correct flag on the VOICE button after app restart */
+    private void updateVoiceButtonLabel() {
+        if (btnVoice == null) return;
+        switch (currentAccent) {
+            case ACCENT_AMERICAN: btnVoice.setText("\uD83C\uDDFA\uD83C\uDDF8 VOICE"); break;
+            case ACCENT_FILIPINO: btnVoice.setText("\uD83C\uDDF5\uD83C\uDDED VOICE"); break;
+            case ACCENT_FRENCH:   btnVoice.setText("\uD83C\uDDEB\uD83C\uDDF7 VOICE"); break;
+            default:              btnVoice.setText("\uD83C\uDDEC\uD83C\uDDE7 VOICE"); break;
         }
-        tts.setPitch(0.75f);
-        tts.setSpeechRate(0.88f);
+    }
+
+    private void applyAccentVoice(String accent) {
+        if (tts == null) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                 @Override public void onStart(String id) {}
                 @Override public void onDone(String id) {
-                    mainHandler.post(() -> {
-                        isSpeaking = false;
-                        setState(OrbView.OrbState.IDLE);
-                    });
+                    mainHandler.post(() -> { isSpeaking = false; setState(OrbView.OrbState.IDLE); });
                 }
                 @Override public void onError(String id) {
-                    mainHandler.post(() -> {
-                        isSpeaking = false;
-                        setState(OrbView.OrbState.IDLE);
-                    });
+                    mainHandler.post(() -> { isSpeaking = false; setState(OrbView.OrbState.IDLE); });
                 }
             });
+        }
+        switch (accent) {
+            case ACCENT_AMERICAN: applyAmericanVoice(); break;
+            case ACCENT_FILIPINO: applyFilipinoVoice(); break;
+            case ACCENT_FRENCH:   applyFrenchVoice();   break;
+            default:              applyBritishVoice();   break;
         }
         ttsReady = true;
     }
 
-    // ── Emotion helpers ───────────────────────────────────────────────────────
+    private void applyBritishVoice() {
+        android.speech.tts.Voice best = findVoice("en", "GB",
+            new String[]{"daniel", "george", "oliver", "harry", "james", "en-gb-x-gba", "en-gb-x-gbb"},
+            new String[]{"female", "woman", "girl", "zira", "hazel", "susan", "kate", "en-gb-x-gbc", "en-gb-x-gbd", "samantha"});
+        if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
+            tts.setVoice(best);
+        else
+            tts.setLanguage(new Locale("en", "GB"));
+        tts.setPitch(0.75f);
+        tts.setSpeechRate(0.88f);
+    }
+
+    private void applyAmericanVoice() {
+        android.speech.tts.Voice best = findVoice("en", "US",
+            new String[]{"john", "david", "mark", "guy", "male", "en-us-x-sfg", "en-us-x-iol", "en-us-x-tpd"},
+            new String[]{"female", "woman", "girl", "zira", "hazel", "susan", "samantha", "salli"});
+        if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
+            tts.setVoice(best);
+        else
+            tts.setLanguage(new Locale("en", "US"));
+        tts.setPitch(0.80f);
+        tts.setSpeechRate(0.90f);
+    }
+
+    private void applyFilipinoVoice() {
+        android.speech.tts.Voice best = null;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && tts.getVoices() != null) {
+            int bestScore = -1;
+            for (android.speech.tts.Voice v : tts.getVoices()) {
+                String lang    = v.getLocale().getLanguage();
+                String country = v.getLocale().getCountry();
+                String name    = v.getName().toLowerCase();
+                boolean isFil  = lang.equals("fil") || lang.equals("tl")
+                    || (lang.equals("en") && country.equals("PH"));
+                if (!isFil) continue;
+                boolean isFemale = name.contains("female") || name.contains("woman") || name.contains("girl");
+                int score = 0;
+                if (!isFemale) score += 20;
+                if (lang.equals("fil") || lang.equals("tl")) score += 15;
+                if (name.contains("male")) score += 10;
+                boolean isNeural = name.contains("neural") || name.contains("wavenet")
+                    || name.contains("enhanced")
+                    || v.getQuality() >= android.speech.tts.Voice.QUALITY_HIGH;
+                if (isNeural) score += 5;
+                if (score > bestScore) { bestScore = score; best = v; }
+            }
+        }
+        if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
+            tts.setVoice(best);
+        else {
+            tts.setLanguage(new Locale("en", "PH"));
+            mainHandler.post(() -> Toast.makeText(this,
+                "Filipino TTS not installed. Using English-PH.", Toast.LENGTH_LONG).show());
+        }
+        tts.setPitch(0.85f);
+        tts.setSpeechRate(0.92f);
+    }
+
+    private void applyFrenchVoice() {
+        android.speech.tts.Voice best = findVoice("fr", "FR",
+            new String[]{"thomas", "nicolas", "male", "fr-fr-x"},
+            new String[]{"female", "woman", "girl"});
+        if (best != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
+            tts.setVoice(best);
+        else
+            tts.setLanguage(Locale.FRENCH);
+        tts.setPitch(0.80f);
+        tts.setSpeechRate(0.88f);
+    }
+
+    private android.speech.tts.Voice findVoice(String lang, String country,
+                                                String[] preferred, String[] excluded) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP || tts.getVoices() == null)
+            return null;
+        android.speech.tts.Voice best = null;
+        int bestScore = -1;
+        for (android.speech.tts.Voice v : tts.getVoices()) {
+            String vLang    = v.getLocale().getLanguage();
+            String vCountry = v.getLocale().getCountry();
+            String name     = v.getName().toLowerCase();
+            if (!vLang.equals(lang)) continue;
+            boolean isExcluded = false;
+            for (String ex : excluded) if (name.contains(ex)) { isExcluded = true; break; }
+            if (isExcluded) continue;
+            int score = 0;
+            if (vCountry.equals(country)) score += 20;
+            for (String pref : preferred) if (name.contains(pref)) { score += 15; break; }
+            boolean isNeural = name.contains("neural") || name.contains("wavenet")
+                || name.contains("enhanced") || name.contains("local")
+                || v.getQuality() >= android.speech.tts.Voice.QUALITY_HIGH;
+            if (isNeural) score += 10;
+            if (score > bestScore) { bestScore = score; best = v; }
+        }
+        return best;
+    }
+
+    // ── Emotion ───────────────────────────────────────────────────────────────
     private String extractEmotion(String text) {
         if (text == null) return "neutral";
         java.util.regex.Matcher m =
@@ -340,7 +468,7 @@ public class MainActivity extends AppCompatActivity {
             .trim();
     }
 
-    // ── Speak — instant on-device, zero network delay ─────────────────────────
+    // ── Speak ─────────────────────────────────────────────────────────────────
     private void speak(String text) { speak(text, "neutral"); }
 
     private void speak(String rawText, String emotion) {
@@ -349,6 +477,35 @@ public class MainActivity extends AppCompatActivity {
         if (clean.isEmpty()) return;
         isSpeaking = true;
         setState(OrbView.OrbState.SPEAKING);
+        speakNative(clean);
+    }
+
+    private void playAudioBytes(byte[] audioBytes, final String fallbackText) {
+        try {
+            if (ttsPlayer != null) {
+                try { ttsPlayer.release(); } catch (Exception ignored) {}
+                ttsPlayer = null;
+            }
+            File tmp = File.createTempFile("tts_", ".mp3", getCacheDir());
+            try (FileOutputStream fos = new FileOutputStream(tmp)) { fos.write(audioBytes); }
+            ttsPlayer = new MediaPlayer();
+            ttsPlayer.setDataSource(tmp.getAbsolutePath());
+            ttsPlayer.setOnCompletionListener(mp -> {
+                isSpeaking = false; setState(OrbView.OrbState.IDLE);
+                mp.release(); ttsPlayer = null; tmp.delete();
+            });
+            ttsPlayer.setOnErrorListener((mp, what, extra) -> {
+                mp.release(); ttsPlayer = null; tmp.delete();
+                speakNative(fallbackText); return true;
+            });
+            ttsPlayer.prepare();
+            ttsPlayer.start();
+        } catch (Exception e) {
+            speakNative(fallbackText);
+        }
+    }
+
+    private void speakNative(String clean) {
         if (!ttsReady || tts == null) return;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
@@ -359,6 +516,10 @@ public class MainActivity extends AppCompatActivity {
 
     private void stopSpeaking() {
         isSpeaking = false;
+        if (ttsPlayer != null) {
+            try { ttsPlayer.stop(); ttsPlayer.release(); } catch (Exception ignored) {}
+            ttsPlayer = null;
+        }
         if (tts != null && tts.isSpeaking()) tts.stop();
         setState(OrbView.OrbState.IDLE);
     }
@@ -413,13 +574,13 @@ public class MainActivity extends AppCompatActivity {
                 if (is == null) throw new IOException("Cannot open stream");
                 Bitmap bmp = BitmapFactory.decodeStream(is);
                 if (bmp == null) throw new IOException("Cannot decode bitmap");
-                int w = bmp.getWidth(), h = bmp.getHeight(), maxPx = 1024;
+                int w = bmp.getWidth(), h = bmp.getHeight(), maxPx = 768;
                 if (w > maxPx || h > maxPx) {
                     float s = Math.min((float) maxPx / w, (float) maxPx / h);
                     bmp = Bitmap.createScaledBitmap(bmp, (int)(w*s), (int)(h*s), true);
                 }
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                bmp.compress(Bitmap.CompressFormat.JPEG, 80, baos);
+                bmp.compress(Bitmap.CompressFormat.JPEG, 72, baos);
                 String b64 = "data:image/jpeg;base64,"
                     + Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
                 mainHandler.post(() -> {
@@ -447,7 +608,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // ── Voice ─────────────────────────────────────────────────────────────────
+    // ── Voice Input ───────────────────────────────────────────────────────────
     private void toggleListening() {
         if (isSpeaking) { stopSpeaking(); return; }
         if (isListening) stopListening(); else startListening();
@@ -558,8 +719,7 @@ public class MainActivity extends AppCompatActivity {
                     String cleanReply = stripEmotionTag(reply);
                     history.add(new HistoryItem("model", cleanReply));
                     if (imageUrl != null && !imageUrl.isEmpty()) {
-                        messages.add(new Message(
-                            Message.TYPE_URL_IMAGE, cleanReply, null, imageUrl));
+                        messages.add(new Message(Message.TYPE_URL_IMAGE, cleanReply, null, imageUrl));
                         adapter.notifyItemInserted(messages.size() - 1);
                         scrollToBottom();
                         speak("Here is your generated image, sir.", "proud");

@@ -61,12 +61,12 @@ public class ConversationInsights {
         };
 
         for (HistoryItem item : history) {
-            String lower = item.content.toLowerCase(Locale.US);
+            String lower = item.text.toLowerCase(Locale.US);
             if ("user".equals(item.role)) {
                 userMsgs++;
-                int words = item.content.trim().split("\\s+").length;
+                int words = item.text.trim().split("\\s+").length;
                 totalWords += words;
-                if (item.content.length() > longestMsg.length()) longestMsg = item.content;
+                if (item.text.length() > longestMsg.length()) longestMsg = item.text;
                 for (String topic : topics) {
                     if (lower.contains(topic)) {
                         topicCount.put(topic, topicCount.getOrDefault(topic, 0) + 1);
@@ -100,12 +100,12 @@ public class ConversationInsights {
         // Sample last 40 user messages for AI analysis
         List<String> userMessages = new ArrayList<>();
         for (HistoryItem item : history)
-            if ("user".equals(item.role)) userMessages.add(item.content);
+            if ("user".equals(item.role)) userMessages.add(item.text);
         List<String> sample = userMessages.size() > 40
             ? userMessages.subList(userMessages.size() - 40, userMessages.size()) : userMessages;
 
         StringBuilder convoText = new StringBuilder();
-        for (String m : sample) convoText.append("- ").append(m).append("\n");
+        for (String msg : sample) convoText.append("- ").append(msg).append("\n");
 
         String name = (profile != null && !profile.name.isEmpty()) ? profile.name : "sir";
         String prompt = "You are H.E.N.R.Y analysing your own conversation history with " + name + ". " +

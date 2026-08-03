@@ -25,28 +25,28 @@ public class OrbView extends View {
     private ValueAnimator spinAnim;
     private ValueAnimator colorAnim;
 
-    // ── Emotion colour palette ────────────────────────────────────────────────
-    // Each emotion gets: accentColor (ring/triangle/dot), coreColor (fill), dimColor (spin ring)
-    private int currentAccent  = 0xFFC9A84C;   // gold  — neutral default
-    private int currentCore    = 0xFF1A1508;
-    private int currentDim     = 0xFF5C4A22;
+    // ── Emotion colour palette — BLUE theme ───────────────────────────────────
+    // Each emotion: accentColor, coreColor, dimColor
+    private int currentAccent  = 0xFF00BEFF;   // electric blue — neutral default
+    private int currentCore    = 0xFF020C1B;
+    private int currentDim     = 0xFF004466;
 
     // emotion → [accent, core, dim]
     private static int[][] EMOTION_PALETTE = {
-        // neutral  — gold
-        { 0xFFC9A84C, 0xFF1A1508, 0xFF5C4A22 },
-        // warm     — soft rose
-        { 0xFFE07898, 0xFF1A0812, 0xFF6B3045 },
-        // concerned — amber-orange
+        // neutral  — electric blue
+        { 0xFF00BEFF, 0xFF020C1B, 0xFF004466 },
+        // warm     — soft cyan
+        { 0xFF40E0FF, 0xFF011520, 0xFF006680 },
+        // concerned — amber
         { 0xFFE09040, 0xFF1A0E04, 0xFF6B4018 },
-        // excited  — electric cyan
-        { 0xFF30D0E8, 0xFF041618, 0xFF185868 },
-        // amused   — lime-green
-        { 0xFF90CC30, 0xFF0A1204, 0xFF3A5210 },
-        // serious  — crimson
+        // excited  — bright white-blue
+        { 0xFF80DFFF, 0xFF021A28, 0xFF0088BB },
+        // amused   — teal-green
+        { 0xFF00E5CC, 0xFF001A18, 0xFF007060 },
+        // serious  — deep red
         { 0xFFCC3030, 0xFF180404, 0xFF5C1010 },
-        // proud    — violet
-        { 0xFF9060D0, 0xFF100818, 0xFF3C2060 },
+        // proud    — violet-blue
+        { 0xFF6080FF, 0xFF080818, 0xFF203070 },
     };
     private static final String[] EMOTION_KEYS = {
         "neutral","warm","concerned","excited","amused","serious","proud"

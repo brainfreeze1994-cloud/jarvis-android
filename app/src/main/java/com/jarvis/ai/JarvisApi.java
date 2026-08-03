@@ -26,19 +26,22 @@ public class JarvisApi {
         void onError(String error);
     }
 
-    /** Backward-compatible call without responseMode. */
+    /** Backward-compatible. */
     public static void ask(List<HistoryItem> history, String imageBase64, Callback cb) {
-        ask(history, imageBase64, "balanced", cb);
+        ask(history, imageBase64, "balanced", null, cb);
+    }
+
+    /** With response mode only. */
+    public static void ask(List<HistoryItem> history, String imageBase64,
+                           String responseMode, Callback cb) {
+        ask(history, imageBase64, responseMode, null, cb);
     }
 
     /**
-     * @param history       Full conversation history
-     * @param imageBase64   Optional base64 image (null if none)
-     * @param responseMode  "brief" | "balanced" | "detailed"
-     * @param cb            Result callback
+     * Full call with user profile for personalisation.
      */
     public static void ask(List<HistoryItem> history, String imageBase64,
-                           String responseMode, Callback cb) {
+                           String responseMode, UserProfile profile, Callback cb) {
         new Thread(() -> {
             try {
                 JSONArray messages = new JSONArray();
@@ -50,12 +53,15 @@ public class JarvisApi {
                 }
 
                 JSONObject body = new JSONObject();
-                body.put("messages", messages);
+                body.put("messages",     messages);
                 body.put("responseMode", responseMode != null ? responseMode : "balanced");
 
-                if (imageBase64 != null && !imageBase64.isEmpty()) {
+                if (imageBase64 != null && !imageBase64.isEmpty())
                     body.put("imageBase64", imageBase64);
-                }
+
+                // Send user profile if available
+                if (profile != null && !profile.isEmpty())
+                    body.put("userProfile", profile.toJson());
 
                 RequestBody rb = RequestBody.create(body.toString(), JSON);
                 Request req = new Request.Builder()
@@ -66,19 +72,12 @@ public class JarvisApi {
 
                 try (Response resp = client.newCall(req).execute()) {
                     String bodyStr = resp.body() != null ? resp.body().string() : "";
-
-                    if (!resp.isSuccessful()) {
-                        cb.onError("Server error " + resp.code());
-                        return;
-                    }
-
+                    if (!resp.isSuccessful()) { cb.onError("Server error " + resp.code()); return; }
                     JSONObject data = new JSONObject(bodyStr);
                     String reply    = data.optString("reply", "I have no response.");
                     String imageUrl = data.optString("imageUrl", null);
-
                     cb.onSuccess(reply, imageUrl);
                 }
-
             } catch (Exception e) {
                 cb.onError(e.getMessage() != null ? e.getMessage() : "Network error");
             }

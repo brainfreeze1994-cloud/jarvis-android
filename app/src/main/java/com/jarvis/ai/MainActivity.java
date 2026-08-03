@@ -86,8 +86,15 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_MUTE         = "tts_muted";
     private static final String KEY_SPEED        = "tts_speed";
     private static final String KEY_PERSONA      = "persona_mode";
+    private static final String KEY_RESP_MODE    = "response_mode";
     private static final String CRASH_FILE       = "henry_crash.txt";
     private static final String SPEAK_URL        = "https://jarvis-ai-seven-dun.vercel.app/api/speak";
+
+    // Response mode
+    private static final String MODE_BRIEF    = "brief";
+    private static final String MODE_BALANCED = "balanced";
+    private static final String MODE_DETAILED = "detailed";
+    private String responseMode = MODE_BALANCED;
 
     // Voice choices
     private static final String VOICE_BRITISH_MALE    = "british_male";
@@ -238,11 +245,12 @@ public class MainActivity extends AppCompatActivity {
         recycler.setNestedScrollingEnabled(false);
 
         // Load prefs
-        currentVoice   = getPrefs().getString(KEY_VOICE,   VOICE_AMERICAN_MALE);
-        currentPersona = getPrefs().getString(KEY_PERSONA, PERSONA_FLIRTY);
-        wakeEnabled    = getPrefs().getBoolean(KEY_WAKE,   false);
-        ttsMuted       = getPrefs().getBoolean(KEY_MUTE,   false);
-        ttsSpeed       = getPrefs().getInt(KEY_SPEED,      1);
+        currentVoice   = getPrefs().getString(KEY_VOICE,      VOICE_AMERICAN_MALE);
+        currentPersona = getPrefs().getString(KEY_PERSONA,    PERSONA_FLIRTY);
+        responseMode   = getPrefs().getString(KEY_RESP_MODE,  MODE_BALANCED);
+        wakeEnabled    = getPrefs().getBoolean(KEY_WAKE,      false);
+        ttsMuted       = getPrefs().getBoolean(KEY_MUTE,      false);
+        ttsSpeed       = getPrefs().getInt(KEY_SPEED,         1);
 
         requestPerms();
         loadHistory();
@@ -388,12 +396,15 @@ public class MainActivity extends AppCompatActivity {
 
     // ── Voice Picker ──────────────────────────────────────────────────────────
     private void showVoicePicker() {
+        String modeLbl = MODE_BRIEF.equals(responseMode) ? "Brief"
+                       : MODE_DETAILED.equals(responseMode) ? "Detailed" : "Balanced";
         CharSequence[] options = {
             "🎙 Voice Accent",
             wakeEnabled ? "🟢 Wake Word: ON  (tap to disable)" : "⚫ Wake Word: OFF  (tap to enable)",
             ttsMuted    ? "🔇 Voice Muted  (tap to unmute)"   : "🔊 Voice Enabled  (tap to mute)",
             "⚡ Voice Speed: " + new String[]{"Slow","Normal","Fast"}[ttsSpeed],
             "🧠 Persona: " + capitalize(currentPersona),
+            "💬 Response Mode: " + modeLbl,
             "📋 My Reminders",
             "📤 Export Chat",
             "🌐 Translate Last Reply"
@@ -407,9 +418,10 @@ public class MainActivity extends AppCompatActivity {
                     case 2: toggleMute(); break;
                     case 3: showSpeedPicker(); break;
                     case 4: showPersonaPicker(); break;
-                    case 5: showReminders(); break;
-                    case 6: exportChat(); break;
-                    case 7: translateLastReply(); break;
+                    case 5: showResponseModePicker(); break;
+                    case 6: showReminders(); break;
+                    case 7: exportChat(); break;
+                    case 8: translateLastReply(); break;
                 }
             }).show();
     }
@@ -506,6 +518,30 @@ public class MainActivity extends AppCompatActivity {
             .setNegativeButton("Cancel", null).show();
     }
 
+    private void showResponseModePicker() {
+        final String[] labels  = { "⚡ Brief — 1-2 sentences max", "⚖ Balanced — default", "📖 Detailed — full explanations" };
+        final String[] modes   = { MODE_BRIEF, MODE_BALANCED, MODE_DETAILED };
+        int cur = 0;
+        for (int i = 0; i < modes.length; i++) if (modes[i].equals(responseMode)) { cur = i; break; }
+        final int[] sel = { cur };
+        new AlertDialog.Builder(this)
+            .setTitle("◆ Response Mode")
+            .setSingleChoiceItems(labels, cur, (d, w) -> sel[0] = w)
+            .setPositiveButton("Apply", (d, w) -> {
+                responseMode = modes[sel[0]];
+                getPrefs().edit().putString(KEY_RESP_MODE, responseMode).apply();
+                String msg;
+                switch (responseMode) {
+                    case MODE_BRIEF:    msg = "Switching to brief mode, sir. Short and sharp."; break;
+                    case MODE_DETAILED: msg = "Detailed mode, sir. I will hold nothing back."; break;
+                    default:            msg = "Balanced mode restored, sir."; break;
+                }
+                Toast.makeText(this, "Mode: " + responseMode, Toast.LENGTH_SHORT).show();
+                speak(msg, "neutral");
+            })
+            .setNegativeButton("Cancel", null).show();
+    }
+
     private void showReminders() {
         String list = ReminderManager.listReminders(this);
         String msg  = list != null ? stripEmotionTag(list) : "No upcoming reminders, sir.";
@@ -551,7 +587,7 @@ public class MainActivity extends AppCompatActivity {
 
                 List<HistoryItem> transHistory = new ArrayList<>();
                 transHistory.add(new HistoryItem("user", prompt));
-                JarvisApi.ask(transHistory, null, new JarvisApi.Callback() {
+                JarvisApi.ask(transHistory, null, MODE_DETAILED, new JarvisApi.Callback() {
                     @Override public void onSuccess(String reply, String imageUrl) {
                         mainHandler.post(() -> {
                             hideTyping();
@@ -698,6 +734,8 @@ public class MainActivity extends AppCompatActivity {
         if (clean.isEmpty()) return;
         isSpeaking = true;
         setState(OrbView.OrbState.SPEAKING);
+        // Apply emotion colour to orb
+        if (orbView != null) orbView.setEmotion(emotion != null ? emotion : "neutral");
 
         new Thread(() -> {
             try {
@@ -1069,7 +1107,7 @@ public class MainActivity extends AppCompatActivity {
             apiHistory.set(apiHistory.size() - 1, new HistoryItem("user", effectiveUserText));
         }
 
-        JarvisApi.ask(apiHistory, imageB64, new JarvisApi.Callback() {
+        JarvisApi.ask(apiHistory, imageB64, responseMode, new JarvisApi.Callback() {
             @Override public void onSuccess(String reply, String imageUrl) {
                 mainHandler.post(() -> {
                     hideTyping();

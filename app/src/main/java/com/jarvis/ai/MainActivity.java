@@ -167,6 +167,10 @@ public class MainActivity extends AppCompatActivity {
     // User profile (loaded once, sent with every AI call)
     private UserProfile userProfile;
 
+    // Floating bubble
+    private static final String KEY_BUBBLE = "bubble_enabled";
+    private boolean bubbleEnabled = false;
+
     // ── onCreate ──────────────────────────────────────────────────────────────
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -210,9 +214,23 @@ public class MainActivity extends AppCompatActivity {
         if (WakeWordService.ACTION_WAKE_WORD.equals(intent.getAction())) {
             handleWakeWord();
         }
-        // Widget mic button: open app and immediately start listening
         if (intent.getBooleanExtra("start_listening", false)) {
             mainHandler.postDelayed(this::startListening, 600);
+        }
+        // Handle shared content from ShareReceiver
+        String sharedText  = intent.getStringExtra("shared_text");
+        String sharedImage = intent.getStringExtra("shared_image");
+        if (sharedImage != null) {
+            encodeImageAsync(android.net.Uri.parse(sharedImage));
+            mainHandler.postDelayed(() -> {
+                hideWelcome();
+                String prompt = sharedText != null ? sharedText : "Analyse this image for me.";
+                if (etInput != null) etInput.setText(prompt);
+            }, 800);
+        } else if (sharedText != null) {
+            hideWelcome();
+            final String txt = sharedText;
+            mainHandler.post(() -> askJarvis("I'm sharing this with you: " + txt));
         }
     }
 
@@ -263,7 +281,9 @@ public class MainActivity extends AppCompatActivity {
         ttsSpeed       = getPrefs().getInt(KEY_SPEED,         1);
         screenAlwaysOn = getPrefs().getBoolean(KEY_SCREEN_ON, false);
         applyScreenAlwaysOn();
-        userProfile = UserProfile.load(this);
+        userProfile    = UserProfile.load(this);
+        bubbleEnabled  = getPrefs().getBoolean(KEY_BUBBLE, false);
+        if (bubbleEnabled) startBubble();
 
         requestPerms();
         loadHistory();
@@ -452,10 +472,15 @@ public class MainActivity extends AppCompatActivity {
             "🧠 Persona: " + capitalize(currentPersona),
             "💬 Response Mode: " + modeLbl,
             screenAlwaysOn ? "💡 Screen Always-On: ON  (tap off)" : "💡 Screen Always-On: OFF  (tap on)",
-            "📰 Morning Briefing — Read News",
+            bubbleEnabled  ? "🫧 Floating Bubble: ON  (tap off)"  : "🫧 Floating Bubble: OFF  (tap on)",
+            "☀️ Daily Digest — Full Morning Briefing",
+            "📰 Headlines Only",
             "📋 My Reminders",
             "📝 My Notes",
-            "👤 My Profile (personalise HENRY)",
+            "🛒 Shopping List",
+            "⚡ My Shortcuts",
+            "🔍 Search Chat History",
+            "👤 My Profile",
             "📤 Export Chat",
             "🌐 Translate Last Reply"
         };
@@ -470,12 +495,17 @@ public class MainActivity extends AppCompatActivity {
                     case 4:  showPersonaPicker(); break;
                     case 5:  showResponseModePicker(); break;
                     case 6:  toggleScreenAlwaysOn(); break;
-                    case 7:  readNewsBriefing(); break;
-                    case 8:  showReminders(); break;
-                    case 9:  showNotes(); break;
-                    case 10: showProfileEditor(); break;
-                    case 11: exportChat(); break;
-                    case 12: translateLastReply(); break;
+                    case 7:  toggleBubble(); break;
+                    case 8:  showDailyDigest(); break;
+                    case 9:  readNewsBriefing(); break;
+                    case 10: showReminders(); break;
+                    case 11: showNotes(); break;
+                    case 12: showShoppingList(); break;
+                    case 13: showShortcuts(); break;
+                    case 14: showChatSearch(); break;
+                    case 15: showProfileEditor(); break;
+                    case 16: exportChat(); break;
+                    case 17: translateLastReply(); break;
                 }
             }).show();
     }
@@ -702,6 +732,121 @@ public class MainActivity extends AppCompatActivity {
             .setTitle("◆ H.E.N.R.Y Reminders")
             .setMessage(msg)
             .setPositiveButton("OK", null).show();
+    }
+
+    // ── Floating Bubble ───────────────────────────────────────────────────────
+    private void toggleBubble() {
+        if (bubbleEnabled) {
+            bubbleEnabled = false;
+            getPrefs().edit().putBoolean(KEY_BUBBLE, false).apply();
+            stopService(new Intent(this, FloatingBubbleService.class));
+            speak("Bubble dismissed, sir.", "neutral");
+        } else {
+            // Need SYSTEM_ALERT_WINDOW permission
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                    && !android.provider.Settings.canDrawOverlays(this)) {
+                Intent i = new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    android.net.Uri.parse("package:" + getPackageName()));
+                startActivity(i);
+                Toast.makeText(this, "Grant 'Display over other apps' then try again", Toast.LENGTH_LONG).show();
+                return;
+            }
+            bubbleEnabled = true;
+            getPrefs().edit().putBoolean(KEY_BUBBLE, true).apply();
+            startBubble();
+            speak("Bubble activated, sir. I'll follow you everywhere.", "warm");
+        }
+    }
+
+    private void startBubble() {
+        Intent i = new Intent(this, FloatingBubbleService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(i);
+        else startService(i);
+    }
+
+    // ── Daily Digest ──────────────────────────────────────────────────────────
+    private void showDailyDigest() {
+        addJarvisMsg("Assembling your morning briefing, sir…");
+        setState(OrbView.OrbState.THINKING);
+        DailyDigest.build(this, digest -> {
+            String clean   = stripEmotionTag(digest);
+            String emotion = extractEmotion(digest);
+            addJarvisMsg(clean);
+            speak(clean, emotion);
+            setState(OrbView.OrbState.IDLE);
+        });
+    }
+
+    // ── Shopping List ─────────────────────────────────────────────────────────
+    private void showShoppingList() {
+        String content = stripEmotionTag(ShoppingList.readAll(this));
+        new AlertDialog.Builder(this)
+            .setTitle("◆ Shopping List")
+            .setMessage(content.isEmpty() ? "Empty, sir." : content)
+            .setPositiveButton("OK", null)
+            .setNeutralButton("Share", (d, w) -> {
+                Intent share = ShoppingList.shareIntent(this);
+                if (share != null) startActivity(share);
+                else Toast.makeText(this, "List is empty", Toast.LENGTH_SHORT).show();
+            })
+            .setNegativeButton("Clear All", (d, w) -> {
+                ShoppingList.clearAll(this);
+                Toast.makeText(this, "List cleared", Toast.LENGTH_SHORT).show();
+            }).show();
+    }
+
+    // ── Custom Shortcuts ──────────────────────────────────────────────────────
+    private void showShortcuts() {
+        String list = stripEmotionTag(CustomShortcuts.listAll(this));
+        new AlertDialog.Builder(this)
+            .setTitle("◆ Voice Shortcuts")
+            .setMessage(list)
+            .setPositiveButton("Add New", (d, w) -> showAddShortcut())
+            .setNeutralButton("Clear All", (d, w) -> {
+                CustomShortcuts.clearAll(this);
+                Toast.makeText(this, "Shortcuts cleared", Toast.LENGTH_SHORT).show();
+            })
+            .setNegativeButton("Close", null).show();
+    }
+
+    private void showAddShortcut() {
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(48, 24, 48, 16);
+        android.widget.EditText etTrigger = field(layout, "When I say… (e.g. good morning)", "");
+        android.widget.EditText etAction  = field(layout, "Do / say… (e.g. tell me today's weather)", "");
+        new AlertDialog.Builder(this)
+            .setTitle("New Shortcut")
+            .setView(layout)
+            .setPositiveButton("Save", (d, w) -> {
+                String trigger = etTrigger.getText().toString().trim();
+                String action  = etAction.getText().toString().trim();
+                if (!trigger.isEmpty() && !action.isEmpty()) {
+                    String reply = stripEmotionTag(CustomShortcuts.add(this, trigger, action));
+                    addJarvisMsg(reply); speak(reply, "excited");
+                }
+            })
+            .setNegativeButton("Cancel", null).show();
+    }
+
+    // ── Chat Search ───────────────────────────────────────────────────────────
+    private void showChatSearch() {
+        android.widget.EditText input = new android.widget.EditText(this);
+        input.setHint("Search keyword…");
+        input.setPadding(48, 24, 48, 24);
+        new AlertDialog.Builder(this)
+            .setTitle("🔍 Search Conversation")
+            .setView(input)
+            .setPositiveButton("Search", (d, w) -> {
+                String kw = input.getText().toString().trim();
+                if (!kw.isEmpty()) {
+                    String result = ChatSearch.search(history, kw);
+                    String clean  = stripEmotionTag(result);
+                    addJarvisMsg(clean);
+                    speak("Here are the results for " + kw + ", sir.", "neutral");
+                }
+            })
+            .setNegativeButton("Cancel", null).show();
     }
 
     // ── Translation ───────────────────────────────────────────────────────────
@@ -1230,6 +1375,81 @@ public class MainActivity extends AppCompatActivity {
         }
 
         String lower = userText.toLowerCase(java.util.Locale.US);
+
+        // ── Custom Shortcuts (checked first — user-defined overrides everything) ──
+        String shortcutAction = CustomShortcuts.match(this, userText);
+        if (shortcutAction != null) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            // If action looks like a command, execute it; otherwise speak it
+            if (shortcutAction.startsWith("ask:") || shortcutAction.startsWith("say:")) {
+                String content = shortcutAction.substring(4).trim();
+                history.add(new HistoryItem("model", content)); addJarvisMsg(content);
+                speak(content, "neutral");
+            } else {
+                // Treat as a new query to HENRY
+                askJarvis(shortcutAction); return;
+            }
+            saveHistory(); return;
+        }
+
+        // ── Chat Search ───────────────────────────────────────────────────────
+        String searchKw = ChatSearch.parseSearchCommand(userText);
+        if (searchKw != null) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String result = ChatSearch.search(history, searchKw);
+            String clean  = stripEmotionTag(result);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak("Here's what I found, sir.", "neutral"); saveHistory(); return;
+        }
+
+        // ── Daily Digest ──────────────────────────────────────────────────────
+        if (lower.matches(".*(?:daily digest|morning briefing|morning summary|good morning henry).*")) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            saveHistory(); showDailyDigest(); return;
+        }
+
+        // ── Shopping List ─────────────────────────────────────────────────────
+        if (ShoppingList.isAddCommand(userText)) {
+            String item = ShoppingList.parseItem(userText);
+            if (item != null) {
+                String reply = ShoppingList.add(this, item);
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String clean = stripEmotionTag(reply);
+                history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+                speak(clean, extractEmotion(reply)); saveHistory(); return;
+            }
+        }
+        if (ShoppingList.isShowCommand(userText)) {
+            String reply = ShoppingList.readAll(this);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+        if (ShoppingList.isClearCommand(userText)) {
+            String reply = ShoppingList.clearAll(this);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, "neutral"); saveHistory(); return;
+        }
+
+        // ── Custom Shortcut definition ("When I say X, do Y") ────────────────
+        String[] shortcutDef = CustomShortcuts.parseDefinition(userText);
+        if (shortcutDef != null) {
+            String reply = CustomShortcuts.add(this, shortcutDef[0], shortcutDef[1]);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+        if (lower.contains("my shortcut") || lower.contains("list shortcut") || lower.contains("show shortcut")) {
+            String reply = CustomShortcuts.listAll(this);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak("Here are your shortcuts, sir.", "neutral"); saveHistory(); return;
+        }
 
         // ── App Launcher ──────────────────────────────────────────────────────
         if (AppLauncher.isLaunchCommand(userText)) {

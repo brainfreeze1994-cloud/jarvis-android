@@ -1705,6 +1705,143 @@ public class MainActivity extends AppCompatActivity {
             addJarvisMsg(clean); speak(clean, "neutral"); saveHistory(); return;
         }
 
+        // ── [v11] Emergency SOS ───────────────────────────────────────────────
+        if (EmergencySOS.isSOSCommand(userText)) {
+            String reply = EmergencySOS.trigger(this);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, "concerned"); saveHistory(); return;
+        }
+        if (EmergencySOS.isSetupCommand(userText)) {
+            String contactName = EmergencySOS.parseContactName(userText);
+            if (contactName != null) {
+                String number = ContactsHelper.findNumber(this, contactName);
+                if (number != null) {
+                    EmergencySOS.setContact(this, contactName, number);
+                    String reply = "[EMOTION:warm] SOS contact set to **" + contactName + "** (" + number + "), sir. Say 'SOS' in an emergency.";
+                    history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                    String clean = stripEmotionTag(reply);
+                    history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+                    speak(clean, "warm"); saveHistory();
+                } else {
+                    showSOSSetupDialog();
+                }
+            } else {
+                showSOSSetupDialog();
+            }
+            return;
+        }
+
+        // ── [v11] Mood Tracker ────────────────────────────────────────────────
+        if (MoodTracker.isMoodCommand(userText)) {
+            String reply = MoodTracker.handle(this, userText);
+            if (reply != null) {
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String clean = stripEmotionTag(reply);
+                history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+                speak(clean, extractEmotion(reply)); saveHistory(); return;
+            }
+        }
+
+        // ── [v11] Habit Tracker ───────────────────────────────────────────────
+        if (HabitTracker.isHabitCommand(userText)) {
+            String reply = HabitTracker.handle(this, userText);
+            if (reply != null) {
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String clean = stripEmotionTag(reply);
+                history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+                speak(clean, extractEmotion(reply)); saveHistory(); return;
+            }
+        }
+
+        // ── [v11] Pomodoro Timer ──────────────────────────────────────────────
+        if (PomodoroTimer.isPomodoroCommand(userText)) {
+            PomodoroTimer pomo = PomodoroTimer.getInstance(this);
+            pomo.setCallback(new PomodoroTimer.Callback() {
+                @Override public void onTick(String label, long secondsLeft) {}
+                @Override public void onPhaseComplete(String phase, int sessions) {
+                    mainHandler.post(() -> {
+                        String msg;
+                        if ("WORK".equals(phase)) {
+                            msg = "[EMOTION:excited] Focus session complete, sir! Session " + sessions + " done. Take a break.";
+                        } else {
+                            msg = "[EMOTION:excited] Break's over, sir. Back to work!";
+                        }
+                        addJarvisMsg(stripEmotionTag(msg));
+                        speak(msg, extractEmotion(msg));
+                    });
+                }
+                @Override public void onStopped() {}
+            });
+            String reply = pomo.handle(userText);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+
+        // ── [v11] Weather Forecast ────────────────────────────────────────────
+        if (WeatherForecast.isWeatherQuery(userText)) {
+            boolean weekly = WeatherForecast.isWeeklyQuery(userText);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING);
+            addJarvisMsg(weekly ? "Fetching 7-day forecast, sir…" : "Checking weather, sir…");
+            saveHistory();
+            WeatherForecast.fetch(this, weekly, new WeatherForecast.Callback() {
+                @Override public void onResult(String formatted) {
+                    mainHandler.post(() -> {
+                        String clean   = stripEmotionTag(formatted);
+                        String emotion = extractEmotion(formatted);
+                        history.add(new HistoryItem("model", clean));
+                        addJarvisMsg(clean); speak(clean, emotion);
+                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                    });
+                }
+                @Override public void onError(String reason) {
+                    mainHandler.post(() -> {
+                        String clean = stripEmotionTag(reason);
+                        addJarvisMsg(clean); speak(clean, "neutral");
+                        setState(OrbView.OrbState.IDLE);
+                    });
+                }
+            });
+            return;
+        }
+
+        // ── [v11] Voice Translator ────────────────────────────────────────────
+        if (VoiceTranslator.isTranslateCommand(userText)) {
+            String[] parsed = VoiceTranslator.parse(userText);
+            if (parsed != null) {
+                String textToTranslate = parsed[0], langCode = parsed[1], langName = parsed[2];
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                setState(OrbView.OrbState.THINKING);
+                addJarvisMsg("Translating to " + langName + ", sir…");
+                saveHistory();
+                VoiceTranslator.translate(textToTranslate, langCode, langName,
+                    new VoiceTranslator.Callback() {
+                        @Override public void onResult(String translation, String lang, String code) {
+                            mainHandler.post(() -> {
+                                String reply = "[EMOTION:excited] **" + textToTranslate + "** in " + lang + ":\n\n**\"" + translation + "\"**";
+                                String clean = stripEmotionTag(reply);
+                                history.add(new HistoryItem("model", clean));
+                                addJarvisMsg(clean);
+                                speak(translation, "excited"); // speak the translation
+                                saveHistory(); setState(OrbView.OrbState.IDLE);
+                            });
+                        }
+                        @Override public void onError(String reason) {
+                            mainHandler.post(() -> {
+                                String clean = stripEmotionTag(reason);
+                                addJarvisMsg(clean); speak(clean, "concerned");
+                                setState(OrbView.OrbState.IDLE);
+                            });
+                        }
+                    });
+                return;
+            }
+        }
+
         // ── [v10] Sleep Mode ──────────────────────────────────────────────────
         if (SleepMode.isSleepCommand(userText)) {
             int[] wake = SleepMode.parseWakeTime(userText);
@@ -2286,6 +2423,34 @@ public class MainActivity extends AppCompatActivity {
                 return sb.toString().trim();
             }
         } catch (Exception e) { return null; }
+    }
+
+    // ── SOS Setup Dialog ─────────────────────────────────────────────────────
+    private void showSOSSetupDialog() {
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(48, 24, 48, 24);
+        android.widget.EditText etName = field(layout, "Contact name", "");
+        android.widget.EditText etNum  = field(layout, "Phone number", "");
+        android.widget.EditText etMsg  = field(layout, "Custom SOS message (optional)", "");
+        new AlertDialog.Builder(this)
+            .setTitle("◆ Set SOS Emergency Contact")
+            .setMessage("This contact will receive your location + SMS when you say 'SOS'.")
+            .setView(layout)
+            .setPositiveButton("Save", (d, w) -> {
+                String name = etName.getText().toString().trim();
+                String num  = etNum.getText().toString().trim();
+                String msg  = etMsg.getText().toString().trim();
+                if (!name.isEmpty() && !num.isEmpty()) {
+                    EmergencySOS.setContact(this, name, num);
+                    if (!msg.isEmpty()) EmergencySOS.setCustomMessage(this, msg);
+                    String reply = "[EMOTION:warm] Emergency contact saved: **" + name + "**. Say 'SOS' anytime, sir.";
+                    addJarvisMsg(stripEmotionTag(reply)); speak(reply, "warm");
+                } else {
+                    Toast.makeText(this, "Name and number required", Toast.LENGTH_SHORT).show();
+                }
+            })
+            .setNegativeButton("Cancel", null).show();
     }
 
     // ── Clear menu ────────────────────────────────────────────────────────────

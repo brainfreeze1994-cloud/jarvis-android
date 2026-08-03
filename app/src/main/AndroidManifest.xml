@@ -35,6 +35,10 @@
     <!-- Calendar -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
 
+    <!-- Fitness / Step counter -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+
     <!-- Location — Nearby Places -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -135,6 +139,15 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/henry_widget_info" />
+        </receiver>
+
+        <!-- Morning alarm receiver (Sleep Mode) -->
+        <receiver
+            android:name=".MorningAlarmReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
         </receiver>
 
         <!-- Live Camera Vision activity -->

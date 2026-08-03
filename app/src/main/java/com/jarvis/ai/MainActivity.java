@@ -1705,6 +1705,272 @@ public class MainActivity extends AppCompatActivity {
             addJarvisMsg(clean); speak(clean, "neutral"); saveHistory(); return;
         }
 
+        // ── [v13] Navigation ──────────────────────────────────────────────────
+        if (NavigationHelper.isNavCommand(userText)) {
+            String dest = NavigationHelper.parseDestination(userText);
+            boolean waze = lower.contains("waze");
+            String reply = NavigationHelper.navigate(this, dest, waze);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, "excited"); saveHistory(); return;
+        }
+
+        // ── [v13] Travel Time ─────────────────────────────────────────────────
+        if (TravelTime.isTravelTimeQuery(userText)) {
+            String dest = TravelTime.parseDestination(userText);
+            if (!dest.isEmpty()) {
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                setState(OrbView.OrbState.THINKING);
+                addJarvisMsg("Calculating travel time to **" + dest + "**, sir…");
+                saveHistory();
+                TravelTime.query(this, dest, new TravelTime.Callback() {
+                    @Override public void onResult(String formatted) {
+                        mainHandler.post(() -> {
+                            String clean   = stripEmotionTag(formatted);
+                            String emotion = extractEmotion(formatted);
+                            history.add(new HistoryItem("model", clean));
+                            addJarvisMsg(clean); speak(clean, emotion);
+                            saveHistory(); setState(OrbView.OrbState.IDLE);
+                        });
+                    }
+                    @Override public void onError(String reason) {
+                        mainHandler.post(() -> {
+                            String clean = stripEmotionTag(reason);
+                            addJarvisMsg(clean); speak(clean, "neutral");
+                            setState(OrbView.OrbState.IDLE);
+                        });
+                    }
+                });
+                return;
+            }
+        }
+
+        // ── [v13] Location Share ──────────────────────────────────────────────
+        if (LocationShare.isShareCommand(userText)) {
+            String contact = LocationShare.parseContact(userText);
+            boolean wa = LocationShare.isWhatsAppPreferred(userText);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            if (contact.isEmpty()) {
+                // Share via system sheet
+                LocationShare.shareViaSheet(this);
+                String reply = "[EMOTION:warm] Sharing your location, sir.";
+                String clean = stripEmotionTag(reply);
+                addJarvisMsg(clean); speak(clean, "warm");
+            } else {
+                String reply = LocationShare.share(this, contact, wa);
+                String clean = stripEmotionTag(reply);
+                history.add(new HistoryItem("model", clean));
+                addJarvisMsg(clean); speak(clean, extractEmotion(reply));
+            }
+            saveHistory(); return;
+        }
+
+        // ── [v13] Place Details ───────────────────────────────────────────────
+        if (PlaceDetails.isPlaceQuery(userText)) {
+            String placeQ = PlaceDetails.parseQuery(userText);
+            if (!placeQ.isEmpty()) {
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                setState(OrbView.OrbState.THINKING);
+                addJarvisMsg("Looking up **" + placeQ + "**, sir…");
+                saveHistory();
+                PlaceDetails.fetch(placeQ, new PlaceDetails.Callback() {
+                    @Override public void onResult(String summary, double lat, double lon, String name) {
+                        mainHandler.post(() -> {
+                            String clean   = stripEmotionTag(summary);
+                            String emotion = extractEmotion(summary);
+                            history.add(new HistoryItem("model", clean));
+                            addJarvisMsg(clean);
+                            speak(clean, emotion);
+                            // If we have coordinates, offer to show on map
+                            if (lat != 0 || lon != 0) {
+                                final double fLat = lat; final double fLon = lon;
+                                final String fName = name;
+                                mainHandler.postDelayed(() -> {
+                                    new AlertDialog.Builder(MainActivity.this)
+                                        .setTitle("Show on Map?")
+                                        .setMessage("Open " + fName + " on the map, sir?")
+                                        .setPositiveButton("Open Map", (d, w) -> {
+                                            Intent mapI = new Intent(MainActivity.this, MapActivity.class);
+                                            mapI.putExtra(MapActivity.EXTRA_LAT, fLat);
+                                            mapI.putExtra(MapActivity.EXTRA_LON, fLon);
+                                            mapI.putExtra(MapActivity.EXTRA_LABEL, fName);
+                                            startActivity(mapI);
+                                        })
+                                        .setNegativeButton("No thanks", null).show();
+                                }, 1500);
+                            }
+                            saveHistory(); setState(OrbView.OrbState.IDLE);
+                        });
+                    }
+                    @Override public void onError(String reason) {
+                        mainHandler.post(() -> {
+                            String clean = stripEmotionTag(reason);
+                            addJarvisMsg(clean); speak(clean, "neutral");
+                            setState(OrbView.OrbState.IDLE);
+                        });
+                    }
+                });
+                return;
+            }
+        }
+
+        // ── [v13] In-App Map (open map / show map) ────────────────────────────
+        if (lower.startsWith("open map") || lower.startsWith("show map") ||
+            lower.startsWith("show me the map") || lower.equals("map") ||
+            lower.startsWith("map of ") || lower.startsWith("find on map")) {
+            String mapQuery = userText
+                .replaceAll("(?i)^(open|show|find on)\\s+map(\\s+of)?\\s*", "").trim();
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply = "[EMOTION:excited] Opening map, sir.";
+            addJarvisMsg(stripEmotionTag(reply)); speak(reply, "excited");
+            Intent mapI = new Intent(this, MapActivity.class);
+            if (!mapQuery.isEmpty()) mapI.putExtra(MapActivity.EXTRA_QUERY, mapQuery);
+            startActivity(mapI);
+            saveHistory(); return;
+        }
+
+        // ── [v12] Speed Test ──────────────────────────────────────────────────
+        if (SpeedTest.isSpeedTestCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING);
+            addJarvisMsg("Running speed test, sir… this takes a few seconds.");
+            saveHistory();
+            SpeedTest.run(this, new SpeedTest.Callback() {
+                @Override public void onResult(String formatted) {
+                    mainHandler.post(() -> {
+                        String clean   = stripEmotionTag(formatted);
+                        String emotion = extractEmotion(formatted);
+                        history.add(new HistoryItem("model", clean));
+                        addJarvisMsg(clean); speak(clean, emotion);
+                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                    });
+                }
+                @Override public void onError(String reason) {
+                    mainHandler.post(() -> {
+                        String clean = stripEmotionTag(reason);
+                        addJarvisMsg(clean); speak(clean, "concerned");
+                        setState(OrbView.OrbState.IDLE);
+                    });
+                }
+            });
+            return;
+        }
+
+        // ── [v12] Password Vault ──────────────────────────────────────────────
+        if (PasswordVault.isVaultCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String[] cmd = PasswordVault.parseCommand(userText);
+            if (cmd == null) {
+                addJarvisMsg("Try: 'Save password for Netflix: mypass123' or 'What's my Netflix password?'");
+                saveHistory(); return;
+            }
+            // Generate — no PIN needed
+            if ("generate".equals(cmd[0])) {
+                java.util.regex.Matcher lenM = java.util.regex.Pattern.compile("(\\d+)").matcher(userText);
+                int len = lenM.find() ? Integer.parseInt(lenM.group(1)) : 16;
+                len = Math.max(8, Math.min(32, len));
+                boolean syms = !userText.toLowerCase().contains("no symbol") &&
+                               !userText.toLowerCase().contains("letters only");
+                String pwd = PasswordVault.generate(len, syms);
+                String reply = "[EMOTION:proud] Generated password: **" + pwd + "**\n\nSay 'Save password for [service]: " + pwd + "' to store it, sir.";
+                String clean = stripEmotionTag(reply);
+                history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+                speak("Password generated, sir.", "proud"); saveHistory(); return;
+            }
+            // All other actions need PIN
+            showVaultPinDialog(cmd);
+            saveHistory(); return;
+        }
+
+        // ── [v12] Trivia Quiz ─────────────────────────────────────────────────
+        // Check answer first if question is active
+        if (TriviaQuiz.hasActiveQuestion() && !TriviaQuiz.isQuizCommand(userText)) {
+            String result = TriviaQuiz.checkAnswer(userText);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(result);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(result)); saveHistory(); return;
+        }
+        if (TriviaQuiz.isQuizCommand(userText)) {
+            if (userText.toLowerCase().contains("score")) {
+                String score = TriviaQuiz.getScore();
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                addJarvisMsg(score); speak(score, "neutral"); saveHistory(); return;
+            }
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING);
+            addJarvisMsg("Fetching trivia question, sir…");
+            saveHistory();
+            TriviaQuiz.fetchQuestion(userText, new TriviaQuiz.Callback() {
+                @Override public void onQuestion(String question, java.util.List<String> options, String correct) {
+                    mainHandler.post(() -> {
+                        String formatted = TriviaQuiz.formatQuestion(question, options);
+                        String clean     = stripEmotionTag(formatted);
+                        history.add(new HistoryItem("model", clean));
+                        addJarvisMsg(clean);
+                        speak("Here's your question, sir. What's your answer?", "excited");
+                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                    });
+                }
+                @Override public void onError(String reason) {
+                    mainHandler.post(() -> {
+                        String clean = stripEmotionTag(reason);
+                        addJarvisMsg(clean); speak(clean, "neutral");
+                        setState(OrbView.OrbState.IDLE);
+                    });
+                }
+            });
+            return;
+        }
+
+        // ── [v12] Health Calculator ───────────────────────────────────────────
+        if (HealthCalculator.isHealthCommand(userText)) {
+            String reply = HealthCalculator.handle(this, userText);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+
+        // ── [v12] Expense Tracker ─────────────────────────────────────────────
+        if (ExpenseTracker.isExpenseCommand(userText)) {
+            String reply = ExpenseTracker.handle(this, userText);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+
+        // ── [v12] Recipe Generator ────────────────────────────────────────────
+        if (RecipeGenerator.isRecipeCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING);
+            addJarvisMsg("Generating recipe, sir…");
+            showTyping(); saveHistory();
+            RecipeGenerator.generate(userText, httpClient, userProfile, new RecipeGenerator.Callback() {
+                @Override public void onResult(String recipe) {
+                    mainHandler.post(() -> {
+                        hideTyping();
+                        String clean   = stripEmotionTag(recipe);
+                        String emotion = extractEmotion(recipe);
+                        history.add(new HistoryItem("model", clean));
+                        addJarvisMsg(clean); speak("Recipe ready, sir.", emotion);
+                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                    });
+                }
+                @Override public void onError(String reason) {
+                    mainHandler.post(() -> {
+                        hideTyping();
+                        String clean = stripEmotionTag(reason);
+                        addJarvisMsg(clean); speak(clean, "concerned");
+                        setState(OrbView.OrbState.IDLE);
+                    });
+                }
+            });
+            return;
+        }
+
         // ── [v11] Emergency SOS ───────────────────────────────────────────────
         if (EmergencySOS.isSOSCommand(userText)) {
             String reply = EmergencySOS.trigger(this);
@@ -2423,6 +2689,59 @@ public class MainActivity extends AppCompatActivity {
                 return sb.toString().trim();
             }
         } catch (Exception e) { return null; }
+    }
+
+    // ── Vault PIN Dialog ──────────────────────────────────────────────────────
+    private void showVaultPinDialog(String[] cmd) {
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(48, 24, 48, 24);
+        android.widget.EditText etPin = new android.widget.EditText(this);
+        etPin.setHint(PasswordVault.hasPin(this) ? "Enter vault PIN" : "Create a 4-digit PIN");
+        etPin.setInputType(android.text.InputType.TYPE_CLASS_NUMBER |
+                           android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        layout.addView(etPin);
+
+        new AlertDialog.Builder(this)
+            .setTitle("◆ Password Vault")
+            .setMessage(PasswordVault.hasPin(this) ? "Enter your vault PIN to continue, sir."
+                : "First time: create a PIN to protect your vault, sir.")
+            .setView(layout)
+            .setPositiveButton("Unlock", (d, w) -> {
+                String pin = etPin.getText().toString().trim();
+                if (pin.isEmpty()) { Toast.makeText(this, "PIN required", Toast.LENGTH_SHORT).show(); return; }
+
+                if (!PasswordVault.hasPin(this)) {
+                    PasswordVault.setPin(this, pin);
+                    Toast.makeText(this, "Vault PIN created", Toast.LENGTH_SHORT).show();
+                } else if (!PasswordVault.checkPin(this, pin)) {
+                    String wrong = "[EMOTION:concerned] Wrong PIN, sir. Vault remains locked.";
+                    addJarvisMsg(stripEmotionTag(wrong)); speak(wrong, "concerned"); return;
+                }
+
+                String reply;
+                switch (cmd[0]) {
+                    case "save":
+                        reply = PasswordVault.save(this, pin, cmd[1],
+                            cmd[2] != null ? cmd[2] : "", cmd[3] != null ? cmd[3] : "");
+                        break;
+                    case "get":
+                        reply = PasswordVault.retrieve(this, pin, cmd[1]);
+                        break;
+                    case "list":
+                        reply = PasswordVault.listServices(this, pin);
+                        break;
+                    case "delete":
+                        reply = PasswordVault.delete(this, pin, cmd[1]);
+                        break;
+                    default:
+                        reply = "[EMOTION:neutral] Unknown vault command, sir.";
+                }
+                String clean = stripEmotionTag(reply);
+                addJarvisMsg(clean); speak(clean, extractEmotion(reply));
+                history.add(new HistoryItem("model", clean)); saveHistory();
+            })
+            .setNegativeButton("Cancel", null).show();
     }
 
     // ── SOS Setup Dialog ─────────────────────────────────────────────────────

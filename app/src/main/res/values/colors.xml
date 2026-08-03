@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Blue theme palette -->
+    <color name="henry_bg">#020C1B</color>
+    <color name="henry_bg2">#050F20</color>
+    <color name="henry_surface">#0A1830</color>
+    <color name="henry_accent">#00BEFF</color>
+    <color name="henry_accent_dim">#004466</color>
+    <color name="henry_accent_mid">#0080CC</color>
+    <color name="henry_text">#00BEFF</color>
+    <color name="henry_text_dim">#1A4A6A</color>
+    <color name="henry_text_hint">#0A2A3A</color>
+    <color name="henry_divider">#081830</color>
+    <color name="henry_input_bg">#050F20</color>
+</resources>

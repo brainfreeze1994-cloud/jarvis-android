@@ -83,6 +83,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int    REQUEST_QR       = 203;
     private static final int    REQUEST_LOCATION = 204;
     private static final int    REQUEST_LIVE_CAM = 205;
+    private static final int    REQUEST_DOC_SCAN = 206;
     private static final String PREFS            = "jarvis_prefs";
     private static final String KEY_HIS          = "history_v2";
     private static final String KEY_VOICE        = "voice_choice";
@@ -144,6 +145,7 @@ public class MainActivity extends AppCompatActivity {
     private String pendingImageBase64;
     private String pendingImageUriStr;
     private String pendingPdfText;      // PDF text waiting to be sent
+    private String pendingDocScanQuestion; // question asked when scan launched
 
     private TextToSpeech tts;
     private boolean      ttsReady   = false;
@@ -176,6 +178,12 @@ public class MainActivity extends AppCompatActivity {
     // Battery guardian
     private Handler batteryHandler;
     private Runnable batteryChecker;
+
+    // Fitness tracker
+    private FitnessTracker fitnessTracker;
+
+    // Sleep mode state
+    private boolean sleepModeActive = false;
 
     // ── onCreate ──────────────────────────────────────────────────────────────
     @Override
@@ -313,6 +321,10 @@ public class MainActivity extends AppCompatActivity {
             }
         };
         batteryHandler.postDelayed(batteryChecker, 30 * 1000); // first check after 30s
+
+        // Fitness tracker
+        fitnessTracker = new FitnessTracker(this);
+        fitnessTracker.start();
 
         // Button listeners
         if (orbView   != null) orbView.setOnClickListener(v -> toggleListening());
@@ -1182,6 +1194,51 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        if (req == REQUEST_DOC_SCAN && data != null && data.getData() != null) {
+            Uri scanUri = data.getData();
+            String question = pendingDocScanQuestion != null ? pendingDocScanQuestion : "Summarise this document.";
+            pendingDocScanQuestion = null;
+            addJarvisMsg("Scanning document with ML Kit OCR…");
+            setState(OrbView.OrbState.THINKING);
+            DocumentScanner.scan(this, scanUri, new DocumentScanner.Callback() {
+                @Override public void onResult(String text, int lineCount) {
+                    mainHandler.post(() -> {
+                        String intro = "**Scanned text (" + lineCount + " lines):**\n\n" + text;
+                        addJarvisMsg(intro);
+                        speak("Scan complete, sir. " + lineCount + " lines of text extracted.", "excited");
+                        // Now ask HENRY about it
+                        String prompt = "The following text was scanned from a document:\n\n" + text +
+                            "\n\n---\n\n" + question;
+                        setState(OrbView.OrbState.THINKING); showTyping();
+                        List<HistoryItem> scanHist = new ArrayList<>();
+                        scanHist.add(new HistoryItem("user", prompt));
+                        JarvisApi.ask(scanHist, null, responseMode, userProfile, new JarvisApi.Callback() {
+                            @Override public void onSuccess(String reply, String imageUrl) {
+                                mainHandler.post(() -> {
+                                    hideTyping();
+                                    String clean   = stripEmotionTag(reply);
+                                    String emotion = extractEmotion(reply);
+                                    addJarvisMsg(clean); speak(clean, emotion);
+                                    history.add(new HistoryItem("model", clean));
+                                    saveHistory(); setState(OrbView.OrbState.IDLE);
+                                });
+                            }
+                            @Override public void onError(String error) {
+                                mainHandler.post(() -> { hideTyping(); setState(OrbView.OrbState.IDLE); });
+                            }
+                        });
+                    });
+                }
+                @Override public void onError(String reason) {
+                    mainHandler.post(() -> {
+                        addJarvisMsg(reason); speak(reason, "concerned");
+                        setState(OrbView.OrbState.IDLE);
+                    });
+                }
+            });
+            return;
+        }
+
         if (req == REQUEST_PDF && data != null && data.getData() != null) {
             handlePdfAttachment(data.getData());
             return;
@@ -1190,7 +1247,50 @@ public class MainActivity extends AppCompatActivity {
         Uri uri = null;
         if (req == REQUEST_CAMERA && cameraImageUri != null) uri = cameraImageUri;
         else if (req == REQUEST_GALLERY && data != null)     uri = data.getData();
-        if (uri != null) encodeImageAsync(uri);
+        if (uri != null) {
+            // If doc scan was pending, use OCR path instead of image attachment
+            if (pendingDocScanQuestion != null && req == REQUEST_CAMERA) {
+                Uri finalUri = uri;
+                String question = pendingDocScanQuestion;
+                pendingDocScanQuestion = null;
+                addJarvisMsg("Scanning document…");
+                setState(OrbView.OrbState.THINKING);
+                DocumentScanner.scan(this, finalUri, new DocumentScanner.Callback() {
+                    @Override public void onResult(String text, int lineCount) {
+                        mainHandler.post(() -> {
+                            addJarvisMsg("**Scanned (" + lineCount + " lines):**\n\n" + text);
+                            speak("Scan complete, " + lineCount + " lines extracted, sir.", "excited");
+                            String prompt = "Scanned document text:\n\n" + text + "\n\n---\n\n" + question;
+                            List<HistoryItem> h2 = new ArrayList<>();
+                            h2.add(new HistoryItem("user", prompt));
+                            showTyping();
+                            JarvisApi.ask(h2, null, responseMode, userProfile, new JarvisApi.Callback() {
+                                @Override public void onSuccess(String reply, String imageUrl) {
+                                    mainHandler.post(() -> {
+                                        hideTyping();
+                                        String clean = stripEmotionTag(reply);
+                                        addJarvisMsg(clean); speak(clean, extractEmotion(reply));
+                                        history.add(new HistoryItem("model", clean));
+                                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                                    });
+                                }
+                                @Override public void onError(String e) {
+                                    mainHandler.post(() -> { hideTyping(); setState(OrbView.OrbState.IDLE); });
+                                }
+                            });
+                        });
+                    }
+                    @Override public void onError(String reason) {
+                        mainHandler.post(() -> {
+                            addJarvisMsg(reason); speak(reason, "concerned");
+                            setState(OrbView.OrbState.IDLE);
+                        });
+                    }
+                });
+            } else {
+                encodeImageAsync(uri);
+            }
+        }
     }
 
     // ── PDF Reading ───────────────────────────────────────────────────────────
@@ -1603,6 +1703,169 @@ public class MainActivity extends AppCompatActivity {
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
             String clean = stripEmotionTag(hint);
             addJarvisMsg(clean); speak(clean, "neutral"); saveHistory(); return;
+        }
+
+        // ── [v10] Sleep Mode ──────────────────────────────────────────────────
+        if (SleepMode.isSleepCommand(userText)) {
+            int[] wake = SleepMode.parseWakeTime(userText);
+            int wh = wake != null ? wake[0] : -1, wm = wake != null ? wake[1] : 0;
+            String reply = SleepMode.activate(this, wh, wm);
+            sleepModeActive = true;
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, "warm"); saveHistory(); return;
+        }
+        if (SleepMode.isWakeCommand(userText) && sleepModeActive) {
+            String reply = SleepMode.deactivate(this);
+            sleepModeActive = false;
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, "excited"); saveHistory(); return;
+        }
+
+        // ── [v10] Fitness Tracker ─────────────────────────────────────────────
+        if (FitnessTracker.isStepsCommand(userText)) {
+            // Set goal?
+            java.util.regex.Matcher goalM = java.util.regex.Pattern.compile(
+                "(?:set.*goal|goal.*to).*?(\\d[\\d,]+)", java.util.regex.Pattern.CASE_INSENSITIVE)
+                .matcher(userText);
+            if (goalM.find()) {
+                int newGoal = Integer.parseInt(goalM.group(1).replace(",", ""));
+                fitnessTracker.setDailyGoal(this, newGoal);
+                String reply = "[EMOTION:excited] Daily step goal set to **" + String.format("%,d", newGoal) + "** steps, sir. Let's move!";
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String clean = stripEmotionTag(reply);
+                history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+                speak(clean, "excited"); saveHistory(); return;
+            }
+            String reply = FitnessTracker.getStatusReport(this);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+
+        // ── [v10] Voice Journal ───────────────────────────────────────────────
+        if (VoiceJournal.isSaveCommand(userText)) {
+            String entry = VoiceJournal.parseEntry(userText);
+            String reply = VoiceJournal.save(this, entry);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+        if (VoiceJournal.isReadCommand(userText)) {
+            String reply = VoiceJournal.readRecent(this, 5);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak("Here are your recent journal entries, sir.", "warm"); saveHistory(); return;
+        }
+        if (VoiceJournal.isSearchCommand(userText)) {
+            String kw = userText.replaceAll("(?i)(search|journal|diary|find)\\s*", "").trim();
+            String reply = VoiceJournal.search(this, kw);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak("Here are the journal results, sir.", "neutral"); saveHistory(); return;
+        }
+        if (VoiceJournal.isExportCommand(userText)) {
+            Intent exportI = VoiceJournal.exportIntent(this);
+            if (exportI != null) startActivity(exportI);
+            else Toast.makeText(this, "Journal is empty", Toast.LENGTH_SHORT).show();
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply = "[EMOTION:warm] Sharing your journal, sir.";
+            String clean = stripEmotionTag(reply);
+            addJarvisMsg(clean); speak(clean, "warm"); saveHistory(); return;
+        }
+
+        // ── [v10] Live Prices ─────────────────────────────────────────────────
+        if (LivePrices.isPriceQuery(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING);
+            addJarvisMsg("Fetching live prices, sir…");
+            saveHistory();
+            LivePrices.query(userText, new LivePrices.Callback() {
+                @Override public void onResult(String formatted) {
+                    mainHandler.post(() -> {
+                        String clean   = stripEmotionTag(formatted);
+                        String emotion = extractEmotion(formatted);
+                        history.add(new HistoryItem("model", clean));
+                        addJarvisMsg(clean); speak(clean, emotion);
+                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                    });
+                }
+                @Override public void onError(String reason) {
+                    mainHandler.post(() -> {
+                        String clean = stripEmotionTag(reason);
+                        addJarvisMsg(clean); speak(clean, "neutral");
+                        setState(OrbView.OrbState.IDLE);
+                    });
+                }
+            });
+            return;
+        }
+
+        // ── [v10] Document Scanner ────────────────────────────────────────────
+        if (DocumentScanner.isScanCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            pendingDocScanQuestion = userText;
+            // Open gallery or camera picker
+            new AlertDialog.Builder(this)
+                .setTitle("◆ Scan Document")
+                .setItems(new String[]{"📷 Take photo", "🖼 Choose from gallery"}, (d, which) -> {
+                    if (which == 0) {
+                        Intent cam = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                        try {
+                            String ts = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+                            File photo = File.createTempFile("SCAN_" + ts, ".jpg",
+                                getExternalFilesDir(Environment.DIRECTORY_PICTURES));
+                            cameraImageUri = FileProvider.getUriForFile(
+                                this, getPackageName() + ".provider", photo);
+                            cam.putExtra(MediaStore.EXTRA_OUTPUT, cameraImageUri);
+                            startActivityForResult(cam, REQUEST_CAMERA);
+                            // Doc scan result handled in onActivityResult by using pendingDocScanQuestion
+                        } catch (Exception e) {
+                            Toast.makeText(this, "Camera error", Toast.LENGTH_SHORT).show();
+                        }
+                    } else {
+                        Intent pick = new Intent(Intent.ACTION_GET_CONTENT);
+                        pick.setType("image/*");
+                        startActivityForResult(Intent.createChooser(pick, "Select document"), REQUEST_DOC_SCAN);
+                    }
+                })
+                .setNegativeButton("Cancel", null).show();
+            speak("Opening scanner, sir.", "neutral");
+            saveHistory(); return;
+        }
+
+        // ── [v10] Conversation Insights ───────────────────────────────────────
+        if (ConversationInsights.isInsightCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING);
+            addJarvisMsg("Analysing our conversation history, sir…");
+            showTyping(); saveHistory();
+            ConversationInsights.analyse(history, httpClient, userProfile, new ConversationInsights.Callback() {
+                @Override public void onResult(String insight) {
+                    mainHandler.post(() -> {
+                        hideTyping();
+                        String clean   = stripEmotionTag(insight);
+                        String emotion = extractEmotion(insight);
+                        history.add(new HistoryItem("model", clean));
+                        addJarvisMsg(clean); speak(clean, emotion);
+                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                    });
+                }
+                @Override public void onError(String reason) {
+                    mainHandler.post(() -> {
+                        hideTyping(); addJarvisMsg(reason);
+                        setState(OrbView.OrbState.IDLE);
+                    });
+                }
+            });
+            return;
         }
 
         // ── [v9] Live Camera Vision ───────────────────────────────────────────
@@ -2119,6 +2382,8 @@ public class MainActivity extends AppCompatActivity {
         needed.add(Manifest.permission.READ_CONTACTS);
         needed.add(Manifest.permission.READ_CALENDAR);
         needed.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+            needed.add(Manifest.permission.ACTIVITY_RECOGNITION);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
             needed.add(Manifest.permission.POST_NOTIFICATIONS);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
@@ -2157,6 +2422,7 @@ public class MainActivity extends AppCompatActivity {
         if (tts != null) { tts.stop(); tts.shutdown(); }
         if (batteryHandler != null && batteryChecker != null)
             batteryHandler.removeCallbacks(batteryChecker);
+        if (fitnessTracker != null) fitnessTracker.stop();
         try { unregisterReceiver(wakeReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(notifReceiver); } catch (Exception ignored) {}
         super.onDestroy();

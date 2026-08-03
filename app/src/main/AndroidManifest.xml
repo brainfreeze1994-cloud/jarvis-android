@@ -153,6 +153,13 @@
             </intent-filter>
         </receiver>
 
+        <!-- In-App Map -->
+        <activity
+            android:name=".MapActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.Jarvis" />
+
         <!-- Live Camera Vision activity -->
         <activity
             android:name=".LiveCameraActivity"

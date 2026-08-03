@@ -2,8 +2,13 @@ package com.jarvis.ai;
 
 import android.Manifest;
 import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
+import android.content.ContentResolver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.AudioManager;
@@ -14,6 +19,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.CalendarContract;
 import android.provider.MediaStore;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
@@ -30,6 +36,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -67,12 +74,17 @@ import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final int    PERM_CODE        = 101;
+    private static final int    PERM_CODE       = 101;
+    private static final int    PERM_CALL       = 102;
     private static final int    REQUEST_GALLERY  = 200;
     private static final int    REQUEST_CAMERA   = 201;
     private static final String PREFS            = "jarvis_prefs";
     private static final String KEY_HIS          = "history_v2";
     private static final String KEY_VOICE        = "voice_choice";
+    private static final String KEY_WAKE         = "wake_enabled";
+    private static final String KEY_MUTE         = "tts_muted";
+    private static final String KEY_SPEED        = "tts_speed";
+    private static final String KEY_PERSONA      = "persona_mode";
     private static final String CRASH_FILE       = "henry_crash.txt";
     private static final String SPEAK_URL        = "https://jarvis-ai-seven-dun.vercel.app/api/speak";
 
@@ -85,18 +97,28 @@ public class MainActivity extends AppCompatActivity {
     private static final String VOICE_FILIPINO_FEMALE = "filipino_female";
     private static final String VOICE_FRENCH_MALE     = "french_male";
     private static final String VOICE_FRENCH_FEMALE   = "french_female";
-    private String currentVoice = VOICE_BRITISH_MALE;
+    private String currentVoice   = VOICE_AMERICAN_MALE;
 
-    private OrbView          orbView;
-    private TextView         tvStatus;
-    private TextView         tvOrbHint;
-    private TextView         btnVoice;
-    private RecyclerView     recycler;
-    private EditText         etInput;
-    private ImageButton      btnMic, btnSend, btnClear, btnAttach;
-    private ImageView        ivAttachPreview;
-    private LinearLayout     orbSection;
-    private LinearLayout     chipsRow1, chipsRow2, chipsRow3;
+    // Persona modes
+    private static final String PERSONA_FLIRTY       = "flirty";
+    private static final String PERSONA_PROFESSIONAL = "professional";
+    private static final String PERSONA_CASUAL       = "casual";
+    private static final String PERSONA_TACTICAL     = "tactical";
+    private String currentPersona = PERSONA_FLIRTY;
+
+    // TTS speed (0=slow, 1=normal, 2=fast)
+    private int    ttsSpeed  = 1;
+    private boolean ttsMuted = false;
+    private boolean wakeEnabled = false;
+
+    // UI
+    private OrbView      orbView;
+    private TextView     tvStatus, tvOrbHint, btnVoice;
+    private RecyclerView recycler;
+    private EditText     etInput;
+    private ImageButton  btnMic, btnSend, btnClear, btnAttach;
+    private ImageView    ivAttachPreview;
+    private LinearLayout orbSection, chipsRow1, chipsRow2, chipsRow3;
     private NestedScrollView scrollMain;
 
     private final List<Message>     messages = new ArrayList<>();
@@ -108,7 +130,6 @@ public class MainActivity extends AppCompatActivity {
     private String pendingImageBase64;
     private String pendingImageUriStr;
 
-    // TTS — Edge TTS (neural, via Vercel) + native TTS fallback
     private TextToSpeech tts;
     private boolean      ttsReady   = false;
     private boolean      isSpeaking = false;
@@ -122,11 +143,17 @@ public class MainActivity extends AppCompatActivity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Gson    gson        = new Gson();
 
+    // Pending call/sms action waiting for permission
+    private String pendingCallAction = null;
+
+    // Broadcast receivers
+    private BroadcastReceiver wakeReceiver;
+    private BroadcastReceiver notifReceiver;
+
     // ── onCreate ──────────────────────────────────────────────────────────────
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         final java.io.File crashFile = new java.io.File(getFilesDir(), CRASH_FILE);
         Thread.setDefaultUncaughtExceptionHandler((thread, ex) -> {
             try {
@@ -138,7 +165,6 @@ public class MainActivity extends AppCompatActivity {
             } catch (Exception ignored) {}
             android.os.Process.killProcess(android.os.Process.myPid());
         });
-
         if (crashFile.exists()) {
             try {
                 java.io.FileInputStream fis = new java.io.FileInputStream(crashFile);
@@ -151,18 +177,20 @@ public class MainActivity extends AppCompatActivity {
                     .setPositiveButton("OK", null).show();
             } catch (Exception ignored) {}
         }
-
         try { startApp(); }
         catch (Throwable t) {
-            String msg = t.getClass().getSimpleName() + ": " + t.getMessage()
-                       + "\n\n" + android.util.Log.getStackTraceString(t);
-            try {
-                new AlertDialog.Builder(this)
-                    .setTitle("HENRY Startup Error").setMessage(msg)
-                    .setPositiveButton("OK", null).show();
-            } catch (Exception ignored) {
-                Toast.makeText(this, "Fatal: " + t.getMessage(), Toast.LENGTH_LONG).show();
-            }
+            new AlertDialog.Builder(this)
+                .setTitle("HENRY Startup Error")
+                .setMessage(android.util.Log.getStackTraceString(t))
+                .setPositiveButton("OK", null).show();
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (intent != null && WakeWordService.ACTION_WAKE_WORD.equals(intent.getAction())) {
+            handleWakeWord();
         }
     }
 
@@ -170,8 +198,7 @@ public class MainActivity extends AppCompatActivity {
     private void startApp() {
         httpClient = new OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(90, TimeUnit.SECONDS)
-            .build();
+            .readTimeout(90, TimeUnit.SECONDS).build();
 
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
             WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -179,7 +206,6 @@ public class MainActivity extends AppCompatActivity {
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY |
             View.SYSTEM_UI_FLAG_FULLSCREEN |
             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
-
         setContentView(R.layout.activity_main);
 
         orbView         = findViewById(R.id.orb_view);
@@ -206,17 +232,27 @@ public class MainActivity extends AppCompatActivity {
         recycler.setAdapter(adapter);
         recycler.setNestedScrollingEnabled(false);
 
+        // Load prefs
+        currentVoice   = getPrefs().getString(KEY_VOICE,    VOICE_AMERICAN_MALE);
+        currentPersona = getPrefs().getString(KEY_PERSONA,  PERSONA_FLIRTY);
+        wakeEnabled    = getPrefs().getBoolean(KEY_WAKE,    false);
+        ttsMuted       = getPrefs().getBoolean(KEY_MUTE,    false);
+        ttsSpeed       = getPrefs().getInt(KEY_SPEED,       1);
+
         requestPerms();
         loadHistory();
-        currentVoice = getSharedPreferences(PREFS, MODE_PRIVATE)
-            .getString(KEY_VOICE, VOICE_BRITISH_MALE);
         initNativeTts();
         updateVoiceButtonLabel();
+        registerReceivers();
 
+        // Restore wake word service if previously enabled
+        if (wakeEnabled) startWakeService();
+
+        // Button listeners
         if (orbView   != null) orbView.setOnClickListener(v -> toggleListening());
         if (btnMic    != null) btnMic.setOnClickListener(v -> toggleListening());
         if (btnSend   != null) btnSend.setOnClickListener(v -> sendText());
-        if (btnClear  != null) btnClear.setOnClickListener(v -> confirmClear());
+        if (btnClear  != null) btnClear.setOnClickListener(v -> showClearMenu());
         if (btnVoice  != null) btnVoice.setOnClickListener(v -> showVoicePicker());
         if (btnAttach != null) btnAttach.setOnClickListener(v -> showAttachDialog());
         if (ivAttachPreview != null) ivAttachPreview.setOnClickListener(v -> clearAttachment());
@@ -235,13 +271,16 @@ public class MainActivity extends AppCompatActivity {
         setupChip(R.id.chip6, "Explain quantum computing");
 
         if (history.isEmpty()) {
-            addJarvisMsg("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?");
+            addJarvisMsg("Good day, sir. H.E.N.R.Y online. All systems nominal.");
             mainHandler.postDelayed(() ->
-                speak("Good day, sir. H.E.N.R.Y online. All systems nominal. How may I assist you?", "warm"),
-                1500);
+                speak("Good day, sir. H.E.N.R.Y online. All systems nominal.", "warm"), 1500);
         } else {
             hideWelcome();
         }
+    }
+
+    private android.content.SharedPreferences getPrefs() {
+        return getSharedPreferences(PREFS, MODE_PRIVATE);
     }
 
     private void setupChip(int chipId, String text) {
@@ -256,7 +295,59 @@ public class MainActivity extends AppCompatActivity {
         if (chipsRow3  != null) chipsRow3.setVisibility(View.GONE);
     }
 
-    // ── Native TTS (offline fallback) ─────────────────────────────────────────
+    // ── Wake Word ─────────────────────────────────────────────────────────────
+    private void startWakeService() {
+        Intent i = new Intent(this, WakeWordService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            startForegroundService(i);
+        else
+            startService(i);
+    }
+
+    private void stopWakeService() {
+        Intent i = new Intent(this, WakeWordService.class);
+        i.setAction(WakeWordService.ACTION_STOP);
+        startService(i);
+    }
+
+    private void handleWakeWord() {
+        if (currentState == OrbView.OrbState.THINKING ||
+            currentState == OrbView.OrbState.LISTENING) return;
+        if (isSpeaking) stopSpeaking();
+        mainHandler.postDelayed(this::startListening, 300);
+    }
+
+    // ── Broadcast Receivers ───────────────────────────────────────────────────
+    private void registerReceivers() {
+        // Wake word from service (if app already in foreground)
+        wakeReceiver = new BroadcastReceiver() {
+            @Override public void onReceive(Context ctx, Intent intent) { handleWakeWord(); }
+        };
+        IntentFilter wf = new IntentFilter(WakeWordService.ACTION_WAKE_WORD);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            registerReceiver(wakeReceiver, wf, Context.RECEIVER_NOT_EXPORTED);
+        else
+            registerReceiver(wakeReceiver, wf);
+
+        // Notification reader
+        notifReceiver = new BroadcastReceiver() {
+            @Override public void onReceive(Context ctx, Intent intent) {
+                String app  = intent.getStringExtra(NotificationService.EXTRA_APP);
+                String text = intent.getStringExtra(NotificationService.EXTRA_TEXT);
+                if (text == null || text.isEmpty()) return;
+                String announce = "Notification from " + app + ": " + text;
+                addJarvisMsg("[Notification] **" + app + ":** " + text);
+                if (!ttsMuted) speak(announce, "neutral");
+            }
+        };
+        IntentFilter nf = new IntentFilter(NotificationService.ACTION_NOTIFY);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            registerReceiver(notifReceiver, nf, Context.RECEIVER_NOT_EXPORTED);
+        else
+            registerReceiver(notifReceiver, nf);
+    }
+
+    // ── Native TTS ────────────────────────────────────────────────────────────
     private void initNativeTts() {
         tts = new TextToSpeech(this, status -> {
             if (status == TextToSpeech.SUCCESS) {
@@ -281,77 +372,173 @@ public class MainActivity extends AppCompatActivity {
         }
         boolean isFrench = voice.startsWith("french");
         boolean isMale   = voice.endsWith("_male");
-        if (isFrench) {
-            tts.setLanguage(Locale.FRENCH);
-            tts.setPitch(isMale ? 0.78f : 1.10f);
-        } else {
-            tts.setLanguage(new Locale("en", "GB"));
-            tts.setPitch(isMale ? 0.75f : 1.05f);
-        }
-        tts.setSpeechRate(isMale ? 0.90f : 0.93f);
+        if (isFrench) tts.setLanguage(Locale.FRENCH);
+        else           tts.setLanguage(new Locale("en", "US"));
+        tts.setPitch(isMale ? 0.75f : 1.05f);
+
+        float[] rates = { 0.75f, 0.90f, 1.10f };
+        tts.setSpeechRate(rates[Math.max(0, Math.min(2, ttsSpeed))]);
     }
 
     // ── Voice Picker ──────────────────────────────────────────────────────────
     private void showVoicePicker() {
+        // Build a menu: Voice, Wake Word, Mute, Speed, Persona, Export, Reminders
+        CharSequence[] options = {
+            "🎙 Voice Accent",
+            wakeEnabled ? "🟢 Wake Word: ON  (tap to disable)" : "⚫ Wake Word: OFF  (tap to enable)",
+            ttsMuted    ? "🔇 Voice Muted  (tap to unmute)"   : "🔊 Voice Enabled  (tap to mute)",
+            "⚡ Voice Speed: " + new String[]{"Slow","Normal","Fast"}[ttsSpeed],
+            "🧠 Persona: " + capitalize(currentPersona),
+            "📋 My Reminders",
+            "📤 Export Chat"
+        };
+        new AlertDialog.Builder(this)
+            .setTitle("◆ H.E.N.R.Y Settings")
+            .setItems(options, (d, which) -> {
+                switch (which) {
+                    case 0: showVoiceAccentPicker(); break;
+                    case 1: toggleWakeWord(); break;
+                    case 2: toggleMute(); break;
+                    case 3: showSpeedPicker(); break;
+                    case 4: showPersonaPicker(); break;
+                    case 5: showReminders(); break;
+                    case 6: exportChat(); break;
+                }
+            }).show();
+    }
+
+    private void showVoiceAccentPicker() {
         final String[] labels = {
-            "\uD83C\uDDEC\uD83C\uDDE7  British   Male   \u2642  (Ryan · Neural)",
-            "\uD83C\uDDEC\uD83C\uDDE7  British   Female \u2640  (Sonia · Neural)",
-            "\uD83C\uDDFA\uD83C\uDDF8  American  Male   \u2642  (Guy · Neural)",
-            "\uD83C\uDDFA\uD83C\uDDF8  American  Female \u2640  (Aria · Neural)",
-            "\uD83C\uDDF5\uD83C\uDDED  Filipino  Male   \u2642  (James · Neural)",
-            "\uD83C\uDDF5\uD83C\uDDED  Filipino  Female \u2640  (Blessica · Neural)",
-            "\uD83C\uDDEB\uD83C\uDDF7  French    Male   \u2642  (Henri · Neural)",
-            "\uD83C\uDDEB\uD83C\uDDF7  French    Female \u2640  (Denise · Neural)"
+            "🇬🇧 British Male ♂ (Ryan·Neural)",
+            "🇬🇧 British Female ♀ (Sonia·Neural)",
+            "🇺🇸 American Male ♂ (Guy·Neural)",
+            "🇺🇸 American Female ♀ (Aria·Neural)",
+            "🇵🇭 Filipino Male ♂ (Angelo·Neural)",
+            "🇵🇭 Filipino Female ♀ (Blessica·Neural)",
+            "🇫🇷 French Male ♂ (Henri·Neural)",
+            "🇫🇷 French Female ♀ (Denise·Neural)"
         };
         final String[] voices = {
-            VOICE_BRITISH_MALE,    VOICE_BRITISH_FEMALE,
-            VOICE_AMERICAN_MALE,   VOICE_AMERICAN_FEMALE,
-            VOICE_FILIPINO_MALE,   VOICE_FILIPINO_FEMALE,
-            VOICE_FRENCH_MALE,     VOICE_FRENCH_FEMALE
+            VOICE_BRITISH_MALE, VOICE_BRITISH_FEMALE,
+            VOICE_AMERICAN_MALE, VOICE_AMERICAN_FEMALE,
+            VOICE_FILIPINO_MALE, VOICE_FILIPINO_FEMALE,
+            VOICE_FRENCH_MALE, VOICE_FRENCH_FEMALE
         };
-        final String[] btnTexts = {
-            "\uD83C\uDDEC\uD83C\uDDE7 \u2642 VOICE",
-            "\uD83C\uDDEC\uD83C\uDDE7 \u2640 VOICE",
-            "\uD83C\uDDFA\uD83C\uDDF8 \u2642 VOICE",
-            "\uD83C\uDDFA\uD83C\uDDF8 \u2640 VOICE",
-            "\uD83C\uDDF5\uD83C\uDDED \u2642 VOICE",
-            "\uD83C\uDDF5\uD83C\uDDED \u2640 VOICE",
-            "\uD83C\uDDEB\uD83C\uDDF7 \u2642 VOICE",
-            "\uD83C\uDDEB\uD83C\uDDF7 \u2640 VOICE"
-        };
-
-        int current = 0;
-        for (int i = 0; i < voices.length; i++)
-            if (voices[i].equals(currentVoice)) { current = i; break; }
-        final int[] selected = { current };
-
+        int cur = 0;
+        for (int i = 0; i < voices.length; i++) if (voices[i].equals(currentVoice)) { cur = i; break; }
+        final int[] sel = { cur };
         new AlertDialog.Builder(this)
-            .setTitle("\u25C6  H.E.N.R.Y Voice  (Microsoft Neural)")
-            .setSingleChoiceItems(labels, current, (d, which) -> selected[0] = which)
+            .setTitle("◆ Voice Accent (Microsoft Neural)")
+            .setSingleChoiceItems(labels, cur, (d, w) -> sel[0] = w)
             .setPositiveButton("Apply", (d, w) -> {
-                currentVoice = voices[selected[0]];
-                getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-                    .putString(KEY_VOICE, currentVoice).apply();
+                currentVoice = voices[sel[0]];
+                getPrefs().edit().putString(KEY_VOICE, currentVoice).apply();
                 applyNativeVoice(currentVoice);
-                if (btnVoice != null) btnVoice.setText(btnTexts[selected[0]]);
+                updateVoiceButtonLabel();
                 speak("H.E.N.R.Y online, sir.", "neutral");
-                Toast.makeText(this, "Neural voice applied", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Voice applied", Toast.LENGTH_SHORT).show();
             })
-            .setNegativeButton("Cancel", null)
-            .show();
+            .setNegativeButton("Cancel", null).show();
+    }
+
+    private void toggleWakeWord() {
+        wakeEnabled = !wakeEnabled;
+        getPrefs().edit().putBoolean(KEY_WAKE, wakeEnabled).apply();
+        if (wakeEnabled) {
+            startWakeService();
+            addJarvisMsg("[EMOTION:warm] Wake word enabled, sir. Say **\"Henry\"** anytime.");
+            speak("Wake word enabled. Say Henry anytime, sir.", "warm");
+        } else {
+            stopWakeService();
+            addJarvisMsg("[EMOTION:neutral] Wake word disabled, sir.");
+            speak("Wake word disabled.", "neutral");
+        }
+        updateVoiceButtonLabel();
+    }
+
+    private void toggleMute() {
+        ttsMuted = !ttsMuted;
+        getPrefs().edit().putBoolean(KEY_MUTE, ttsMuted).apply();
+        Toast.makeText(this, ttsMuted ? "Voice muted" : "Voice enabled", Toast.LENGTH_SHORT).show();
+        if (!ttsMuted) speak("Voice enabled, sir.", "warm");
+    }
+
+    private void showSpeedPicker() {
+        final String[] speeds = { "🐢 Slow", "▶ Normal", "⚡ Fast" };
+        new AlertDialog.Builder(this)
+            .setTitle("Voice Speed")
+            .setSingleChoiceItems(speeds, ttsSpeed, null)
+            .setPositiveButton("Apply", (d, w) -> {
+                android.widget.ListView lv = ((AlertDialog) d).getListView();
+                ttsSpeed = lv.getCheckedItemPosition();
+                getPrefs().edit().putInt(KEY_SPEED, ttsSpeed).apply();
+                applyNativeVoice(currentVoice);
+                Toast.makeText(this, "Speed: " + speeds[ttsSpeed], Toast.LENGTH_SHORT).show();
+            })
+            .setNegativeButton("Cancel", null).show();
+    }
+
+    private void showPersonaPicker() {
+        final String[] labels = { "😏 Flirty (default)", "👔 Professional", "😊 Casual", "🎯 Tactical" };
+        final String[] personas = { PERSONA_FLIRTY, PERSONA_PROFESSIONAL, PERSONA_CASUAL, PERSONA_TACTICAL };
+        int cur = 0;
+        for (int i = 0; i < personas.length; i++) if (personas[i].equals(currentPersona)) { cur = i; break; }
+        final int[] sel = { cur };
+        new AlertDialog.Builder(this)
+            .setTitle("◆ Persona Mode")
+            .setSingleChoiceItems(labels, cur, (d, w) -> sel[0] = w)
+            .setPositiveButton("Apply", (d, w) -> {
+                currentPersona = personas[sel[0]];
+                getPrefs().edit().putString(KEY_PERSONA, currentPersona).apply();
+                // Send persona update to backend via history
+                history.add(new HistoryItem("user",
+                    "[SYSTEM] Persona mode changed to: " + currentPersona +
+                    ". Adjust your personality accordingly."));
+                Toast.makeText(this, "Persona: " + capitalize(currentPersona), Toast.LENGTH_SHORT).show();
+                speak("Persona set to " + currentPersona + " mode, sir.", "neutral");
+            })
+            .setNegativeButton("Cancel", null).show();
+    }
+
+    private void showReminders() {
+        String list = ReminderManager.listReminders(this);
+        String msg  = list != null ? stripEmotionTag(list) : "No upcoming reminders, sir.";
+        new AlertDialog.Builder(this)
+            .setTitle("◆ H.E.N.R.Y Reminders")
+            .setMessage(msg)
+            .setPositiveButton("OK", null).show();
+    }
+
+    private void exportChat() {
+        if (messages.isEmpty()) {
+            Toast.makeText(this, "No chat to export", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        StringBuilder sb = new StringBuilder("H.E.N.R.Y Chat Export\n");
+        sb.append(new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date())).append("\n\n");
+        for (Message m : messages) {
+            if (m.type == Message.TYPE_USER)   sb.append("YOU: ").append(m.text).append("\n\n");
+            if (m.type == Message.TYPE_JARVIS) sb.append("HENRY: ").append(m.text).append("\n\n");
+        }
+        Intent share = new Intent(Intent.ACTION_SEND);
+        share.setType("text/plain");
+        share.putExtra(Intent.EXTRA_TEXT, sb.toString());
+        share.putExtra(Intent.EXTRA_SUBJECT, "H.E.N.R.Y Chat Export");
+        startActivity(Intent.createChooser(share, "Export chat via…"));
     }
 
     private void updateVoiceButtonLabel() {
         if (btnVoice == null) return;
+        String wake = wakeEnabled ? " 🟢" : "";
         switch (currentVoice) {
-            case VOICE_BRITISH_MALE:    btnVoice.setText("\uD83C\uDDEC\uD83C\uDDE7 \u2642 VOICE"); break;
-            case VOICE_BRITISH_FEMALE:  btnVoice.setText("\uD83C\uDDEC\uD83C\uDDE7 \u2640 VOICE"); break;
-            case VOICE_AMERICAN_FEMALE: btnVoice.setText("\uD83C\uDDFA\uD83C\uDDF8 \u2640 VOICE"); break;
-            case VOICE_FILIPINO_MALE:   btnVoice.setText("\uD83C\uDDF5\uD83C\uDDED \u2642 VOICE"); break;
-            case VOICE_FILIPINO_FEMALE: btnVoice.setText("\uD83C\uDDF5\uD83C\uDDED \u2640 VOICE"); break;
-            case VOICE_FRENCH_MALE:     btnVoice.setText("\uD83C\uDDEB\uD83C\uDDF7 \u2642 VOICE"); break;
-            case VOICE_FRENCH_FEMALE:   btnVoice.setText("\uD83C\uDDEB\uD83C\uDDF7 \u2640 VOICE"); break;
-            default:                    btnVoice.setText("\uD83C\uDDEC\uD83C\uDDE7 \u2642 VOICE"); break;
+            case VOICE_BRITISH_MALE:    btnVoice.setText("🇬🇧♂" + wake); break;
+            case VOICE_BRITISH_FEMALE:  btnVoice.setText("🇬🇧♀" + wake); break;
+            case VOICE_AMERICAN_FEMALE: btnVoice.setText("🇺🇸♀" + wake); break;
+            case VOICE_FILIPINO_MALE:   btnVoice.setText("🇵🇭♂" + wake); break;
+            case VOICE_FILIPINO_FEMALE: btnVoice.setText("🇵🇭♀" + wake); break;
+            case VOICE_FRENCH_MALE:     btnVoice.setText("🇫🇷♂" + wake); break;
+            case VOICE_FRENCH_FEMALE:   btnVoice.setText("🇫🇷♀" + wake); break;
+            default:                    btnVoice.setText("🇺🇸♂" + wake); break;
         }
     }
 
@@ -376,31 +563,24 @@ public class MainActivity extends AppCompatActivity {
             .replaceAll("`([^`]+)`", "$1")
             .replaceAll("\\*\\*(.*?)\\*\\*", "$1")
             .replaceAll("\\*(.*?)\\*", "$1")
-            .replaceAll("__(.*?)__", "$1")
-            .replaceAll("_(.*?)_", "$1")
             .replaceAll("(?m)^#{1,6}\\s*", "")
             .replaceAll("\\[([^\\]]+)\\]\\([^)]+\\)", "$1")
             .replaceAll("\\[[^\\]]*\\]", "")
-            .replaceAll("\\{[^}]*\\}", "")
-            .replaceAll("<[^>]*>", "")
             .replaceAll("https?://\\S+", "")
             .replaceAll("[|^~`#@]", "")
             .replaceAll("(?m)^\\s*[-*+]\\s+", "")
-            .replaceAll("(?m)^\\s*\\d+[.)\\s]+", "")
-            .replaceAll("-{2,}", "")
             .replaceAll("[\\r\\n]+", " ")
             .replaceAll("\\s{2,}", " ")
             .trim();
     }
 
-    // ── Speak — Edge TTS via Vercel, fallback to native ───────────────────────
+    // ── Speak ─────────────────────────────────────────────────────────────────
     private void speak(String text) { speak(text, "neutral"); }
 
     private void speak(final String rawText, final String emotion) {
-        if (rawText == null || rawText.trim().isEmpty()) return;
+        if (ttsMuted || rawText == null || rawText.trim().isEmpty()) return;
         final String clean = cleanForTts(rawText);
         if (clean.isEmpty()) return;
-
         isSpeaking = true;
         setState(OrbView.OrbState.SPEAKING);
 
@@ -409,18 +589,13 @@ public class MainActivity extends AppCompatActivity {
                 JSONObject body = new JSONObject();
                 body.put("text", clean);
                 body.put("voice", currentVoice);
-
                 RequestBody rb = RequestBody.create(
-                    body.toString(),
-                    MediaType.get("application/json; charset=utf-8"));
+                    body.toString(), MediaType.get("application/json; charset=utf-8"));
                 Request req = new Request.Builder()
                     .url(SPEAK_URL).post(rb)
-                    .addHeader("Content-Type", "application/json")
-                    .build();
-
+                    .addHeader("Content-Type", "application/json").build();
                 try (Response resp = httpClient.newCall(req).execute()) {
-                    if (resp.isSuccessful() && resp.code() != 204
-                            && resp.body() != null) {
+                    if (resp.isSuccessful() && resp.code() != 204 && resp.body() != null) {
                         byte[] audio = resp.body().bytes();
                         if (audio.length > 0) {
                             mainHandler.post(() -> playAudioBytes(audio, clean));
@@ -429,8 +604,6 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             } catch (Exception ignored) {}
-
-            // Fallback: native TTS
             mainHandler.post(() -> speakNative(clean));
         }).start();
     }
@@ -443,7 +616,6 @@ public class MainActivity extends AppCompatActivity {
             }
             File tmp = File.createTempFile("tts_", ".mp3", getCacheDir());
             try (FileOutputStream fos = new FileOutputStream(tmp)) { fos.write(audioBytes); }
-
             ttsPlayer = new MediaPlayer();
             ttsPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
             ttsPlayer.setDataSource(tmp.getAbsolutePath());
@@ -454,27 +626,21 @@ public class MainActivity extends AppCompatActivity {
             });
             ttsPlayer.setOnErrorListener((mp, what, extra) -> {
                 mp.release(); ttsPlayer = null; tmp.delete();
-                speakNative(fallbackText);
-                return true;
+                speakNative(fallbackText); return true;
             });
             ttsPlayer.prepare();
             ttsPlayer.start();
-        } catch (Exception e) {
-            speakNative(fallbackText);
-        }
+        } catch (Exception e) { speakNative(fallbackText); }
     }
 
     private void speakNative(String clean) {
         if (!ttsReady || tts == null) {
-            isSpeaking = false;
-            setState(OrbView.OrbState.IDLE);
-            return;
+            isSpeaking = false; setState(OrbView.OrbState.IDLE); return;
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
             tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
-        } else {
+        else
             tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null);
-        }
     }
 
     private void stopSpeaking() {
@@ -490,8 +656,8 @@ public class MainActivity extends AppCompatActivity {
     // ── Attachment ────────────────────────────────────────────────────────────
     private void showAttachDialog() {
         new AlertDialog.Builder(this)
-            .setTitle("Attach image")
-            .setItems(new String[]{"Take photo", "Choose from gallery"}, (d, which) -> {
+            .setTitle("Attach")
+            .setItems(new String[]{"📷 Take photo", "🖼 Choose from gallery"}, (d, which) -> {
                 if (which == 0) openCamera(); else openGallery();
             }).show();
     }
@@ -515,8 +681,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void openGallery() {
-        Intent i = new Intent(Intent.ACTION_GET_CONTENT);
-        i.setType("image/*");
+        Intent i = new Intent(Intent.ACTION_GET_CONTENT); i.setType("image/*");
         startActivityForResult(Intent.createChooser(i, "Select image"), REQUEST_GALLERY);
     }
 
@@ -552,7 +717,7 @@ public class MainActivity extends AppCompatActivity {
                         ivAttachPreview.setImageURI(uri);
                         ivAttachPreview.setVisibility(View.VISIBLE);
                     }
-                    Toast.makeText(this, "Image attached — tap to remove", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Image attached", Toast.LENGTH_SHORT).show();
                 });
             } catch (Exception e) {
                 mainHandler.post(() ->
@@ -578,18 +743,15 @@ public class MainActivity extends AppCompatActivity {
     private void startListening() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                 != PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(this, "Microphone permission required", Toast.LENGTH_SHORT).show();
             ActivityCompat.requestPermissions(this,
                 new String[]{Manifest.permission.RECORD_AUDIO}, PERM_CODE);
             return;
         }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            Toast.makeText(this, "Speech recognition not available", Toast.LENGTH_LONG).show();
-            return;
+            Toast.makeText(this, "Speech recognition not available", Toast.LENGTH_LONG).show(); return;
         }
         if (speechRec != null) {
             try { speechRec.destroy(); } catch (Exception ignored) {}
-            speechRec = null;
         }
         speechRec = SpeechRecognizer.createSpeechRecognizer(this);
         speechRec.setRecognitionListener(new RecognitionListener() {
@@ -597,7 +759,7 @@ public class MainActivity extends AppCompatActivity {
                 isListening = true;
                 mainHandler.post(() -> {
                     setState(OrbView.OrbState.LISTENING);
-                    if (tvOrbHint != null) tvOrbHint.setText("LISTENING \u2014 TAP TO STOP");
+                    if (tvOrbHint != null) tvOrbHint.setText("LISTENING — TAP TO STOP");
                 });
             }
             @Override public void onBeginningOfSpeech() {}
@@ -612,8 +774,7 @@ public class MainActivity extends AppCompatActivity {
                     if (error != SpeechRecognizer.ERROR_NO_MATCH
                         && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT
                         && error != SpeechRecognizer.ERROR_RECOGNIZER_BUSY)
-                        Toast.makeText(MainActivity.this,
-                            "Voice error (" + error + ")", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, "Voice error (" + error + ")", Toast.LENGTH_SHORT).show();
                 });
             }
             @Override public void onResults(Bundle results) {
@@ -621,8 +782,7 @@ public class MainActivity extends AppCompatActivity {
                 mainHandler.post(() -> {
                     if (tvOrbHint != null) tvOrbHint.setText("WHAT CAN I DO FOR YOU, SIR?");
                 });
-                ArrayList<String> m =
-                    results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                ArrayList<String> m = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                 if (m != null && !m.isEmpty() && !m.get(0).trim().isEmpty())
                     mainHandler.post(() -> { hideWelcome(); askJarvis(m.get(0).trim()); });
                 else
@@ -658,6 +818,58 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void askJarvis(String userText) {
+        // ── Reminder detection (local, no API call) ───────────────────────────
+        String reminderReply = ReminderManager.trySchedule(this, userText);
+        if (reminderReply != null) {
+            history.add(new HistoryItem("user", userText));
+            addUserMsg(userText);
+            String clean = stripEmotionTag(reminderReply);
+            history.add(new HistoryItem("model", clean));
+            addJarvisMsg(clean);
+            speak(clean, extractEmotion(reminderReply));
+            saveHistory();
+            return;
+        }
+
+        // ── "My reminders" query ──────────────────────────────────────────────
+        if (userText.toLowerCase().contains("my reminder") ||
+            userText.toLowerCase().contains("list reminder")) {
+            String list = ReminderManager.listReminders(this);
+            String reply = list != null ? list : "[EMOTION:warm]\nNo upcoming reminders, sir.";
+            history.add(new HistoryItem("user", userText));
+            addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply));
+            history.add(new HistoryItem("model", clean));
+            saveHistory();
+            return;
+        }
+
+        // ── Contacts / Calls / SMS ─────────────────────────────────────────────
+        String contactCmd = ContactsHelper.parseContactCommand(userText);
+        if (contactCmd != null) {
+            handleContactCommand(contactCmd, userText);
+            return;
+        }
+
+        // ── Calendar query ─────────────────────────────────────────────────────
+        String calLower = userText.toLowerCase();
+        if (calLower.contains("my schedule") || calLower.contains("my calendar")
+            || calLower.contains("my event") || calLower.contains("what do i have")) {
+            String calResult = readCalendar();
+            if (calResult != null) {
+                history.add(new HistoryItem("user", userText));
+                addUserMsg(userText);
+                history.add(new HistoryItem("model", calResult));
+                addJarvisMsg(calResult);
+                speak(calResult, "neutral");
+                saveHistory();
+                return;
+            }
+        }
+
+        // ── Default: send to AI backend ────────────────────────────────────────
         history.add(new HistoryItem("user", userText));
         addUserMsg(userText);
         if (pendingImageUriStr != null) {
@@ -703,50 +915,145 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    // ── Contacts / Calls / SMS ────────────────────────────────────────────────
+    private void handleContactCommand(String cmd, String userText) {
+        history.add(new HistoryItem("user", userText));
+        addUserMsg(userText);
+        String[] parts = cmd.split(":", 3);
+        String action = parts[0];
+        String name   = parts.length > 1 ? parts[1].trim() : "";
+        String body   = parts.length > 2 ? parts[2].trim() : "";
+
+        String number = ContactsHelper.findNumber(this, name);
+        if (number == null) {
+            String reply = "I couldn't find " + name + " in your contacts, sir.";
+            addJarvisMsg(reply); speak(reply, "concerned"); return;
+        }
+
+        if ("CALL".equals(action)) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE)
+                    != PackageManager.PERMISSION_GRANTED) {
+                pendingCallAction = cmd;
+                ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.CALL_PHONE}, PERM_CALL);
+                return;
+            }
+            startActivity(ContactsHelper.callIntent(number));
+            String reply = "Calling " + name + " now, sir.";
+            addJarvisMsg(reply); speak(reply, "warm");
+        } else {
+            startActivity(ContactsHelper.smsIntent(number, body));
+            String reply = "Opening message to " + name + ", sir.";
+            addJarvisMsg(reply); speak(reply, "warm");
+        }
+        saveHistory();
+    }
+
+    // ── Calendar ──────────────────────────────────────────────────────────────
+    private String readCalendar() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALENDAR)
+                != PackageManager.PERMISSION_GRANTED) return null;
+        try {
+            ContentResolver cr = getContentResolver();
+            long now = System.currentTimeMillis();
+            long tomorrow = now + 48 * 3600_000L;
+            Uri uri = CalendarContract.Events.CONTENT_URI;
+            String[] proj = {
+                CalendarContract.Events.TITLE,
+                CalendarContract.Events.DTSTART,
+                CalendarContract.Events.DTEND
+            };
+            String sel = CalendarContract.Events.DTSTART + " >= ? AND "
+                       + CalendarContract.Events.DTSTART + " <= ?";
+            String[] args = { String.valueOf(now), String.valueOf(tomorrow) };
+            try (Cursor c = cr.query(uri, proj, sel, args, CalendarContract.Events.DTSTART + " ASC")) {
+                if (c == null || !c.moveToFirst()) return "No events in the next 48 hours, sir.";
+                SimpleDateFormat sdf = new SimpleDateFormat("EEE h:mm a", Locale.US);
+                StringBuilder sb = new StringBuilder("Your upcoming events, sir:\n\n");
+                int count = 0;
+                do {
+                    String title = c.getString(0);
+                    long start   = c.getLong(1);
+                    sb.append("**").append(sdf.format(new Date(start))).append("** — ")
+                      .append(title).append("\n");
+                    count++;
+                } while (c.moveToNext() && count < 10);
+                return sb.toString().trim();
+            }
+        } catch (Exception e) { return null; }
+    }
+
+    // ── Clear menu ────────────────────────────────────────────────────────────
+    private void showClearMenu() {
+        new AlertDialog.Builder(this)
+            .setTitle("Clear")
+            .setItems(new String[]{"🗑 Clear conversation", "📤 Export chat first"}, (d, w) -> {
+                if (w == 0) confirmClear(); else { exportChat(); }
+            }).show();
+    }
+
+    private void confirmClear() {
+        new AlertDialog.Builder(this)
+            .setTitle("Clear Memory")
+            .setMessage("Wipe all conversation history?")
+            .setPositiveButton("Clear", (d, w) -> {
+                history.clear(); messages.clear();
+                getPrefs().edit().remove(KEY_HIS).apply();
+                adapter.notifyDataSetChanged();
+                if (orbSection != null) orbSection.setVisibility(View.VISIBLE);
+                if (chipsRow1  != null) chipsRow1.setVisibility(View.VISIBLE);
+                if (chipsRow2  != null) chipsRow2.setVisibility(View.VISIBLE);
+                if (chipsRow3  != null) chipsRow3.setVisibility(View.VISIBLE);
+            })
+            .setNegativeButton("Cancel", null).show();
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
     private void addUserMsg(String text) {
         messages.add(new Message(Message.TYPE_USER, text));
-        adapter.notifyItemInserted(messages.size() - 1);
-        scrollToBottom();
+        adapter.notifyItemInserted(messages.size() - 1); scrollToBottom();
     }
-
     private void addJarvisMsg(String text) {
         messages.add(new Message(Message.TYPE_JARVIS, text));
-        adapter.notifyItemInserted(messages.size() - 1);
-        scrollToBottom();
+        adapter.notifyItemInserted(messages.size() - 1); scrollToBottom();
     }
-
     private void scrollToBottom() {
         recycler.post(() -> {
-            if (scrollMain != null)
-                scrollMain.post(() -> scrollMain.fullScroll(View.FOCUS_DOWN));
+            if (scrollMain != null) scrollMain.post(() -> scrollMain.fullScroll(View.FOCUS_DOWN));
         });
     }
-
     private void showTyping() {
         messages.add(new Message(Message.TYPE_TYPING, ""));
         typingPos = messages.size() - 1;
-        adapter.notifyItemInserted(typingPos);
-        scrollToBottom();
+        adapter.notifyItemInserted(typingPos); scrollToBottom();
     }
-
     private void hideTyping() {
         if (typingPos >= 0 && typingPos < messages.size()) {
             messages.remove(typingPos);
-            adapter.notifyItemRemoved(typingPos);
-            typingPos = -1;
+            adapter.notifyItemRemoved(typingPos); typingPos = -1;
         }
+    }
+    private void setState(OrbView.OrbState state) {
+        currentState = state;
+        if (orbView  != null) orbView.setState(state);
+        if (tvStatus != null) {
+            final String[] labels = {"STANDBY","LISTENING…","PROCESSING…","SPEAKING…","WAKE"};
+            tvStatus.setText(labels[state.ordinal()]);
+        }
+    }
+    private String capitalize(String s) {
+        if (s == null || s.isEmpty()) return s;
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     // ── Memory ────────────────────────────────────────────────────────────────
     private void saveHistory() {
         List<HistoryItem> toSave = history.size() > 80
             ? history.subList(history.size() - 80, history.size()) : history;
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-            .putString(KEY_HIS, gson.toJson(toSave)).apply();
+        getPrefs().edit().putString(KEY_HIS, gson.toJson(toSave)).apply();
     }
-
     private void loadHistory() {
-        String json = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_HIS, null);
+        String json = getPrefs().getString(KEY_HIS, null);
         if (json == null || json.isEmpty()) return;
         try {
             Type type = new TypeToken<List<HistoryItem>>(){}.getType();
@@ -757,36 +1064,9 @@ public class MainActivity extends AppCompatActivity {
                 ? saved.subList(saved.size() - 20, saved.size()) : saved;
             for (HistoryItem item : vis)
                 messages.add(new Message(
-                    "user".equals(item.role) ? Message.TYPE_USER : Message.TYPE_JARVIS,
-                    item.text));
+                    "user".equals(item.role) ? Message.TYPE_USER : Message.TYPE_JARVIS, item.text));
             if (!messages.isEmpty()) { adapter.notifyDataSetChanged(); scrollToBottom(); }
         } catch (Exception ignored) {}
-    }
-
-    private void confirmClear() {
-        new AlertDialog.Builder(this)
-            .setTitle("Clear Memory")
-            .setMessage("Wipe all conversation history?")
-            .setPositiveButton("Clear", (d, w) -> {
-                history.clear(); messages.clear();
-                getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(KEY_HIS).apply();
-                adapter.notifyDataSetChanged();
-                if (orbSection != null) orbSection.setVisibility(View.VISIBLE);
-                if (chipsRow1  != null) chipsRow1.setVisibility(View.VISIBLE);
-                if (chipsRow2  != null) chipsRow2.setVisibility(View.VISIBLE);
-                if (chipsRow3  != null) chipsRow3.setVisibility(View.VISIBLE);
-            })
-            .setNegativeButton("Cancel", null).show();
-    }
-
-    // ── State ─────────────────────────────────────────────────────────────────
-    private void setState(OrbView.OrbState state) {
-        currentState = state;
-        if (orbView  != null) orbView.setState(state);
-        if (tvStatus != null) {
-            final String[] labels = {"STANDBY", "LISTENING\u2026", "PROCESSING\u2026", "SPEAKING\u2026", "WAKE"};
-            tvStatus.setText(labels[state.ordinal()]);
-        }
     }
 
     // ── Permissions ───────────────────────────────────────────────────────────
@@ -794,10 +1074,15 @@ public class MainActivity extends AppCompatActivity {
         List<String> needed = new ArrayList<>();
         needed.add(Manifest.permission.RECORD_AUDIO);
         needed.add(Manifest.permission.CAMERA);
+        needed.add(Manifest.permission.READ_CONTACTS);
+        needed.add(Manifest.permission.READ_CALENDAR);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            needed.add(Manifest.permission.POST_NOTIFICATIONS);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
             needed.add(Manifest.permission.READ_MEDIA_IMAGES);
         else
             needed.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+
         List<String> toReq = new ArrayList<>();
         for (String p : needed)
             if (ContextCompat.checkSelfPermission(this, p) != PackageManager.PERMISSION_GRANTED)
@@ -807,8 +1092,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onRequestPermissionsResult(int c, @NonNull String[] p, @NonNull int[] r) {
-        super.onRequestPermissionsResult(c, p, r);
+    public void onRequestPermissionsResult(int code, @NonNull String[] perms, @NonNull int[] results) {
+        super.onRequestPermissionsResult(code, perms, results);
+        if (code == PERM_CALL && pendingCallAction != null) {
+            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+                handleContactCommand(pendingCallAction, "");
+            }
+            pendingCallAction = null;
+        }
     }
 
     @Override protected void onPause() {
@@ -821,6 +1112,8 @@ public class MainActivity extends AppCompatActivity {
         stopSpeaking();
         if (speechRec != null) try { speechRec.destroy(); } catch (Exception ignored) {}
         if (tts != null) { tts.stop(); tts.shutdown(); }
+        try { unregisterReceiver(wakeReceiver); } catch (Exception ignored) {}
+        try { unregisterReceiver(notifReceiver); } catch (Exception ignored) {}
         super.onDestroy();
     }
 }

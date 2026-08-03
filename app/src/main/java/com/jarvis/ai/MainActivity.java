@@ -356,6 +356,16 @@ public class MainActivity extends AppCompatActivity {
             hideWelcome();
         }
 
+        // Word of the Day — show once per day after greeting
+        if (WordOfTheDay.shouldShowToday(this)) {
+            mainHandler.postDelayed(() ->
+                WordOfTheDay.fetch(this, result -> mainHandler.post(() -> {
+                    String clean = stripEmotionTag(result);
+                    addJarvisMsg(clean);
+                    // Don't speak it automatically — just show in chat
+                })), 3000);
+        }
+
         // If launched from widget mic button
         if (getIntent() != null && getIntent().getBooleanExtra("start_listening", false)) {
             mainHandler.postDelayed(this::startListening, 800);
@@ -1378,14 +1388,20 @@ public class MainActivity extends AppCompatActivity {
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
                 new String[]{Manifest.permission.RECORD_AUDIO}, PERM_CODE);
+            Toast.makeText(this, "Microphone permission required", Toast.LENGTH_SHORT).show();
             return;
         }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            Toast.makeText(this, "Speech recognition not available", Toast.LENGTH_LONG).show(); return;
+            Toast.makeText(this, "Install Google app for voice recognition", Toast.LENGTH_LONG).show();
+            return;
         }
+        // Destroy previous instance cleanly
         if (speechRec != null) {
+            try { speechRec.stopListening(); } catch (Exception ignored) {}
             try { speechRec.destroy(); } catch (Exception ignored) {}
+            speechRec = null;
         }
+        try {
         speechRec = SpeechRecognizer.createSpeechRecognizer(this);
         speechRec.setRecognitionListener(new RecognitionListener() {
             @Override public void onReadyForSpeech(Bundle p) {
@@ -1428,7 +1444,14 @@ public class MainActivity extends AppCompatActivity {
         i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
         i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+        i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1000L);
+        i.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1500L);
         speechRec.startListening(i);
+        } catch (Exception e) {
+            isListening = false;
+            setState(OrbView.OrbState.IDLE);
+            Toast.makeText(this, "Voice error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void stopListening() {
@@ -1703,6 +1726,104 @@ public class MainActivity extends AppCompatActivity {
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
             String clean = stripEmotionTag(hint);
             addJarvisMsg(clean); speak(clean, "neutral"); saveHistory(); return;
+        }
+
+        // ── [v14] Notification Summary ────────────────────────────────────────
+        if (NotificationSummary.isSummaryCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String summary = NotificationSummary.summarise(this);
+            String clean   = stripEmotionTag(summary);
+            String emotion = extractEmotion(summary);
+            history.add(new HistoryItem("model", clean));
+            addJarvisMsg(clean);
+            speak(NotificationSummary.getSpokenSummary(this), emotion);
+            saveHistory(); return;
+        }
+
+        // ── [v14] Task Manager ────────────────────────────────────────────────
+        if (TaskManager.isTaskCommand(userText)) {
+            String reply = TaskManager.handle(this, userText);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+
+        // ── [v14] Word of the Day ─────────────────────────────────────────────
+        if (WordOfTheDay.isWordCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING);
+            saveHistory();
+            WordOfTheDay.fetch(this, result -> {
+                mainHandler.post(() -> {
+                    String clean   = stripEmotionTag(result);
+                    String emotion = extractEmotion(result);
+                    history.add(new HistoryItem("model", clean));
+                    addJarvisMsg(clean); speak(clean, emotion);
+                    saveHistory(); setState(OrbView.OrbState.IDLE);
+                });
+            });
+            return;
+        }
+
+        // ── [v14] Currency Converter ──────────────────────────────────────────
+        if (CurrencyConverter.isCurrencyCommand(userText)) {
+            String[] parsed = CurrencyConverter.parse(userText);
+            if (parsed != null) {
+                double amount = Double.parseDouble(parsed[0]);
+                String from = parsed[1], to = parsed[2];
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                setState(OrbView.OrbState.THINKING);
+                addJarvisMsg("Converting, sir…");
+                saveHistory();
+                CurrencyConverter.convert(amount, from, to, new CurrencyConverter.Callback() {
+                    @Override public void onResult(String formatted) {
+                        mainHandler.post(() -> {
+                            String clean   = stripEmotionTag(formatted);
+                            String emotion = extractEmotion(formatted);
+                            history.add(new HistoryItem("model", clean));
+                            addJarvisMsg(clean); speak(clean, emotion);
+                            saveHistory(); setState(OrbView.OrbState.IDLE);
+                        });
+                    }
+                    @Override public void onError(String reason) {
+                        mainHandler.post(() -> {
+                            String clean = stripEmotionTag(reason);
+                            addJarvisMsg(clean); speak(clean, "neutral");
+                            setState(OrbView.OrbState.IDLE);
+                        });
+                    }
+                });
+                return;
+            }
+        }
+
+        // ── [v14] Study Mode ──────────────────────────────────────────────────
+        if (StudyMode.isStudyCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING);
+            showTyping(); saveHistory();
+            StudyMode.ask(userText, "balanced", httpClient, userProfile, new StudyMode.Callback() {
+                @Override public void onResult(String response) {
+                    mainHandler.post(() -> {
+                        hideTyping();
+                        String clean   = stripEmotionTag(response);
+                        String emotion = extractEmotion(response);
+                        history.add(new HistoryItem("model", clean));
+                        addJarvisMsg(clean); speak(clean, emotion);
+                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                    });
+                }
+                @Override public void onError(String reason) {
+                    mainHandler.post(() -> {
+                        hideTyping();
+                        String clean = stripEmotionTag(reason);
+                        addJarvisMsg(clean); speak(clean, "concerned");
+                        setState(OrbView.OrbState.IDLE);
+                    });
+                }
+            });
+            return;
         }
 
         // ── [v13] Navigation ──────────────────────────────────────────────────
@@ -2828,6 +2949,9 @@ public class MainActivity extends AppCompatActivity {
         if (tvStatus != null) {
             final String[] labels = {"STANDBY","LISTENING…","PROCESSING…","SPEAKING…","WAKE"};
             tvStatus.setText(labels[state.ordinal()]);
+            // Blue accent when active
+            tvStatus.setTextColor(state == OrbView.OrbState.IDLE
+                ? 0xFF004466 : 0xFF00BEFF);
         }
     }
     private String capitalize(String s) {

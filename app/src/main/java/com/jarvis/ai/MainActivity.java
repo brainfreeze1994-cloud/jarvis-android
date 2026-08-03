@@ -81,6 +81,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int    REQUEST_CAMERA   = 201;
     private static final int    REQUEST_PDF      = 202;
     private static final int    REQUEST_QR       = 203;
+    private static final int    REQUEST_LOCATION = 204;
+    private static final int    REQUEST_LIVE_CAM = 205;
     private static final String PREFS            = "jarvis_prefs";
     private static final String KEY_HIS          = "history_v2";
     private static final String KEY_VOICE        = "voice_choice";
@@ -170,6 +172,10 @@ public class MainActivity extends AppCompatActivity {
     // Floating bubble
     private static final String KEY_BUBBLE = "bubble_enabled";
     private boolean bubbleEnabled = false;
+
+    // Battery guardian
+    private Handler batteryHandler;
+    private Runnable batteryChecker;
 
     // ── onCreate ──────────────────────────────────────────────────────────────
     @Override
@@ -292,6 +298,21 @@ public class MainActivity extends AppCompatActivity {
         registerReceivers();
 
         if (wakeEnabled) startWakeService();
+
+        // Battery guardian — check every 2 minutes
+        batteryHandler  = new Handler(Looper.getMainLooper());
+        batteryChecker  = new Runnable() {
+            @Override public void run() {
+                BatteryGuardian.check(MainActivity.this, (level, threshold) -> {
+                    String msg = "[EMOTION:concerned] Sir, battery is at " + level +
+                        "%. I strongly recommend plugging in now.";
+                    addJarvisMsg(stripEmotionTag(msg));
+                    speak(msg, "concerned");
+                });
+                batteryHandler.postDelayed(this, 2 * 60 * 1000);
+            }
+        };
+        batteryHandler.postDelayed(batteryChecker, 30 * 1000); // first check after 30s
 
         // Button listeners
         if (orbView   != null) orbView.setOnClickListener(v -> toggleListening());
@@ -1149,6 +1170,18 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(req, res, data);
         if (res != RESULT_OK) return;
 
+        // Live camera result
+        if (req == REQUEST_LIVE_CAM && data != null) {
+            String analysisResult = data.getStringExtra(LiveCameraActivity.EXTRA_RESULT);
+            if (analysisResult != null && !analysisResult.isEmpty()) {
+                addJarvisMsg(analysisResult);
+                speak(analysisResult, "neutral");
+                history.add(new HistoryItem("model", analysisResult));
+                saveHistory();
+            }
+            return;
+        }
+
         if (req == REQUEST_PDF && data != null && data.getData() != null) {
             handlePdfAttachment(data.getData());
             return;
@@ -1572,6 +1605,169 @@ public class MainActivity extends AppCompatActivity {
             addJarvisMsg(clean); speak(clean, "neutral"); saveHistory(); return;
         }
 
+        // ── [v9] Live Camera Vision ───────────────────────────────────────────
+        if (lower.contains("what do you see") || lower.contains("look at this") ||
+            lower.contains("live camera") || lower.contains("point camera") ||
+            lower.contains("describe what's in front") || lower.contains("analyse camera") ||
+            lower.contains("camera vision") || lower.contains("what's in front of me")) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply = "[EMOTION:excited] Opening live camera, sir. Point it at anything and tap Analyse.";
+            addJarvisMsg(stripEmotionTag(reply)); speak(reply, "excited"); saveHistory();
+            Intent camIntent = new Intent(this, LiveCameraActivity.class);
+            camIntent.putExtra(LiveCameraActivity.EXTRA_QUESTION, userText);
+            startActivityForResult(camIntent, REQUEST_LIVE_CAM);
+            return;
+        }
+
+        // ── [v9] Nearby Places ────────────────────────────────────────────────
+        if (NearbyPlaces.isNearbyQuery(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            saveHistory();
+            setState(OrbView.OrbState.THINKING);
+            addJarvisMsg("Searching nearby locations, sir…");
+            // Request location permission if needed
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
+                                 Manifest.permission.ACCESS_COARSE_LOCATION}, REQUEST_LOCATION);
+                setState(OrbView.OrbState.IDLE);
+                return;
+            }
+            NearbyPlaces.search(this, userText, new NearbyPlaces.Callback() {
+                @Override public void onResult(String formatted) {
+                    mainHandler.post(() -> {
+                        String clean   = stripEmotionTag(formatted);
+                        String emotion = extractEmotion(formatted);
+                        history.add(new HistoryItem("model", clean));
+                        addJarvisMsg(clean); speak(clean, emotion);
+                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                    });
+                }
+                @Override public void onError(String reason) {
+                    mainHandler.post(() -> {
+                        String clean = stripEmotionTag(reason);
+                        addJarvisMsg(clean); speak(clean, "concerned");
+                        setState(OrbView.OrbState.IDLE);
+                    });
+                }
+            });
+            return;
+        }
+
+        // ── [v9] Music Control ────────────────────────────────────────────────
+        if (MusicControl.isMusicCommand(userText)) {
+            String reply = MusicControl.handle(this, userText);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+
+        // ── [v9] Battery Guardian threshold setting ───────────────────────────
+        String batchPctStr = BatteryGuardian.parseThresholdCommand(userText);
+        if (batchPctStr != null) {
+            int pct = Integer.parseInt(batchPctStr);
+            BatteryGuardian.setThreshold(this, pct);
+            String reply = "[EMOTION:warm] Battery alert set at " + pct + "%, sir. I'll warn you when you drop below that.";
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, "warm"); saveHistory(); return;
+        }
+
+        // ── [v9] Screen Reader ────────────────────────────────────────────────
+        if (ScreenReader.isScreenReaderCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            if (!ScreenReader.isEnabled(this)) {
+                String reply = "[EMOTION:neutral] I need Accessibility permission to read the screen, sir. Opening settings now.";
+                addJarvisMsg(stripEmotionTag(reply)); speak(reply, "neutral");
+                ScreenReader.requestEnable(this);
+            } else {
+                String screenText = ScreenReader.captureNow();
+                if (screenText == null || screenText.trim().isEmpty()) {
+                    String reply = "[EMOTION:neutral] The screen appears empty or I can't read it right now, sir. Try again in a moment.";
+                    addJarvisMsg(stripEmotionTag(reply)); speak(reply, "neutral");
+                } else {
+                    // Send screen text to AI for summary
+                    setState(OrbView.OrbState.THINKING); showTyping();
+                    final String prompt = "The following is text from the user's current phone screen. " +
+                        "Summarise or explain it naturally:\n\n" + screenText;
+                    List<HistoryItem> screenHist = new ArrayList<>();
+                    screenHist.add(new HistoryItem("user", prompt));
+                    JarvisApi.ask(screenHist, null, MODE_BALANCED, userProfile, new JarvisApi.Callback() {
+                        @Override public void onSuccess(String reply, String imageUrl) {
+                            mainHandler.post(() -> {
+                                hideTyping();
+                                String clean   = stripEmotionTag(reply);
+                                String emotion = extractEmotion(reply);
+                                addJarvisMsg(clean); speak(clean, emotion);
+                                setState(OrbView.OrbState.IDLE);
+                            });
+                        }
+                        @Override public void onError(String error) {
+                            mainHandler.post(() -> { hideTyping(); setState(OrbView.OrbState.IDLE); });
+                        }
+                    });
+                }
+            }
+            saveHistory(); return;
+        }
+
+        // ── [v9] Smart Compose ────────────────────────────────────────────────
+        if (SmartCompose.isComposeCommand(userText)) {
+            SmartCompose.ComposeRequest compReq = SmartCompose.parse(userText);
+            if (compReq != null) {
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                setState(OrbView.OrbState.THINKING);
+                addJarvisMsg("Drafting your message, sir…");
+                SmartCompose.generate(this, compReq, httpClient, userProfile,
+                    new SmartCompose.Callback() {
+                        @Override public void onDraftReady(String draft, SmartCompose.ComposeRequest req,
+                                                           String number, String email) {
+                            mainHandler.post(() -> {
+                                setState(OrbView.OrbState.IDLE);
+                                String preview = "Here's your draft to **" + req.contactName + "**, sir:\n\n" +
+                                    "\"" + draft + "\"\n\n" +
+                                    "Say **send it** to send, or **cancel** to discard.";
+                                addJarvisMsg(preview);
+                                speak("Draft ready. Shall I send it, sir?", "warm");
+                                history.add(new HistoryItem("model", preview));
+                                // Show confirm dialog
+                                mainHandler.post(() -> {
+                                    new AlertDialog.Builder(MainActivity.this)
+                                        .setTitle("◆ Send Message?")
+                                        .setMessage("To: " + req.contactName + "\n\n" + draft)
+                                        .setPositiveButton("Send ✓", (d, w) -> {
+                                            if (req.channel == SmartCompose.Channel.EMAIL && email != null)
+                                                SmartCompose.sendEmail(MainActivity.this, email, "From HENRY", draft);
+                                            else if (req.channel == SmartCompose.Channel.SMS && number != null)
+                                                SmartCompose.sendSms(MainActivity.this, number, draft);
+                                            else if (number != null)
+                                                SmartCompose.sendWhatsApp(MainActivity.this, number, draft);
+                                            else
+                                                Toast.makeText(MainActivity.this, "Contact not found in your phonebook", Toast.LENGTH_LONG).show();
+                                            String sent = "[EMOTION:proud] Message sent to " + req.contactName + ", sir.";
+                                            addJarvisMsg(stripEmotionTag(sent)); speak(sent, "proud");
+                                        })
+                                        .setNegativeButton("Cancel", (d, w) ->
+                                            speak("Message discarded, sir.", "neutral"))
+                                        .show();
+                                });
+                                saveHistory();
+                            });
+                        }
+                        @Override public void onError(String error) {
+                            mainHandler.post(() -> {
+                                addJarvisMsg(error); speak(error, "concerned");
+                                setState(OrbView.OrbState.IDLE);
+                            });
+                        }
+                    });
+                return;
+            }
+        }
+
         // ── Battery / DateTime (answered locally, no AI needed) ───────────────
         if (lower.contains("battery") || lower.contains("charge") || lower.contains("power level")) {
             String reply = DeviceCommands.getBatteryInfo(this);
@@ -1922,6 +2118,7 @@ public class MainActivity extends AppCompatActivity {
         needed.add(Manifest.permission.CAMERA);
         needed.add(Manifest.permission.READ_CONTACTS);
         needed.add(Manifest.permission.READ_CALENDAR);
+        needed.add(Manifest.permission.ACCESS_FINE_LOCATION);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
             needed.add(Manifest.permission.POST_NOTIFICATIONS);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
@@ -1958,6 +2155,8 @@ public class MainActivity extends AppCompatActivity {
         stopSpeaking();
         if (speechRec != null) try { speechRec.destroy(); } catch (Exception ignored) {}
         if (tts != null) { tts.stop(); tts.shutdown(); }
+        if (batteryHandler != null && batteryChecker != null)
+            batteryHandler.removeCallbacks(batteryChecker);
         try { unregisterReceiver(wakeReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(notifReceiver); } catch (Exception ignored) {}
         super.onDestroy();

@@ -5,35 +5,37 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Dark blue background circle -->
+    <!-- Dark blue fill -->
     <path
         android:pathData="M54,54m-46,0a46,46 0,1 1,92 0a46,46 0,1 1,-92 0"
         android:fillColor="#020C1B"/>
 
-    <!-- Outer blue ring -->
+    <!-- Outer ring -->
     <path
         android:pathData="M54,54m-42,0a42,42 0,1 1,84 0a42,42 0,1 1,-84 0"
         android:fillColor="#00000000"
         android:strokeColor="#00BEFF"
-        android:strokeWidth="2"/>
+        android:strokeWidth="2.5"/>
 
-    <!-- Inner dashed ring -->
+    <!-- Middle ring -->
     <path
-        android:pathData="M54,54m-32,0a32,32 0,1 1,64 0a32,32 0,1 1,-64 0"
-        android:fillColor="#00000000"
-        android:strokeColor="#004466"
-        android:strokeWidth="1.5"/>
-
-    <!-- Blue triangle -->
-    <path
-        android:pathData="M54,30 L76,66 L32,66 Z"
+        android:pathData="M54,54m-30,0a30,30 0,1 1,60 0a30,30 0,1 1,-60 0"
         android:fillColor="#00000000"
         android:strokeColor="#00BEFF"
-        android:strokeWidth="2.5"/>
+        android:strokeWidth="1.5"
+        android:strokeAlpha="0.6"/>
+
+    <!-- Inner ring -->
+    <path
+        android:pathData="M54,54m-18,0a18,18 0,1 1,36 0a18,18 0,1 1,-36 0"
+        android:fillColor="#00000000"
+        android:strokeColor="#00BEFF"
+        android:strokeWidth="1.2"
+        android:strokeAlpha="0.4"/>
 
     <!-- Center dot -->
     <path
-        android:pathData="M54,54m-4,0a4,4 0,1 1,8 0a4,4 0,1 1,-8 0"
+        android:pathData="M54,54m-5,0a5,5 0,1 1,10 0a5,5 0,1 1,-10 0"
         android:fillColor="#00BEFF"/>
 
 </vector>

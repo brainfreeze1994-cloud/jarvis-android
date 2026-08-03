@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="12dp"
+    android:background="#CC0d0d0d">
+
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="H.E.N.R.Y"
+        android:textColor="#c9a84c"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.15"
+        android:paddingBottom="8dp" />
+
+    <TextView
+        android:id="@+id/widget_subtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="TAP MIC TO SPEAK"
+        android:textColor="#88c9a84c"
+        android:textSize="9sp"
+        android:letterSpacing="0.2"
+        android:paddingBottom="12dp" />
+
+    <TextView
+        android:id="@+id/widget_mic_btn"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:gravity="center"
+        android:text="🎙"
+        android:textSize="28sp"
+        android:background="#33c9a84c"
+        android:padding="8dp" />
+
+</LinearLayout>

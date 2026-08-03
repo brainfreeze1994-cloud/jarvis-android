@@ -74,10 +74,11 @@ import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final int    PERM_CODE       = 101;
-    private static final int    PERM_CALL       = 102;
+    private static final int    PERM_CODE        = 101;
+    private static final int    PERM_CALL        = 102;
     private static final int    REQUEST_GALLERY  = 200;
     private static final int    REQUEST_CAMERA   = 201;
+    private static final int    REQUEST_PDF      = 202;
     private static final String PREFS            = "jarvis_prefs";
     private static final String KEY_HIS          = "history_v2";
     private static final String KEY_VOICE        = "voice_choice";
@@ -107,8 +108,8 @@ public class MainActivity extends AppCompatActivity {
     private String currentPersona = PERSONA_FLIRTY;
 
     // TTS speed (0=slow, 1=normal, 2=fast)
-    private int    ttsSpeed  = 1;
-    private boolean ttsMuted = false;
+    private int     ttsSpeed    = 1;
+    private boolean ttsMuted    = false;
     private boolean wakeEnabled = false;
 
     // UI
@@ -129,6 +130,7 @@ public class MainActivity extends AppCompatActivity {
     private Uri    cameraImageUri;
     private String pendingImageBase64;
     private String pendingImageUriStr;
+    private String pendingPdfText;      // PDF text waiting to be sent
 
     private TextToSpeech tts;
     private boolean      ttsReady   = false;
@@ -143,10 +145,8 @@ public class MainActivity extends AppCompatActivity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Gson    gson        = new Gson();
 
-    // Pending call/sms action waiting for permission
     private String pendingCallAction = null;
 
-    // Broadcast receivers
     private BroadcastReceiver wakeReceiver;
     private BroadcastReceiver notifReceiver;
 
@@ -189,8 +189,13 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        if (intent != null && WakeWordService.ACTION_WAKE_WORD.equals(intent.getAction())) {
+        if (intent == null) return;
+        if (WakeWordService.ACTION_WAKE_WORD.equals(intent.getAction())) {
             handleWakeWord();
+        }
+        // Widget mic button: open app and immediately start listening
+        if (intent.getBooleanExtra("start_listening", false)) {
+            mainHandler.postDelayed(this::startListening, 600);
         }
     }
 
@@ -233,11 +238,11 @@ public class MainActivity extends AppCompatActivity {
         recycler.setNestedScrollingEnabled(false);
 
         // Load prefs
-        currentVoice   = getPrefs().getString(KEY_VOICE,    VOICE_AMERICAN_MALE);
-        currentPersona = getPrefs().getString(KEY_PERSONA,  PERSONA_FLIRTY);
-        wakeEnabled    = getPrefs().getBoolean(KEY_WAKE,    false);
-        ttsMuted       = getPrefs().getBoolean(KEY_MUTE,    false);
-        ttsSpeed       = getPrefs().getInt(KEY_SPEED,       1);
+        currentVoice   = getPrefs().getString(KEY_VOICE,   VOICE_AMERICAN_MALE);
+        currentPersona = getPrefs().getString(KEY_PERSONA, PERSONA_FLIRTY);
+        wakeEnabled    = getPrefs().getBoolean(KEY_WAKE,   false);
+        ttsMuted       = getPrefs().getBoolean(KEY_MUTE,   false);
+        ttsSpeed       = getPrefs().getInt(KEY_SPEED,      1);
 
         requestPerms();
         loadHistory();
@@ -245,7 +250,6 @@ public class MainActivity extends AppCompatActivity {
         updateVoiceButtonLabel();
         registerReceivers();
 
-        // Restore wake word service if previously enabled
         if (wakeEnabled) startWakeService();
 
         // Button listeners
@@ -276,6 +280,11 @@ public class MainActivity extends AppCompatActivity {
                 speak("Good day, sir. H.E.N.R.Y online. All systems nominal.", "warm"), 1500);
         } else {
             hideWelcome();
+        }
+
+        // If launched from widget mic button
+        if (getIntent() != null && getIntent().getBooleanExtra("start_listening", false)) {
+            mainHandler.postDelayed(this::startListening, 800);
         }
     }
 
@@ -319,7 +328,6 @@ public class MainActivity extends AppCompatActivity {
 
     // ── Broadcast Receivers ───────────────────────────────────────────────────
     private void registerReceivers() {
-        // Wake word from service (if app already in foreground)
         wakeReceiver = new BroadcastReceiver() {
             @Override public void onReceive(Context ctx, Intent intent) { handleWakeWord(); }
         };
@@ -329,7 +337,6 @@ public class MainActivity extends AppCompatActivity {
         else
             registerReceiver(wakeReceiver, wf);
 
-        // Notification reader
         notifReceiver = new BroadcastReceiver() {
             @Override public void onReceive(Context ctx, Intent intent) {
                 String app  = intent.getStringExtra(NotificationService.EXTRA_APP);
@@ -375,14 +382,12 @@ public class MainActivity extends AppCompatActivity {
         if (isFrench) tts.setLanguage(Locale.FRENCH);
         else           tts.setLanguage(new Locale("en", "US"));
         tts.setPitch(isMale ? 0.75f : 1.05f);
-
         float[] rates = { 0.75f, 0.90f, 1.10f };
         tts.setSpeechRate(rates[Math.max(0, Math.min(2, ttsSpeed))]);
     }
 
     // ── Voice Picker ──────────────────────────────────────────────────────────
     private void showVoicePicker() {
-        // Build a menu: Voice, Wake Word, Mute, Speed, Persona, Export, Reminders
         CharSequence[] options = {
             "🎙 Voice Accent",
             wakeEnabled ? "🟢 Wake Word: ON  (tap to disable)" : "⚫ Wake Word: OFF  (tap to enable)",
@@ -390,7 +395,8 @@ public class MainActivity extends AppCompatActivity {
             "⚡ Voice Speed: " + new String[]{"Slow","Normal","Fast"}[ttsSpeed],
             "🧠 Persona: " + capitalize(currentPersona),
             "📋 My Reminders",
-            "📤 Export Chat"
+            "📤 Export Chat",
+            "🌐 Translate Last Reply"
         };
         new AlertDialog.Builder(this)
             .setTitle("◆ H.E.N.R.Y Settings")
@@ -403,6 +409,7 @@ public class MainActivity extends AppCompatActivity {
                     case 4: showPersonaPicker(); break;
                     case 5: showReminders(); break;
                     case 6: exportChat(); break;
+                    case 7: translateLastReply(); break;
                 }
             }).show();
     }
@@ -490,7 +497,6 @@ public class MainActivity extends AppCompatActivity {
             .setPositiveButton("Apply", (d, w) -> {
                 currentPersona = personas[sel[0]];
                 getPrefs().edit().putString(KEY_PERSONA, currentPersona).apply();
-                // Send persona update to backend via history
                 history.add(new HistoryItem("user",
                     "[SYSTEM] Persona mode changed to: " + currentPersona +
                     ". Adjust your personality accordingly."));
@@ -509,22 +515,131 @@ public class MainActivity extends AppCompatActivity {
             .setPositiveButton("OK", null).show();
     }
 
+    // ── Translation ───────────────────────────────────────────────────────────
+    private void translateLastReply() {
+        // Find last JARVIS message
+        String lastReply = null;
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            if (messages.get(i).type == Message.TYPE_JARVIS) {
+                lastReply = messages.get(i).text;
+                break;
+            }
+        }
+        if (lastReply == null) {
+            Toast.makeText(this, "No reply to translate", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final String[] targetLangs = {
+            "Filipino/Tagalog", "French", "Spanish", "Arabic",
+            "Japanese", "Korean", "Chinese (Simplified)", "German"
+        };
+        final String[] langCodes = {
+            "Filipino", "French", "Spanish", "Arabic",
+            "Japanese", "Korean", "Chinese Simplified", "German"
+        };
+        final String replyToTranslate = lastReply;
+        new AlertDialog.Builder(this)
+            .setTitle("Translate to…")
+            .setItems(targetLangs, (d, which) -> {
+                String lang  = langCodes[which];
+                String label = targetLangs[which];
+                String prompt = "Translate this text to " + lang + " naturally and fluently. " +
+                                "Output only the translation, no explanation:\n\n" + replyToTranslate;
+                addJarvisMsg("Translating to " + label + "…");
+                setState(OrbView.OrbState.THINKING);
+                showTyping();
+
+                List<HistoryItem> transHistory = new ArrayList<>();
+                transHistory.add(new HistoryItem("user", prompt));
+                JarvisApi.ask(transHistory, null, new JarvisApi.Callback() {
+                    @Override public void onSuccess(String reply, String imageUrl) {
+                        mainHandler.post(() -> {
+                            hideTyping();
+                            String clean = stripEmotionTag(reply);
+                            addJarvisMsg("**[" + label + "]** " + clean);
+                            speak(clean, "neutral");
+                            setState(OrbView.OrbState.IDLE);
+                        });
+                    }
+                    @Override public void onError(String error) {
+                        mainHandler.post(() -> {
+                            hideTyping();
+                            addJarvisMsg("Translation failed, sir: " + error);
+                            setState(OrbView.OrbState.IDLE);
+                        });
+                    }
+                });
+            }).show();
+    }
+
+    // ── Export Chat ───────────────────────────────────────────────────────────
     private void exportChat() {
         if (messages.isEmpty()) {
             Toast.makeText(this, "No chat to export", Toast.LENGTH_SHORT).show();
             return;
         }
-        StringBuilder sb = new StringBuilder("H.E.N.R.Y Chat Export\n");
-        sb.append(new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date())).append("\n\n");
+        String[] exportOptions = { "📋 Share as Text", "💾 Save to File" };
+        new AlertDialog.Builder(this)
+            .setTitle("Export Chat")
+            .setItems(exportOptions, (d, which) -> {
+                String content = buildChatExportText();
+                if (which == 0) {
+                    // Share via system share sheet
+                    Intent share = new Intent(Intent.ACTION_SEND);
+                    share.setType("text/plain");
+                    share.putExtra(Intent.EXTRA_TEXT, content);
+                    share.putExtra(Intent.EXTRA_SUBJECT, "H.E.N.R.Y Chat Export");
+                    startActivity(Intent.createChooser(share, "Export chat via…"));
+                } else {
+                    // Save to file and share file URI
+                    saveChatToFile(content);
+                }
+            }).show();
+    }
+
+    private String buildChatExportText() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("═══════════════════════════════\n");
+        sb.append("  H.E.N.R.Y Chat Export\n");
+        sb.append("  Highly Enhanced Neural Reasoning for You\n");
+        sb.append("  ").append(new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(new Date())).append("\n");
+        sb.append("═══════════════════════════════\n\n");
         for (Message m : messages) {
-            if (m.type == Message.TYPE_USER)   sb.append("YOU: ").append(m.text).append("\n\n");
-            if (m.type == Message.TYPE_JARVIS) sb.append("HENRY: ").append(m.text).append("\n\n");
+            if (m.type == Message.TYPE_USER)
+                sb.append("YOU ▶  ").append(m.text).append("\n\n");
+            else if (m.type == Message.TYPE_JARVIS)
+                sb.append("HENRY ◆  ").append(m.text).append("\n\n");
         }
-        Intent share = new Intent(Intent.ACTION_SEND);
-        share.setType("text/plain");
-        share.putExtra(Intent.EXTRA_TEXT, sb.toString());
-        share.putExtra(Intent.EXTRA_SUBJECT, "H.E.N.R.Y Chat Export");
-        startActivity(Intent.createChooser(share, "Export chat via…"));
+        sb.append("═══════════════════════════════\n");
+        sb.append("Total messages: ").append(messages.size()).append("\n");
+        return sb.toString();
+    }
+
+    private void saveChatToFile(String content) {
+        new Thread(() -> {
+            try {
+                String ts = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+                File file = new File(getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS),
+                                     "HENRY_chat_" + ts + ".txt");
+                file.getParentFile().mkdirs();
+                try (FileOutputStream fos = new FileOutputStream(file)) {
+                    fos.write(content.getBytes("UTF-8"));
+                }
+                Uri fileUri = FileProvider.getUriForFile(
+                    this, getPackageName() + ".provider", file);
+                mainHandler.post(() -> {
+                    Intent share = new Intent(Intent.ACTION_SEND);
+                    share.setType("text/plain");
+                    share.putExtra(Intent.EXTRA_STREAM, fileUri);
+                    share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(Intent.createChooser(share, "Save or share chat file…"));
+                    Toast.makeText(this, "Saved: " + file.getName(), Toast.LENGTH_LONG).show();
+                });
+            } catch (Exception e) {
+                mainHandler.post(() ->
+                    Toast.makeText(this, "Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        }).start();
     }
 
     private void updateVoiceButtonLabel() {
@@ -657,8 +772,10 @@ public class MainActivity extends AppCompatActivity {
     private void showAttachDialog() {
         new AlertDialog.Builder(this)
             .setTitle("Attach")
-            .setItems(new String[]{"📷 Take photo", "🖼 Choose from gallery"}, (d, which) -> {
-                if (which == 0) openCamera(); else openGallery();
+            .setItems(new String[]{"📷 Take photo", "🖼 Choose image", "📄 Read PDF"}, (d, which) -> {
+                if (which == 0)      openCamera();
+                else if (which == 1) openGallery();
+                else                 openPdf();
             }).show();
     }
 
@@ -685,16 +802,69 @@ public class MainActivity extends AppCompatActivity {
         startActivityForResult(Intent.createChooser(i, "Select image"), REQUEST_GALLERY);
     }
 
+    private void openPdf() {
+        Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+        i.setType("application/pdf");
+        startActivityForResult(Intent.createChooser(i, "Select PDF"), REQUEST_PDF);
+    }
+
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
         if (res != RESULT_OK) return;
+
+        if (req == REQUEST_PDF && data != null && data.getData() != null) {
+            handlePdfAttachment(data.getData());
+            return;
+        }
+
         Uri uri = null;
         if (req == REQUEST_CAMERA && cameraImageUri != null) uri = cameraImageUri;
         else if (req == REQUEST_GALLERY && data != null)     uri = data.getData();
         if (uri != null) encodeImageAsync(uri);
     }
 
+    // ── PDF Reading ───────────────────────────────────────────────────────────
+    private void handlePdfAttachment(Uri pdfUri) {
+        Toast.makeText(this, "Reading PDF…", Toast.LENGTH_SHORT).show();
+        if (ivAttachPreview != null) ivAttachPreview.setVisibility(View.GONE);
+
+        PdfReader.read(this, pdfUri, new PdfReader.Callback() {
+            @Override public void onResult(String text, int pages) {
+                mainHandler.post(() -> {
+                    pendingPdfText = text;
+                    pendingImageBase64 = null;
+                    pendingImageUriStr = null;
+                    if (ivAttachPreview != null) {
+                        ivAttachPreview.setImageDrawable(null);
+                        // Show a placeholder icon to indicate PDF is attached
+                        ivAttachPreview.setVisibility(View.VISIBLE);
+                    }
+                    Toast.makeText(MainActivity.this,
+                        "PDF read: " + pages + " page(s). Ask me anything about it.",
+                        Toast.LENGTH_LONG).show();
+                    if (etInput != null) etInput.setHint("Ask about the PDF…");
+                });
+            }
+            @Override public void onError(String reason) {
+                mainHandler.post(() ->
+                    Toast.makeText(MainActivity.this, "PDF error: " + reason, Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private void clearAttachment() {
+        pendingImageBase64 = null;
+        pendingImageUriStr = null;
+        pendingPdfText     = null;
+        if (ivAttachPreview != null) {
+            ivAttachPreview.setImageDrawable(null);
+            ivAttachPreview.setVisibility(View.GONE);
+        }
+        if (etInput != null) etInput.setHint("Command HENRY…");
+    }
+
+    // ── Image encoding ────────────────────────────────────────────────────────
     private void encodeImageAsync(Uri uri) {
         new Thread(() -> {
             try (InputStream is = getContentResolver().openInputStream(uri)) {
@@ -713,10 +883,12 @@ public class MainActivity extends AppCompatActivity {
                 mainHandler.post(() -> {
                     pendingImageBase64 = b64;
                     pendingImageUriStr = uri.toString();
+                    pendingPdfText     = null;
                     if (ivAttachPreview != null) {
                         ivAttachPreview.setImageURI(uri);
                         ivAttachPreview.setVisibility(View.VISIBLE);
                     }
+                    if (etInput != null) etInput.setHint("Ask about the image…");
                     Toast.makeText(this, "Image attached", Toast.LENGTH_SHORT).show();
                 });
             } catch (Exception e) {
@@ -724,14 +896,6 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(this, "Failed: " + e.getMessage(), Toast.LENGTH_SHORT).show());
             }
         }).start();
-    }
-
-    private void clearAttachment() {
-        pendingImageBase64 = null; pendingImageUriStr = null;
-        if (ivAttachPreview != null) {
-            ivAttachPreview.setImageDrawable(null);
-            ivAttachPreview.setVisibility(View.GONE);
-        }
     }
 
     // ── Voice Input ───────────────────────────────────────────────────────────
@@ -809,16 +973,21 @@ public class MainActivity extends AppCompatActivity {
     private void sendText() {
         if (etInput == null) return;
         String text = etInput.getText().toString().trim();
-        if (text.isEmpty() && pendingImageBase64 == null) return;
+        boolean hasAttachment = pendingImageBase64 != null || pendingPdfText != null;
+        if (text.isEmpty() && !hasAttachment) return;
         if (currentState == OrbView.OrbState.THINKING) return;
-        if (text.isEmpty()) text = "Analyse this image and describe what you see in detail.";
+        if (text.isEmpty() && pendingImageBase64 != null)
+            text = "Analyse this image and describe what you see in detail.";
+        if (text.isEmpty() && pendingPdfText != null)
+            text = "Summarise this document for me.";
         etInput.setText("");
+        etInput.setHint("Command HENRY…");
         hideWelcome();
         askJarvis(text);
     }
 
     private void askJarvis(String userText) {
-        // ── Reminder detection (local, no API call) ───────────────────────────
+        // ── Reminder detection ────────────────────────────────────────────────
         String reminderReply = ReminderManager.trySchedule(this, userText);
         if (reminderReply != null) {
             history.add(new HistoryItem("user", userText));
@@ -869,6 +1038,15 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        // ── PDF context injection ──────────────────────────────────────────────
+        String effectiveUserText = userText;
+        if (pendingPdfText != null) {
+            effectiveUserText = "The following is a PDF document the user wants to discuss:\n\n"
+                + pendingPdfText + "\n\n---\n\nUser question: " + userText;
+            pendingPdfText = null;
+            clearAttachment();
+        }
+
         // ── Default: send to AI backend ────────────────────────────────────────
         history.add(new HistoryItem("user", userText));
         addUserMsg(userText);
@@ -884,7 +1062,14 @@ public class MainActivity extends AppCompatActivity {
         String imageB64 = pendingImageBase64;
         clearAttachment();
 
-        JarvisApi.ask(history, imageB64, new JarvisApi.Callback() {
+        // Build history for API call — inject PDF text in last user message if present
+        List<HistoryItem> apiHistory = new ArrayList<>(history);
+        if (!effectiveUserText.equals(userText) && !apiHistory.isEmpty()) {
+            // Replace last user entry with the enriched version
+            apiHistory.set(apiHistory.size() - 1, new HistoryItem("user", effectiveUserText));
+        }
+
+        JarvisApi.ask(apiHistory, imageB64, new JarvisApi.Callback() {
             @Override public void onSuccess(String reply, String imageUrl) {
                 mainHandler.post(() -> {
                     hideTyping();
@@ -955,7 +1140,7 @@ public class MainActivity extends AppCompatActivity {
                 != PackageManager.PERMISSION_GRANTED) return null;
         try {
             ContentResolver cr = getContentResolver();
-            long now = System.currentTimeMillis();
+            long now      = System.currentTimeMillis();
             long tomorrow = now + 48 * 3600_000L;
             Uri uri = CalendarContract.Events.CONTENT_URI;
             String[] proj = {
@@ -973,7 +1158,7 @@ public class MainActivity extends AppCompatActivity {
                 int count = 0;
                 do {
                     String title = c.getString(0);
-                    long start   = c.getLong(1);
+                    long   start = c.getLong(1);
                     sb.append("**").append(sdf.format(new Date(start))).append("** — ")
                       .append(title).append("\n");
                     count++;
@@ -988,7 +1173,7 @@ public class MainActivity extends AppCompatActivity {
         new AlertDialog.Builder(this)
             .setTitle("Clear")
             .setItems(new String[]{"🗑 Clear conversation", "📤 Export chat first"}, (d, w) -> {
-                if (w == 0) confirmClear(); else { exportChat(); }
+                if (w == 0) confirmClear(); else exportChat();
             }).show();
     }
 

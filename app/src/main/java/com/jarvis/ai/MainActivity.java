@@ -162,7 +162,10 @@ public class MainActivity extends AppCompatActivity {
     private BroadcastReceiver notifReceiver;
 
     // Active timer state
-    private TextView tvTimerBadge = null;   // optional badge shown in UI
+    private TextView tvTimerBadge = null;
+
+    // User profile (loaded once, sent with every AI call)
+    private UserProfile userProfile;
 
     // ── onCreate ──────────────────────────────────────────────────────────────
     @Override
@@ -260,6 +263,7 @@ public class MainActivity extends AppCompatActivity {
         ttsSpeed       = getPrefs().getInt(KEY_SPEED,         1);
         screenAlwaysOn = getPrefs().getBoolean(KEY_SCREEN_ON, false);
         applyScreenAlwaysOn();
+        userProfile = UserProfile.load(this);
 
         requestPerms();
         loadHistory();
@@ -451,6 +455,7 @@ public class MainActivity extends AppCompatActivity {
             "📰 Morning Briefing — Read News",
             "📋 My Reminders",
             "📝 My Notes",
+            "👤 My Profile (personalise HENRY)",
             "📤 Export Chat",
             "🌐 Translate Last Reply"
         };
@@ -468,8 +473,9 @@ public class MainActivity extends AppCompatActivity {
                     case 7:  readNewsBriefing(); break;
                     case 8:  showReminders(); break;
                     case 9:  showNotes(); break;
-                    case 10: exportChat(); break;
-                    case 11: translateLastReply(); break;
+                    case 10: showProfileEditor(); break;
+                    case 11: exportChat(); break;
+                    case 12: translateLastReply(); break;
                 }
             }).show();
     }
@@ -643,6 +649,52 @@ public class MainActivity extends AppCompatActivity {
             }).show();
     }
 
+    // ── User Profile Editor ───────────────────────────────────────────────────
+    private void showProfileEditor() {
+        android.view.LayoutInflater inflater = android.view.LayoutInflater.from(this);
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(48, 24, 48, 24);
+
+        android.widget.EditText etName      = field(layout, "Your name",           userProfile.name);
+        android.widget.EditText etCity      = field(layout, "Your city",           userProfile.city);
+        android.widget.EditText etJob       = field(layout, "Your job/role",       userProfile.job);
+        android.widget.EditText etInterests = field(layout, "Interests (hobbies, topics…)", userProfile.interests);
+        android.widget.EditText etNickname  = field(layout, "What HENRY calls you (default: sir)", userProfile.nickname);
+
+        new AlertDialog.Builder(this)
+            .setTitle("◆ Your Profile")
+            .setView(layout)
+            .setPositiveButton("Save", (d, w) -> {
+                userProfile.name      = etName.getText().toString().trim();
+                userProfile.city      = etCity.getText().toString().trim();
+                userProfile.job       = etJob.getText().toString().trim();
+                userProfile.interests = etInterests.getText().toString().trim();
+                userProfile.nickname  = etNickname.getText().toString().trim();
+                if (userProfile.nickname.isEmpty()) userProfile.nickname = "sir";
+                userProfile.save(this);
+                String name = userProfile.name.isEmpty() ? "sir" : userProfile.name;
+                String msg  = "Profile saved. Good to know you better, " + name + ".";
+                Toast.makeText(this, "Profile saved", Toast.LENGTH_SHORT).show();
+                speak(msg, "warm");
+            })
+            .setNegativeButton("Cancel", null).show();
+    }
+
+    private android.widget.EditText field(android.widget.LinearLayout parent, String hint, String value) {
+        android.widget.EditText et = new android.widget.EditText(this);
+        et.setHint(hint);
+        et.setText(value != null ? value : "");
+        et.setSingleLine(true);
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+            android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+            android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = 16;
+        et.setLayoutParams(lp);
+        parent.addView(et);
+        return et;
+    }
+
     private void showReminders() {
         String list = ReminderManager.listReminders(this);
         String msg  = list != null ? stripEmotionTag(list) : "No upcoming reminders, sir.";
@@ -688,7 +740,7 @@ public class MainActivity extends AppCompatActivity {
 
                 List<HistoryItem> transHistory = new ArrayList<>();
                 transHistory.add(new HistoryItem("user", prompt));
-                JarvisApi.ask(transHistory, null, MODE_DETAILED, new JarvisApi.Callback() {
+                JarvisApi.ask(transHistory, null, MODE_DETAILED, userProfile, new JarvisApi.Callback() {
                     @Override public void onSuccess(String reply, String imageUrl) {
                         mainHandler.post(() -> {
                             hideTyping();
@@ -1458,7 +1510,7 @@ public class MainActivity extends AppCompatActivity {
             apiHistory.set(apiHistory.size() - 1, new HistoryItem("user", effectiveUserText));
         }
 
-        JarvisApi.ask(apiHistory, imageB64, responseMode, new JarvisApi.Callback() {
+        JarvisApi.ask(apiHistory, imageB64, responseMode, userProfile, new JarvisApi.Callback() {
             @Override public void onSuccess(String reply, String imageUrl) {
                 mainHandler.post(() -> {
                     hideTyping();

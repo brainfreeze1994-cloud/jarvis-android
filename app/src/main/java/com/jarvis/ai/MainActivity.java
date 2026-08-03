@@ -80,6 +80,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int    REQUEST_GALLERY  = 200;
     private static final int    REQUEST_CAMERA   = 201;
     private static final int    REQUEST_PDF      = 202;
+    private static final int    REQUEST_QR       = 203;
     private static final String PREFS            = "jarvis_prefs";
     private static final String KEY_HIS          = "history_v2";
     private static final String KEY_VOICE        = "voice_choice";
@@ -283,12 +284,12 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
-        setupChip(R.id.chip1, "What's the weather in Dubai?");
-        setupChip(R.id.chip2, "Generate image of a warrior");
-        setupChip(R.id.chip3, "Write me a Python script");
-        setupChip(R.id.chip4, "Tell me something fascinating");
-        setupChip(R.id.chip5, "Latest tech news today");
-        setupChip(R.id.chip6, "Explain quantum computing");
+        setupChip(R.id.chip1, 0);
+        setupChip(R.id.chip2, 1);
+        setupChip(R.id.chip3, 2);
+        setupChip(R.id.chip4, 3);
+        setupChip(R.id.chip5, 4);
+        setupChip(R.id.chip6, 5);
 
         if (history.isEmpty()) {
             addJarvisMsg("Good day, sir. H.E.N.R.Y online. All systems nominal.");
@@ -308,9 +309,42 @@ public class MainActivity extends AppCompatActivity {
         return getSharedPreferences(PREFS, MODE_PRIVATE);
     }
 
-    private void setupChip(int chipId, String text) {
+    private void setupChip(int chipId, int index) {
         View chip = findViewById(chipId);
-        if (chip != null) chip.setOnClickListener(v -> { hideWelcome(); askJarvis(text); });
+        if (chip == null) return;
+        // Update label
+        String text = ChipPrefs.get(this, index);
+        if (chip instanceof TextView) ((TextView) chip).setText(
+            text.length() > 28 ? text.substring(0, 25) + "…" : text);
+        // Tap → ask
+        chip.setOnClickListener(v -> { hideWelcome(); askJarvis(ChipPrefs.get(this, index)); });
+        // Long-press → edit
+        chip.setOnLongClickListener(v -> {
+            editChip(chipId, index); return true;
+        });
+    }
+
+    private void editChip(int chipId, int index) {
+        android.widget.EditText input = new android.widget.EditText(this);
+        input.setText(ChipPrefs.get(this, index));
+        input.setSingleLine(true);
+        input.selectAll();
+        new AlertDialog.Builder(this)
+            .setTitle("Edit Suggestion")
+            .setView(input)
+            .setPositiveButton("Save", (d, w) -> {
+                String newText = input.getText().toString().trim();
+                if (!newText.isEmpty()) {
+                    ChipPrefs.set(this, index, newText);
+                    setupChip(chipId, index); // refresh label
+                    Toast.makeText(this, "Chip updated", Toast.LENGTH_SHORT).show();
+                }
+            })
+            .setNeutralButton("Reset", (d, w) -> {
+                ChipPrefs.reset(this, index);
+                setupChip(chipId, index);
+            })
+            .setNegativeButton("Cancel", null).show();
     }
 
     private void hideWelcome() {
@@ -1143,8 +1177,130 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // ── Battery / DateTime (answered locally, no AI needed) ───────────────
         String lower = userText.toLowerCase(java.util.Locale.US);
+
+        // ── App Launcher ──────────────────────────────────────────────────────
+        if (AppLauncher.isLaunchCommand(userText)) {
+            String reply = AppLauncher.launch(this, userText);
+            if (reply != null) {
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String clean = stripEmotionTag(reply);
+                history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+                speak(clean, extractEmotion(reply)); saveHistory(); return;
+            }
+        }
+
+        // ── Web Search ────────────────────────────────────────────────────────
+        if (lower.startsWith("search") || lower.startsWith("google ") ||
+            lower.contains("search google for") || lower.contains("search the web for") ||
+            lower.contains("look up") || lower.contains("search for ")) {
+            String query = userText
+                .replaceFirst("(?i)search (google )?for\\s+", "")
+                .replaceFirst("(?i)search the web for\\s+", "")
+                .replaceFirst("(?i)google\\s+", "")
+                .replaceFirst("(?i)look up\\s+", "")
+                .replaceFirst("(?i)search\\s+", "")
+                .trim();
+            if (!query.isEmpty()) {
+                String reply = AppLauncher.webSearch(this, query);
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String clean = stripEmotionTag(reply);
+                history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+                speak(clean, extractEmotion(reply)); saveHistory(); return;
+            }
+        }
+
+        // ── WhatsApp message ──────────────────────────────────────────────────
+        // "WhatsApp John: I'm on my way" or "send whatsapp to John: message"
+        java.util.regex.Matcher wam = java.util.regex.Pattern.compile(
+            "(?:whatsapp|send\\s+(?:a\\s+)?whatsapp\\s+(?:to\\s+)?)([\\w\\s]+):\\s*(.+)",
+            java.util.regex.Pattern.CASE_INSENSITIVE).matcher(userText);
+        if (wam.find()) {
+            String name = wam.group(1).trim();
+            String msg  = wam.group(2).trim();
+            String number = ContactsHelper.findNumber(this, name);
+            String reply;
+            if (number != null)
+                reply = AppLauncher.whatsappMessage(this, number, msg);
+            else
+                reply = "[EMOTION:concerned] I couldn't find " + name + " in your contacts, sir.";
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+
+        // ── Calculator ────────────────────────────────────────────────────────
+        String calcResult = Calculator.evaluate(userText);
+        if (calcResult != null) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(calcResult);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, "neutral"); saveHistory(); return;
+        }
+
+        // ── Unit / Currency Converter ─────────────────────────────────────────
+        String convResult = Calculator.convert(userText);
+        if (convResult != null) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(convResult);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, "neutral"); saveHistory(); return;
+        }
+
+        // ── Alarm ─────────────────────────────────────────────────────────────
+        String alarmReply = AlarmHelper.parseAndSet(this, userText);
+        if (alarmReply != null) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(alarmReply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(alarmReply)); saveHistory(); return;
+        }
+
+        // ── Stopwatch ─────────────────────────────────────────────────────────
+        if (lower.contains("stopwatch") || (lower.contains("stop") && lower.contains("watch"))) {
+            String sw;
+            if (lower.contains("start") || lower.contains("begin") || lower.contains("go"))
+                sw = Stopwatch.start(null);
+            else if (lower.contains("stop") || lower.contains("pause"))
+                sw = Stopwatch.stop();
+            else if (lower.contains("reset") || lower.contains("clear"))
+                sw = Stopwatch.reset();
+            else if (lower.contains("lap"))
+                sw = Stopwatch.lap();
+            else
+                sw = Stopwatch.status();
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(sw);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(sw)); saveHistory(); return;
+        }
+        if (lower.equals("lap") && Stopwatch.isRunning()) {
+            String sw = Stopwatch.lap();
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(sw);
+            addJarvisMsg(clean); speak(clean, "excited"); saveHistory(); return;
+        }
+
+        // ── QR Scanner ────────────────────────────────────────────────────────
+        if (QrScanner.isQrCommand(userText)) {
+            String reply = QrScanner.scan(this);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+
+        // ── Multi-language voice input hint ───────────────────────────────────
+        if (lower.contains("switch language") || lower.contains("speak in ") ||
+            lower.contains("change language")) {
+            String hint = "[EMOTION:neutral] Tap the mic, sir — your voice input language follows the device default. Change it in Settings → System → Language.";
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(hint);
+            addJarvisMsg(clean); speak(clean, "neutral"); saveHistory(); return;
+        }
+
+        // ── Battery / DateTime (answered locally, no AI needed) ───────────────
         if (lower.contains("battery") || lower.contains("charge") || lower.contains("power level")) {
             String reply = DeviceCommands.getBatteryInfo(this);
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);

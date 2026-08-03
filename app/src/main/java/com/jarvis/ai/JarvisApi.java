@@ -26,7 +26,19 @@ public class JarvisApi {
         void onError(String error);
     }
 
+    /** Backward-compatible call without responseMode. */
     public static void ask(List<HistoryItem> history, String imageBase64, Callback cb) {
+        ask(history, imageBase64, "balanced", cb);
+    }
+
+    /**
+     * @param history       Full conversation history
+     * @param imageBase64   Optional base64 image (null if none)
+     * @param responseMode  "brief" | "balanced" | "detailed"
+     * @param cb            Result callback
+     */
+    public static void ask(List<HistoryItem> history, String imageBase64,
+                           String responseMode, Callback cb) {
         new Thread(() -> {
             try {
                 JSONArray messages = new JSONArray();
@@ -39,6 +51,7 @@ public class JarvisApi {
 
                 JSONObject body = new JSONObject();
                 body.put("messages", messages);
+                body.put("responseMode", responseMode != null ? responseMode : "balanced");
 
                 if (imageBase64 != null && !imageBase64.isEmpty()) {
                     body.put("imageBase64", imageBase64);
@@ -53,13 +66,16 @@ public class JarvisApi {
 
                 try (Response resp = client.newCall(req).execute()) {
                     String bodyStr = resp.body() != null ? resp.body().string() : "";
+
                     if (!resp.isSuccessful()) {
                         cb.onError("Server error " + resp.code());
                         return;
                     }
+
                     JSONObject data = new JSONObject(bodyStr);
                     String reply    = data.optString("reply", "I have no response.");
                     String imageUrl = data.optString("imageUrl", null);
+
                     cb.onSuccess(reply, imageUrl);
                 }
 

@@ -226,20 +226,17 @@ public class OrbView extends View {
         // Core fill circle
         canvas.drawCircle(cx, cy, r * 0.55f, paintCore);
 
-        // Triangle in center
-        float th = r * 0.38f;
-        float tw = th * 1.10f;
-        Path tri = new Path();
-        tri.moveTo(cx,      cy - th * 0.80f);
-        tri.lineTo(cx - tw, cy + th * 0.60f);
-        tri.lineTo(cx + tw, cy + th * 0.60f);
-        tri.close();
-        paintTri.setAlpha(220);
-        canvas.drawPath(tri, paintTri);
+        // Inner ring 1
+        paintTri.setAlpha(180);
+        canvas.drawCircle(cx, cy, r * 0.38f, paintTri);
+
+        // Inner ring 2 (tighter, brighter)
+        paintTri.setAlpha(120);
+        canvas.drawCircle(cx, cy, r * 0.22f, paintTri);
 
         // Center dot
-        paintDot.setAlpha(200);
-        canvas.drawCircle(cx, cy, r * 0.055f, paintDot);
+        paintDot.setAlpha(255);
+        canvas.drawCircle(cx, cy, r * 0.07f, paintDot);
     }
 
     @Override

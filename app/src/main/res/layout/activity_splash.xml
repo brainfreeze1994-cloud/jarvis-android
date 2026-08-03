@@ -2,16 +2,18 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0d0d0d"
+    android:background="#020C1B"
     android:gravity="center">
 
+    <!-- Blue top accent line -->
     <View
         android:id="@+id/splash_top_line"
         android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="#c9a84c"
+        android:layout_height="2dp"
+        android:background="#00BEFF"
         android:layout_alignParentTop="true"/>
 
+    <!-- Orb icon -->
     <ImageView
         android:id="@+id/splash_orb"
         android:layout_width="160dp"
@@ -21,6 +23,7 @@
         android:src="@mipmap/ic_launcher"
         android:contentDescription="HENRY Orb" />
 
+    <!-- H.E.N.R.Y title -->
     <TextView
         android:id="@+id/splash_title"
         android:layout_width="wrap_content"
@@ -29,11 +32,12 @@
         android:layout_centerHorizontal="true"
         android:text="H.E.N.R.Y"
         android:textSize="30sp"
-        android:textColor="#c9a84c"
-        android:letterSpacing="0.3"
+        android:textColor="#00BEFF"
+        android:letterSpacing="0.35"
         android:fontFamily="sans-serif-medium"
         android:visibility="invisible" />
 
+    <!-- Subtitle -->
     <TextView
         android:id="@+id/splash_subtitle"
         android:layout_width="wrap_content"
@@ -43,24 +47,26 @@
         android:layout_marginTop="8dp"
         android:text="HIGHLY ENHANCED NEURAL REASONING FOR YOU"
         android:textSize="8sp"
-        android:textColor="#4a4030"
+        android:textColor="#0A3A5A"
         android:letterSpacing="0.15"
         android:visibility="invisible" />
 
+    <!-- Bottom version -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
         android:layout_marginBottom="32dp"
-        android:text="v1.0.0"
+        android:text="v14.0.0"
         android:textSize="11sp"
-        android:textColor="#2a2318" />
+        android:textColor="#071525" />
 
+    <!-- Blue bottom accent line -->
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#1a1508"
+        android:background="#071525"
         android:layout_alignParentBottom="true"/>
 
 </RelativeLayout>

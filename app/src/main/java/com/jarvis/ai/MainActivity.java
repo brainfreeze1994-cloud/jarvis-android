@@ -21,6 +21,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.CalendarContract;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
@@ -87,6 +88,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_SPEED        = "tts_speed";
     private static final String KEY_PERSONA      = "persona_mode";
     private static final String KEY_RESP_MODE    = "response_mode";
+    private static final String KEY_SCREEN_ON    = "screen_always_on";
     private static final String CRASH_FILE       = "henry_crash.txt";
     private static final String SPEAK_URL        = "https://jarvis-ai-seven-dun.vercel.app/api/speak";
 
@@ -94,7 +96,8 @@ public class MainActivity extends AppCompatActivity {
     private static final String MODE_BRIEF    = "brief";
     private static final String MODE_BALANCED = "balanced";
     private static final String MODE_DETAILED = "detailed";
-    private String responseMode = MODE_BALANCED;
+    private String responseMode  = MODE_BALANCED;
+    private boolean screenAlwaysOn = false;
 
     // Voice choices
     private static final String VOICE_BRITISH_MALE    = "british_male";
@@ -156,6 +159,9 @@ public class MainActivity extends AppCompatActivity {
 
     private BroadcastReceiver wakeReceiver;
     private BroadcastReceiver notifReceiver;
+
+    // Active timer state
+    private TextView tvTimerBadge = null;   // optional badge shown in UI
 
     // ── onCreate ──────────────────────────────────────────────────────────────
     @Override
@@ -251,6 +257,8 @@ public class MainActivity extends AppCompatActivity {
         wakeEnabled    = getPrefs().getBoolean(KEY_WAKE,      false);
         ttsMuted       = getPrefs().getBoolean(KEY_MUTE,      false);
         ttsSpeed       = getPrefs().getInt(KEY_SPEED,         1);
+        screenAlwaysOn = getPrefs().getBoolean(KEY_SCREEN_ON, false);
+        applyScreenAlwaysOn();
 
         requestPerms();
         loadHistory();
@@ -400,12 +408,15 @@ public class MainActivity extends AppCompatActivity {
                        : MODE_DETAILED.equals(responseMode) ? "Detailed" : "Balanced";
         CharSequence[] options = {
             "🎙 Voice Accent",
-            wakeEnabled ? "🟢 Wake Word: ON  (tap to disable)" : "⚫ Wake Word: OFF  (tap to enable)",
-            ttsMuted    ? "🔇 Voice Muted  (tap to unmute)"   : "🔊 Voice Enabled  (tap to mute)",
+            wakeEnabled    ? "🟢 Wake Word: ON  (tap to disable)"  : "⚫ Wake Word: OFF  (tap to enable)",
+            ttsMuted       ? "🔇 Voice Muted  (tap to unmute)"    : "🔊 Voice Enabled  (tap to mute)",
             "⚡ Voice Speed: " + new String[]{"Slow","Normal","Fast"}[ttsSpeed],
             "🧠 Persona: " + capitalize(currentPersona),
             "💬 Response Mode: " + modeLbl,
+            screenAlwaysOn ? "💡 Screen Always-On: ON  (tap off)" : "💡 Screen Always-On: OFF  (tap on)",
+            "📰 Morning Briefing — Read News",
             "📋 My Reminders",
+            "📝 My Notes",
             "📤 Export Chat",
             "🌐 Translate Last Reply"
         };
@@ -413,15 +424,18 @@ public class MainActivity extends AppCompatActivity {
             .setTitle("◆ H.E.N.R.Y Settings")
             .setItems(options, (d, which) -> {
                 switch (which) {
-                    case 0: showVoiceAccentPicker(); break;
-                    case 1: toggleWakeWord(); break;
-                    case 2: toggleMute(); break;
-                    case 3: showSpeedPicker(); break;
-                    case 4: showPersonaPicker(); break;
-                    case 5: showResponseModePicker(); break;
-                    case 6: showReminders(); break;
-                    case 7: exportChat(); break;
-                    case 8: translateLastReply(); break;
+                    case 0:  showVoiceAccentPicker(); break;
+                    case 1:  toggleWakeWord(); break;
+                    case 2:  toggleMute(); break;
+                    case 3:  showSpeedPicker(); break;
+                    case 4:  showPersonaPicker(); break;
+                    case 5:  showResponseModePicker(); break;
+                    case 6:  toggleScreenAlwaysOn(); break;
+                    case 7:  readNewsBriefing(); break;
+                    case 8:  showReminders(); break;
+                    case 9:  showNotes(); break;
+                    case 10: exportChat(); break;
+                    case 11: translateLastReply(); break;
                 }
             }).show();
     }
@@ -540,6 +554,59 @@ public class MainActivity extends AppCompatActivity {
                 speak(msg, "neutral");
             })
             .setNegativeButton("Cancel", null).show();
+    }
+
+    // ── Screen Always-On ──────────────────────────────────────────────────────
+    private void toggleScreenAlwaysOn() {
+        screenAlwaysOn = !screenAlwaysOn;
+        getPrefs().edit().putBoolean(KEY_SCREEN_ON, screenAlwaysOn).apply();
+        applyScreenAlwaysOn();
+        String msg = screenAlwaysOn
+            ? "Screen will stay on while I'm with you, sir."
+            : "Screen timeout restored, sir.";
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+        speak(msg, "neutral");
+    }
+
+    private void applyScreenAlwaysOn() {
+        if (screenAlwaysOn)
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
+    // ── News Briefing ─────────────────────────────────────────────────────────
+    private void readNewsBriefing() {
+        addJarvisMsg("Fetching your morning briefing, sir…");
+        setState(OrbView.OrbState.THINKING);
+        NewsReader.fetch(new NewsReader.Callback() {
+            @Override public void onResult(String formatted) {
+                String clean = stripEmotionTag(formatted);
+                String emotion = extractEmotion(formatted);
+                addJarvisMsg(clean);
+                speak(clean, emotion);
+                setState(OrbView.OrbState.IDLE);
+            }
+            @Override public void onError(String reason) {
+                addJarvisMsg(reason);
+                speak(reason, "concerned");
+                setState(OrbView.OrbState.IDLE);
+            }
+        });
+    }
+
+    // ── Voice Notes ───────────────────────────────────────────────────────────
+    private void showNotes() {
+        String notes = VoiceNotes.readAll(this);
+        String clean = stripEmotionTag(notes);
+        new AlertDialog.Builder(this)
+            .setTitle("◆ H.E.N.R.Y Notes")
+            .setMessage(clean)
+            .setPositiveButton("OK", null)
+            .setNegativeButton("Clear All", (d, w) -> {
+                String reply = stripEmotionTag(VoiceNotes.deleteAll(this));
+                Toast.makeText(this, reply, Toast.LENGTH_SHORT).show();
+            }).show();
     }
 
     private void showReminders() {
@@ -1074,6 +1141,134 @@ public class MainActivity extends AppCompatActivity {
                 saveHistory();
                 return;
             }
+        }
+
+        // ── Battery / DateTime (answered locally, no AI needed) ───────────────
+        String lower = userText.toLowerCase(java.util.Locale.US);
+        if (lower.contains("battery") || lower.contains("charge") || lower.contains("power level")) {
+            String reply = DeviceCommands.getBatteryInfo(this);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, "neutral"); saveHistory(); return;
+        }
+        if (lower.matches(".*what('s| is) the (time|date|day|datetime).*")
+            || lower.equals("time") || lower.equals("date")) {
+            String reply = DeviceCommands.getDateTime();
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, "neutral"); saveHistory(); return;
+        }
+
+        // ── Flashlight ────────────────────────────────────────────────────────
+        if (lower.contains("flashlight") || lower.contains("torch")) {
+            boolean on = lower.contains("on") || lower.contains("enable") || lower.contains("turn on");
+            boolean off= lower.contains("off")|| lower.contains("disable")|| lower.contains("turn off");
+            String reply = (on && !off) ? DeviceCommands.setFlashlight(this, true)
+                         : (off && !on) ? DeviceCommands.setFlashlight(this, false)
+                         : DeviceCommands.toggleFlashlight(this);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            history.add(new HistoryItem("model", reply)); addJarvisMsg(reply);
+            speak(reply, "neutral"); saveHistory(); return;
+        }
+
+        // ── Brightness ────────────────────────────────────────────────────────
+        if (lower.contains("brightness")) {
+            java.util.regex.Matcher bm =
+                java.util.regex.Pattern.compile("(\\d+)").matcher(lower);
+            int pct = bm.find() ? Integer.parseInt(bm.group(1)) : 70;
+            String reply = DeviceCommands.setBrightness(this, pct);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            history.add(new HistoryItem("model", reply)); addJarvisMsg(reply);
+            speak(reply, "neutral"); saveHistory(); return;
+        }
+
+        // ── Do Not Disturb ────────────────────────────────────────────────────
+        if (lower.contains("do not disturb") || lower.contains("dnd")
+            || lower.contains("silent mode") || lower.contains("quiet mode")) {
+            boolean enable = !lower.contains("off") && !lower.contains("disable");
+            String reply = DeviceCommands.setDoNotDisturb(this, enable);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            history.add(new HistoryItem("model", reply)); addJarvisMsg(reply);
+            speak(reply, "neutral"); saveHistory(); return;
+        }
+
+        // ── Voice Timer ───────────────────────────────────────────────────────
+        // Cancel timer
+        if ((lower.contains("cancel") || lower.contains("stop")) && lower.contains("timer")) {
+            String reply = VoiceTimer.cancel();
+            if (reply == null) reply = "[EMOTION:neutral] No active timer, sir.";
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+        // Timer status
+        if ((lower.contains("how long") || lower.contains("time left") || lower.contains("timer status"))
+            && VoiceTimer.isActive()) {
+            String reply = VoiceTimer.status();
+            if (reply == null) reply = "[EMOTION:neutral] No active timer, sir.";
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+        // Start timer
+        String timerReply = VoiceTimer.startFromText(this, userText, new VoiceTimer.Callback() {
+            @Override public void onTick(long secondsLeft) { /* optional countdown UI */ }
+            @Override public void onFinish(String label) {
+                mainHandler.post(() -> {
+                    String msg = label + " done, sir. Time's up.";
+                    addJarvisMsg(msg);
+                    speak(msg, "excited");
+                });
+            }
+        });
+        if (timerReply != null) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(timerReply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(timerReply)); saveHistory(); return;
+        }
+
+        // ── Voice Notes ───────────────────────────────────────────────────────
+        String noteContent = VoiceNotes.parseSaveCommand(userText);
+        if (noteContent != null) {
+            String reply = VoiceNotes.save(this, noteContent);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+        if (VoiceNotes.isRecallCommand(userText)) {
+            String reply = VoiceNotes.readAll(this);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+        if (VoiceNotes.isDeleteCommand(userText)) {
+            String reply = VoiceNotes.deleteAll(this);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+
+        // ── News ──────────────────────────────────────────────────────────────
+        if (lower.contains("news") || lower.contains("headlines") || lower.contains("briefing")) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            saveHistory();
+            readNewsBriefing(); return;
+        }
+
+        // ── Screen always-on toggle via voice ─────────────────────────────────
+        if (lower.contains("screen") && (lower.contains("always on") || lower.contains("stay on")
+            || lower.contains("keep on") || lower.contains("keep awake"))) {
+            toggleScreenAlwaysOn();
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            saveHistory(); return;
         }
 
         // ── PDF context injection ──────────────────────────────────────────────

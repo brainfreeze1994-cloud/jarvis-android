@@ -150,6 +150,45 @@ public class SmartMemory {
         } catch (Exception ignored) {}
     }
 
+    // ── Methods used by SmartMemoryActivity ──────────────────────────────────
+
+    /** Returns all stored facts as a plain List<String> for display. */
+    public static List<String> getFacts(Context ctx) {
+        List<String> result = new ArrayList<>();
+        try {
+            JSONArray arr = loadFacts(ctx);
+            for (int i = 0; i < arr.length(); i++) {
+                result.add(arr.getJSONObject(i).getString("fact"));
+            }
+        } catch (Exception ignored) {}
+        return result;
+    }
+
+    /** Add a single fact string directly (no prefix). */
+    public static void addFact(Context ctx, String fact) {
+        saveFact(ctx, fact);
+    }
+
+    /** Remove the fact at the given index. */
+    public static void removeFact(Context ctx, int index) {
+        try {
+            JSONArray facts = loadFacts(ctx);
+            if (index < 0 || index >= facts.length()) return;
+            JSONArray updated = new JSONArray();
+            for (int i = 0; i < facts.length(); i++) {
+                if (i != index) updated.put(facts.getJSONObject(i));
+            }
+            ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+               .putString(KEY_FACTS, updated.toString()).apply();
+        } catch (Exception ignored) {}
+    }
+
+    /** Erase all stored memories. */
+    public static void clearAll(Context ctx) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+           .remove(KEY_FACTS).apply();
+    }
+
     /** Build memory context string to inject into AI prompts */
     public static String buildMemoryContext(Context ctx) {
         try {

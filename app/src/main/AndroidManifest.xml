@@ -285,6 +285,13 @@
             android:screenOrientation="portrait"
             android:theme="@style/Theme.Jarvis" />
 
+        <!-- Vision Intelligence Hub -->
+        <activity
+            android:name=".VisionActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.Jarvis" />
+
     </application>
 
 </manifest>

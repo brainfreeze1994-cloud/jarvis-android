@@ -48,10 +48,10 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="STARK INDUSTRIES"
+                android:text="HIGHLY ENHANCED NEURAL REASONING"
                 android:textColor="#1E4A66"
-                android:textSize="7sp"
-                android:letterSpacing="0.18"/>
+                android:textSize="6sp"
+                android:letterSpacing="0.12"/>
 
         </LinearLayout>
 

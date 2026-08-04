@@ -320,6 +320,7 @@ public class AnimalScannerActivity extends AppCompatActivity {
                 JSONObject body = new JSONObject();
                 body.put("messages", msgs);
                 body.put("imageBase64", b64);
+                body.put("overrideSystem", "You are an expert zoologist and wildlife biologist. When shown an animal photo, identify it in detail. Describe: common name, scientific name, habitat, diet, conservation status, size, and 3 fun facts. Write like a nature documentary narrator. Never talk about anything other than the animal in the photo.");
 
                 Request request = new Request.Builder()
                         .url("https://jarvis-ai-seven-dun.vercel.app/api/jarvis")

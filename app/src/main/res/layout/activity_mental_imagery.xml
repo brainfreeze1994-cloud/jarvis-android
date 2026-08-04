@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#020C1B">
+
+    <!-- Top bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp"
+        android:background="#040F1D">
+
+        <Button
+            android:id="@+id/mi_btn_back"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="← BACK"
+            android:textColor="#00D4FF"
+            android:background="@null"
+            android:textSize="11sp"/>
+
+        <TextView
+            android:id="@+id/mi_scene_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="◈ MENTAL IMAGERY"
+            android:textColor="#00D4FF"
+            android:textSize="13sp"
+            android:letterSpacing="0.25"
+            android:fontFamily="monospace"
+            android:gravity="center"/>
+
+        <View android:layout_width="60dp" android:layout_height="1dp"/>
+    </LinearLayout>
+
+    <!-- Progress -->
+    <ProgressBar
+        android:id="@+id/mi_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="4dp"
+        android:progressTint="#00D4FF"
+        android:progressBackgroundTint="#0A2A3A"
+        android:max="8"
+        android:progress="0"/>
+
+    <!-- Main prompt area -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="20dp">
+
+        <TextView
+            android:id="@+id/mi_prompt"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Select a visualization to begin your journey."
+            android:textColor="#C0E8FF"
+            android:textSize="18sp"
+            android:lineSpacingMultiplier="1.6"
+            android:gravity="center"/>
+    </ScrollView>
+
+    <!-- Category buttons scroll -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxHeight="320dp">
+
+        <LinearLayout
+            android:id="@+id/mi_category_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="12dp"/>
+    </ScrollView>
+
+    <!-- Control buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="12dp">
+
+        <Button
+            android:id="@+id/mi_btn_pause"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:text="⏸ PAUSE"
+            android:textColor="#00D4FF"
+            android:background="@drawable/bg_chip"
+            android:visibility="gone"/>
+
+        <Button
+            android:id="@+id/mi_btn_next"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="NEXT ▶"
+            android:textColor="#00D4FF"
+            android:background="@drawable/bg_chip"
+            android:visibility="gone"/>
+    </LinearLayout>
+</LinearLayout>

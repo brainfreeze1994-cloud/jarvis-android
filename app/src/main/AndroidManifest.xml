@@ -81,6 +81,21 @@
             android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
+        <!-- 🌍 Earth Map Activity -->
+        <activity
+            android:name=".EarthMapActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:hardwareAccelerated="true"/>
+
+        <!-- 🐾 Animal Scanner Activity -->
+        <activity
+            android:name=".AnimalScannerActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|keyboardHidden"/>
+
         <!-- Share receiver — catches content shared from other apps -->
         <activity
             android:name=".ShareReceiver"
@@ -131,6 +146,25 @@
             </intent-filter>
         </service>
 
+        <!-- Live Subtitles overlay service -->
+        <service
+            android:name=".LiveSubtitles"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <!-- Voice Shortcut Widget -->
+        <receiver
+            android:name=".VoiceShortcutWidget"
+            android:exported="true"
+            android:label="HENRY Voice Shortcuts">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/voice_shortcut_widget_info" />
+        </receiver>
+
         <!-- Home screen widget -->
         <receiver
             android:name=".HenryWidget"
@@ -152,6 +186,21 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- Car Mode -->
+        <activity
+            android:name=".CarModeActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.Jarvis" />
+
+        <!-- In-App Browser -->
+        <activity
+            android:name=".InAppBrowser"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize"
+            android:theme="@style/Theme.Jarvis" />
 
         <!-- In-App Map -->
         <activity

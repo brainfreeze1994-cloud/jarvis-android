@@ -1642,6 +1642,38 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void askJarvis(String userText) {
+        // ── Vision Intelligence — checked FIRST ───────────────────────────────
+        {
+            String vl = userText.toLowerCase(java.util.Locale.US).trim();
+            int visionMode = 0;
+            if (vl.matches(".*(classify|what is this|identify|image classification|label this).*"))
+                visionMode = VisionActivity.MODE_CLASSIFY;
+            else if (vl.matches(".*(detect object|object detection|find object|what.*objects|locate object).*"))
+                visionMode = VisionActivity.MODE_DETECT;
+            else if (vl.matches(".*(track|tracking|live track|object track).*") && vl.contains("object"))
+                visionMode = VisionActivity.MODE_TRACK;
+            else if (vl.matches(".*(face|facial|detect face|who is this|face recognition|face detect).*"))
+                visionMode = VisionActivity.MODE_FACE;
+            else if (vl.matches(".*(similar image|image retrieval|find similar|reverse image|content.*image).*"))
+                visionMode = VisionActivity.MODE_RETRIEVE;
+            else if (vl.matches(".*(open vision|vision hub|vision mode|visual intelligence).*"))
+                visionMode = -1; // menu
+
+            if (visionMode != 0) {
+                android.content.Intent vi = new android.content.Intent(this, VisionActivity.class);
+                if (visionMode > 0) vi.putExtra(VisionActivity.EXTRA_MODE, visionMode);
+                startActivity(vi);
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String[] names = { "", "image classification", "object detection",
+                    "object tracking", "facial recognition", "image retrieval" };
+                String r = visionMode > 0
+                    ? "Opening " + names[visionMode] + ", sir."
+                    : "Opening Vision Intelligence hub, sir.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                speak(r, "excited"); saveHistory(); return;
+            }
+        }
+
         // ── HENRY Brain modules — checked FIRST before any other handler ──────
         {
             String bl = userText.toLowerCase(java.util.Locale.US).trim();

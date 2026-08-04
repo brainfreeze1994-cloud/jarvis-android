@@ -2,6 +2,7 @@ package com.jarvis.ai;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import okhttp3.MediaType;
@@ -22,26 +23,32 @@ public class JarvisApi {
         .build();
 
     public interface Callback {
-        void onSuccess(String reply, String imageUrl);
+        void onSuccess(String reply, String imageUrl, List<String> followUps);
         void onError(String error);
     }
 
-    /** Backward-compatible. */
+    /** Backward-compatible (no follow-ups needed). */
     public static void ask(List<HistoryItem> history, String imageBase64, Callback cb) {
-        ask(history, imageBase64, "balanced", null, cb);
+        ask(history, imageBase64, "balanced", null, null, cb);
     }
 
-    /** With response mode only. */
     public static void ask(List<HistoryItem> history, String imageBase64,
                            String responseMode, Callback cb) {
-        ask(history, imageBase64, responseMode, null, cb);
+        ask(history, imageBase64, responseMode, null, null, cb);
+    }
+
+    public static void ask(List<HistoryItem> history, String imageBase64,
+                           String responseMode, UserProfile profile, Callback cb) {
+        ask(history, imageBase64, responseMode, profile, null, cb);
     }
 
     /**
-     * Full call with user profile for personalisation.
+     * Full call with user profile, intent hint, and follow-up chip support.
+     * queryType: "chat" | "search" | "news" | "crypto" | "forex" | "math" | "reason" | null
      */
     public static void ask(List<HistoryItem> history, String imageBase64,
-                           String responseMode, UserProfile profile, Callback cb) {
+                           String responseMode, UserProfile profile,
+                           String queryType, Callback cb) {
         new Thread(() -> {
             try {
                 JSONArray messages = new JSONArray();
@@ -58,10 +65,10 @@ public class JarvisApi {
 
                 if (imageBase64 != null && !imageBase64.isEmpty())
                     body.put("imageBase64", imageBase64);
-
-                // Send user profile if available
                 if (profile != null && !profile.isEmpty())
                     body.put("userProfile", profile.toJson());
+                if (queryType != null && !queryType.isEmpty())
+                    body.put("queryType", queryType);
 
                 RequestBody rb = RequestBody.create(body.toString(), JSON);
                 Request req = new Request.Builder()
@@ -76,11 +83,40 @@ public class JarvisApi {
                     JSONObject data = new JSONObject(bodyStr);
                     String reply    = data.optString("reply", "I have no response.");
                     String imageUrl = data.optString("imageUrl", null);
-                    cb.onSuccess(reply, imageUrl);
+                    if ("null".equals(imageUrl)) imageUrl = null;
+
+                    // Parse follow-up suggestions
+                    List<String> followUps = new ArrayList<>();
+                    if (data.has("followUps")) {
+                        JSONArray fuArr = data.optJSONArray("followUps");
+                        if (fuArr != null) {
+                            for (int i = 0; i < fuArr.length(); i++) {
+                                String q = fuArr.optString(i, "").trim();
+                                if (!q.isEmpty()) followUps.add(q);
+                            }
+                        }
+                    }
+
+                    cb.onSuccess(reply, imageUrl, followUps);
                 }
             } catch (Exception e) {
                 cb.onError(e.getMessage() != null ? e.getMessage() : "Network error");
             }
         }).start();
+    }
+
+    // ── Client-side intent classifier (mirrors backend logic) ─────────────────
+    public static String classifyIntent(String msg) {
+        if (msg == null || msg.isEmpty()) return "chat";
+        String t = msg.toLowerCase();
+        if (t.matches(".*\\b(bitcoin|btc|ethereum|eth|solana|sol|crypto|coin|nft|defi).*")) return "crypto";
+        if (t.matches(".*\\d+\\s*(usd|eur|gbp|aed|jpy|php|inr|cad|aud)\\s*(to|in)\\s*(usd|eur|gbp|aed|jpy|php|inr|cad|aud).*")
+            || t.contains("exchange rate") || t.matches(".*convert\\s+\\d+.*")) return "forex";
+        if (t.matches(".*\\b(news|headlines|latest news|breaking|what happened)\\b.*")) return "news";
+        if (t.matches(".*\\b(calculate|compute|what is \\d|sqrt|factorial|\\d+%\\s+of).*")) return "math";
+        if (t.matches(".*\\b(latest|breaking|right now|today's|current|2025|2026|score|results|trending)\\b.*")) return "search";
+        if (t.matches(".*\\b(why|how does|difference between|compare|pros and cons|should i|step by step)\\b.*")
+            && msg.length() > 30) return "reason";
+        return "chat";
     }
 }

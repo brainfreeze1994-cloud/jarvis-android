@@ -74,39 +74,58 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
                 final ImageView iv = h.ivImage;
                 new Thread(() -> {
                     try {
-                        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-                        conn.setConnectTimeout(20000);
-                        conn.setReadTimeout(90000);
-                        conn.connect();
-                        InputStream is = conn.getInputStream();
-                        Bitmap bmp = BitmapFactory.decodeStream(is);
-                        is.close();
+                        Bitmap bmp = null;
+                        if (url.startsWith("data:image")) {
+                            // Base64 data URI (from Cloudflare AI)
+                            String b64 = url.substring(url.indexOf(',') + 1);
+                            byte[] bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+                            bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                        } else {
+                            // HTTP URL (from Pollinations)
+                            HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+                            conn.setConnectTimeout(20000);
+                            conn.setReadTimeout(90000);
+                            conn.connect();
+                            InputStream is = conn.getInputStream();
+                            bmp = BitmapFactory.decodeStream(is);
+                            is.close();
+                        }
                         if (bmp != null) {
-                            mainHandler.post(() -> iv.setImageBitmap(bmp));
+                            final Bitmap finalBmp = bmp;
+                            mainHandler.post(() -> iv.setImageBitmap(finalBmp));
                         }
                     } catch (Exception e) {
-                        // Show error placeholder
+                        // Show error placeholder with retry
                         mainHandler.post(() -> {
                             if (h.tvMsg != null) h.tvMsg.setText("⚠ Image failed to load. Tap to retry.");
                             iv.setOnClickListener(v2 -> {
                                 iv.setImageResource(android.R.drawable.ic_menu_gallery);
                                 new Thread(() -> {
                                     try {
-                                        HttpURLConnection c2 = (HttpURLConnection) new URL(url).openConnection();
-                                        c2.setConnectTimeout(20000); c2.setReadTimeout(90000); c2.connect();
-                                        Bitmap b2 = BitmapFactory.decodeStream(c2.getInputStream());
-                                        if (b2 != null) mainHandler.post(() -> iv.setImageBitmap(b2));
+                                        if (url.startsWith("data:image")) {
+                                            String b64 = url.substring(url.indexOf(',') + 1);
+                                            byte[] bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+                                            Bitmap b2 = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                                            if (b2 != null) mainHandler.post(() -> iv.setImageBitmap(b2));
+                                        } else {
+                                            HttpURLConnection c2 = (HttpURLConnection) new URL(url).openConnection();
+                                            c2.setConnectTimeout(20000); c2.setReadTimeout(90000); c2.connect();
+                                            Bitmap b2 = BitmapFactory.decodeStream(c2.getInputStream());
+                                            if (b2 != null) mainHandler.post(() -> iv.setImageBitmap(b2));
+                                        }
                                     } catch (Exception ignored2) {}
                                 }).start();
                             });
                         });
                     }
                 }).start();
-                // Tap image to open in browser
-                h.ivImage.setOnClickListener(v -> {
-                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                    v.getContext().startActivity(intent);
-                });
+                // Tap HTTP image to open in browser (skip for base64)
+                if (!url.startsWith("data:")) {
+                    h.ivImage.setOnClickListener(v -> {
+                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                        v.getContext().startActivity(intent);
+                    });
+                }
             }
             return;
         }

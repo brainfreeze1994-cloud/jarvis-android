@@ -1378,6 +1378,45 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // ── Story Generation ──────────────────────────────────────────────────────
+    private void generateAndReadStory(String userRequest, boolean readAloud) {
+        setState(OrbView.OrbState.THINKING);
+        showTyping();
+        if (btnSend != null) btnSend.setEnabled(false);
+        String storyPrompt = userRequest + "\n\nWrite an engaging, vivid story (3–5 paragraphs). "
+            + "Give it a proper beginning, middle, and satisfying end. "
+            + "Use descriptive language, dialogue where natural, and make it entertaining.";
+        List<HistoryItem> stHist = new ArrayList<>(history);
+        if (!stHist.isEmpty()) {
+            stHist.set(stHist.size() - 1, new HistoryItem("user", storyPrompt));
+        }
+        JarvisApi.askV20(stHist, null, MODE_DETAILED, userProfile, "story",
+                this, "warm", null, false, false, new JarvisApi.Callback() {
+            @Override public void onSuccess(String reply, String imageUrl, java.util.List<String> followUps) {
+                mainHandler.post(() -> {
+                    hideTyping();
+                    String clean = stripEmotionTag(reply);
+                    history.add(new HistoryItem("model", clean));
+                    addJarvisMsg(clean);
+                    saveHistory();
+                    setState(OrbView.OrbState.IDLE);
+                    if (btnSend != null) btnSend.setEnabled(true);
+                    if (readAloud) {
+                        speak(clean, "warm");
+                    } else {
+                        speak("Your story is ready, sir.", "warm");
+                    }
+                });
+            }
+            @Override public void onError(String e) {
+                mainHandler.post(() -> {
+                    hideTyping(); setState(OrbView.OrbState.IDLE);
+                    if (btnSend != null) btnSend.setEnabled(true);
+                });
+            }
+        });
+    }
+
     // ── PDF Reading ───────────────────────────────────────────────────────────
     private void handlePdfAttachment(Uri pdfUri) {
         Toast.makeText(this, "Reading PDF…", Toast.LENGTH_SHORT).show();
@@ -1386,18 +1425,55 @@ public class MainActivity extends AppCompatActivity {
         PdfReader.read(this, pdfUri, new PdfReader.Callback() {
             @Override public void onResult(String text, int pages) {
                 mainHandler.post(() -> {
-                    pendingPdfText = text;
-                    pendingImageBase64 = null;
-                    pendingImageUriStr = null;
-                    if (ivAttachPreview != null) {
-                        ivAttachPreview.setImageDrawable(null);
-                        // Show a placeholder icon to indicate PDF is attached
-                        ivAttachPreview.setVisibility(View.VISIBLE);
-                    }
-                    Toast.makeText(MainActivity.this,
-                        "PDF read: " + pages + " page(s). Ask me anything about it.",
-                        Toast.LENGTH_LONG).show();
-                    if (etInput != null) etInput.setHint("Ask about the PDF…");
+                    // Auto-summarize the PDF immediately
+                    hideWelcome();
+                    addUserMsg("📄 PDF attached (" + pages + " page" + (pages > 1 ? "s" : "") + ") — please summarize");
+                    setState(OrbView.OrbState.THINKING);
+                    showTyping();
+                    if (btnSend != null) btnSend.setEnabled(false);
+
+                    String summaryPrompt = "The user has attached a PDF document. Please summarize it clearly.\n\n"
+                        + "PDF Content:\n" + text + "\n\n---\n\n"
+                        + "Provide a structured summary with:\n"
+                        + "**📄 Document Type** — what kind of document is this\n"
+                        + "**📌 Key Points** — the most important information (bullet list)\n"
+                        + "**📊 Details** — any notable facts, figures, dates, or names\n"
+                        + "**💡 Summary** — 2-3 sentence overall summary\n"
+                        + "Be thorough and accurate, sir.";
+
+                    List<HistoryItem> pdfHist = new ArrayList<>();
+                    pdfHist.add(new HistoryItem("user", summaryPrompt));
+
+                    JarvisApi.askV20(pdfHist, null, MODE_DETAILED, userProfile, "document",
+                            MainActivity.this, "neutral", null, false, false, new JarvisApi.Callback() {
+                        @Override public void onSuccess(String reply, String imageUrl, java.util.List<String> followUps) {
+                            mainHandler.post(() -> {
+                                hideTyping();
+                                String clean = stripEmotionTag(reply);
+                                history.add(new HistoryItem("user", "Summarize attached PDF"));
+                                history.add(new HistoryItem("model", clean));
+                                addJarvisMsg(clean);
+                                speak("PDF summary ready, sir.", extractEmotion(reply));
+                                // Keep PDF text for follow-up questions
+                                pendingPdfText = text;
+                                if (etInput != null) etInput.setHint("Ask more about the PDF…");
+                                if (followUps != null && !followUps.isEmpty()) showFollowUpChips(followUps);
+                                saveHistory(); setState(OrbView.OrbState.IDLE);
+                                if (btnSend != null) btnSend.setEnabled(true);
+                            });
+                        }
+                        @Override public void onError(String e) {
+                            mainHandler.post(() -> {
+                                hideTyping();
+                                // Fallback: keep PDF for manual query
+                                pendingPdfText = text;
+                                if (etInput != null) etInput.setHint("Ask about the PDF…");
+                                Toast.makeText(MainActivity.this, "PDF read (" + pages + " pages). Ask me anything.", Toast.LENGTH_LONG).show();
+                                setState(OrbView.OrbState.IDLE);
+                                if (btnSend != null) btnSend.setEnabled(true);
+                            });
+                        }
+                    });
                 });
             }
             @Override public void onError(String reason) {
@@ -1495,10 +1571,22 @@ public class MainActivity extends AppCompatActivity {
                 mainHandler.post(() -> {
                     setState(OrbView.OrbState.IDLE);
                     if (tvOrbHint != null) tvOrbHint.setText("WHAT CAN I DO FOR YOU, SIR?");
-                    if (error != SpeechRecognizer.ERROR_NO_MATCH
+                    // Error 5 = ERROR_CLIENT (recognizer busy/config issue) → silently retry once
+                    // Error 11 = ERROR_SERVER_DISCONNECTED (transient network blip) → silently retry once
+                    // Error 6 = ERROR_SPEECH_TIMEOUT, 7 = ERROR_NO_MATCH, 8 = ERROR_RECOGNIZER_BUSY → silent
+                    if (error == SpeechRecognizer.ERROR_CLIENT ||
+                        error == SpeechRecognizer.ERROR_SERVER_DISCONNECTED) {
+                        // Destroy and reinit recognizer, then auto-retry after short delay
+                        if (speechRec != null) {
+                            try { speechRec.destroy(); } catch (Exception ignored) {}
+                            speechRec = null;
+                        }
+                        mainHandler.postDelayed(() -> startListening(), 800);
+                    } else if (error != SpeechRecognizer.ERROR_NO_MATCH
                         && error != SpeechRecognizer.ERROR_SPEECH_TIMEOUT
-                        && error != SpeechRecognizer.ERROR_RECOGNIZER_BUSY)
-                        Toast.makeText(MainActivity.this, "Voice error (" + error + ")", Toast.LENGTH_SHORT).show();
+                        && error != SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
+                        Toast.makeText(MainActivity.this, "Voice unavailable. Tap mic to retry.", Toast.LENGTH_SHORT).show();
+                    }
                 });
             }
             @Override public void onResults(Bundle results) {
@@ -3260,6 +3348,124 @@ public class MainActivity extends AppCompatActivity {
             String clean = stripEmotionTag(reply);
             history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
             speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+
+        // ── Story: ask before reading aloud ───────────────────────────────────
+        // Detect story requests; ask user whether HENRY should read it aloud
+        {
+            String stLower = userText.toLowerCase(java.util.Locale.US);
+            boolean isStoryRequest =
+                stLower.matches(".*(tell me a story|tell me a tale|tell me about|read me a story|bedtime story|short story|fairy tale|narrate a story|once upon a time).*") ||
+                (stLower.contains("story") && (stLower.contains("tell") || stLower.contains("read") || stLower.contains("write")));
+            if (isStoryRequest) {
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                addJarvisMsg("Shall I read the story aloud for you once it's ready, sir?");
+                speak("Shall I read the story aloud for you once it's ready, sir?", "warm");
+                new android.app.AlertDialog.Builder(this)
+                    .setTitle("Read Story Aloud?")
+                    .setMessage("Would you like me to read the story aloud after generating it?")
+                    .setPositiveButton("Yes, read it", (d, w) -> {
+                        generateAndReadStory(userText, true);
+                    })
+                    .setNegativeButton("Just show text", (d, w) -> {
+                        generateAndReadStory(userText, false);
+                    })
+                    .setCancelable(false)
+                    .show();
+                return;
+            }
+        }
+
+        // ── Recipe: rich structured summary ───────────────────────────────────
+        {
+            String rcLower = userText.toLowerCase(java.util.Locale.US);
+            boolean isRecipeRequest =
+                rcLower.matches(".*(recipe|how to (make|cook|bake|prepare)|ingredients for|how do (i|you) (make|cook|bake)|steps to (make|cook|bake)).*") &&
+                !rcLower.contains("recommend") && !rcLower.contains("suggest");
+            if (isRecipeRequest) {
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                saveHistory();
+                setState(OrbView.OrbState.THINKING);
+                showTyping();
+                // Build an enriched recipe prompt
+                String recipePrompt = userText + "\n\nStructure your answer with these sections:\n" +
+                    "**🍽 Dish Overview** — brief description & origin\n" +
+                    "**📋 Ingredients** — bullet list with quantities\n" +
+                    "**👨‍🍳 Steps** — numbered cooking steps\n" +
+                    "**💡 Pro Tips** — 2-3 chef tips\n" +
+                    "**🕐 Time** — prep time & cook time\n" +
+                    "Make it detailed and delicious, sir.";
+                List<HistoryItem> recipeHist = new ArrayList<>(history);
+                if (!recipeHist.isEmpty()) {
+                    recipeHist.set(recipeHist.size() - 1, new HistoryItem("user", recipePrompt));
+                }
+                JarvisApi.askV20(recipeHist, null, MODE_DETAILED, userProfile, "recipe",
+                        this, "normal", null, false, false, new JarvisApi.Callback() {
+                    @Override public void onSuccess(String reply, String imageUrl, java.util.List<String> followUps) {
+                        mainHandler.post(() -> {
+                            hideTyping();
+                            String clean = stripEmotionTag(reply);
+                            history.add(new HistoryItem("model", clean));
+                            addJarvisMsg(clean);
+                            speak("Your recipe is ready, sir.", extractEmotion(reply));
+                            if (followUps != null && !followUps.isEmpty()) showFollowUpChips(followUps);
+                            saveHistory(); setState(OrbView.OrbState.IDLE);
+                            if (btnSend != null) btnSend.setEnabled(true);
+                        });
+                    }
+                    @Override public void onError(String e) {
+                        mainHandler.post(() -> { hideTyping(); setState(OrbView.OrbState.IDLE); if (btnSend != null) btnSend.setEnabled(true); });
+                    }
+                });
+                return;
+            }
+        }
+
+        // ── Country Info: rich structured summary ──────────────────────────────
+        {
+            String ctLower = userText.toLowerCase(java.util.Locale.US);
+            boolean isCountryRequest =
+                ctLower.matches(".*(tell me about|info(rmation)? (about|on)|facts about|summarize|summary of|all about).*(country|nation|place|island|city|capital|republic|kingdom|state).*") ||
+                ctLower.matches(".*(country|nation|place).*(history|culture|food|tourism|population|economy|facts).*") ||
+                (ctLower.contains("about") && (ctLower.contains("history") || ctLower.contains("culture") || ctLower.contains("tourism")));
+            if (isCountryRequest) {
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                saveHistory();
+                setState(OrbView.OrbState.THINKING);
+                showTyping();
+                String countryPrompt = userText + "\n\nProvide a comprehensive summary with these sections:\n" +
+                    "**🌍 Overview** — what & where it is\n" +
+                    "**📜 History** — key historical highlights\n" +
+                    "**🎭 Culture & Traditions** — customs, art, religion\n" +
+                    "**🍜 Cuisine** — famous dishes & food culture\n" +
+                    "**🗺 Top Tourist Attractions** — must-see places\n" +
+                    "**💰 Economy & Facts** — currency, GDP, population, capital\n" +
+                    "**✈ Travel Tips** — best time to visit, visa info\n" +
+                    "Be engaging and informative, sir.";
+                List<HistoryItem> ctHist = new ArrayList<>(history);
+                if (!ctHist.isEmpty()) {
+                    ctHist.set(ctHist.size() - 1, new HistoryItem("user", countryPrompt));
+                }
+                JarvisApi.askV20(ctHist, null, MODE_DETAILED, userProfile, "country",
+                        this, "normal", null, false, false, new JarvisApi.Callback() {
+                    @Override public void onSuccess(String reply, String imageUrl, java.util.List<String> followUps) {
+                        mainHandler.post(() -> {
+                            hideTyping();
+                            String clean = stripEmotionTag(reply);
+                            history.add(new HistoryItem("model", clean));
+                            addJarvisMsg(clean);
+                            speak("Here's the country briefing, sir.", extractEmotion(reply));
+                            if (followUps != null && !followUps.isEmpty()) showFollowUpChips(followUps);
+                            saveHistory(); setState(OrbView.OrbState.IDLE);
+                            if (btnSend != null) btnSend.setEnabled(true);
+                        });
+                    }
+                    @Override public void onError(String e) {
+                        mainHandler.post(() -> { hideTyping(); setState(OrbView.OrbState.IDLE); if (btnSend != null) btnSend.setEnabled(true); });
+                    }
+                });
+                return;
+            }
         }
 
         // ── PDF context injection ──────────────────────────────────────────────

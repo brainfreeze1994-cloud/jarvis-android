@@ -240,7 +240,7 @@ public class MainActivity extends AppCompatActivity {
         if (widgetCmd != null && !widgetCmd.isEmpty()) {
             hideWelcome();
             final String cmd = widgetCmd;
-            mainHandler.postDelayed(() -> processUserInput(cmd), 600);
+            mainHandler.postDelayed(() -> askJarvis(cmd), 600);
         } else if (VoiceShortcutWidget.ACTION_MIC.equals(intent.getAction())) {
             mainHandler.postDelayed(this::startListening, 600);
         }

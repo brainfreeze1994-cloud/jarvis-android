@@ -3248,7 +3248,10 @@ public class MainActivity extends AppCompatActivity {
             apiHistory.set(apiHistory.size() - 1, new HistoryItem("user", effectiveUserText));
         }
 
-        JarvisApi.ask(apiHistory, imageB64, responseMode, userProfile, intentType, new JarvisApi.Callback() {
+        // [v19] Auto-learn from user message before sending
+        SmartMemory.learnFromMessage(this, userText);
+
+        JarvisApi.ask(apiHistory, imageB64, responseMode, userProfile, intentType, this, new JarvisApi.Callback() {
             @Override public void onSuccess(String reply, String imageUrl, java.util.List<String> followUps) {
                 mainHandler.post(() -> {
                     hideTyping();

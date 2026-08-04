@@ -49,6 +49,16 @@ public class JarvisApi {
     public static void ask(List<HistoryItem> history, String imageBase64,
                            String responseMode, UserProfile profile,
                            String queryType, Callback cb) {
+        ask(history, imageBase64, responseMode, profile, queryType, null, cb);
+    }
+
+    /**
+     * Full call including persistent memory facts for context injection.
+     */
+    public static void ask(List<HistoryItem> history, String imageBase64,
+                           String responseMode, UserProfile profile,
+                           String queryType, android.content.Context memCtx,
+                           Callback cb) {
         new Thread(() -> {
             try {
                 JSONArray messages = new JSONArray();
@@ -69,6 +79,20 @@ public class JarvisApi {
                     body.put("userProfile", profile.toJson());
                 if (queryType != null && !queryType.isEmpty())
                     body.put("queryType", queryType);
+
+                // Send stored memory facts so backend injects them into system prompt
+                if (memCtx != null) {
+                    String memCtxStr = SmartMemory.buildMemoryContext(memCtx);
+                    if (!memCtxStr.isEmpty()) {
+                        // Convert "fact1; fact2; fact3" → JSONArray
+                        JSONArray factsArr = new JSONArray();
+                        for (String f : memCtxStr.replace("Known facts about user: ", "").split(";")) {
+                            String t = f.trim();
+                            if (!t.isEmpty()) factsArr.put(t);
+                        }
+                        if (factsArr.length() > 0) body.put("memoryFacts", factsArr);
+                    }
+                }
 
                 RequestBody rb = RequestBody.create(body.toString(), JSON);
                 Request req = new Request.Builder()
@@ -93,6 +117,17 @@ public class JarvisApi {
                             for (int i = 0; i < fuArr.length(); i++) {
                                 String q = fuArr.optString(i, "").trim();
                                 if (!q.isEmpty()) followUps.add(q);
+                            }
+                        }
+                    }
+
+                    // Auto-save memory facts detected by backend
+                    if (memCtx != null && data.has("newFacts")) {
+                        JSONArray nf = data.optJSONArray("newFacts");
+                        if (nf != null) {
+                            for (int i = 0; i < nf.length(); i++) {
+                                String fact = nf.optString(i, "").trim();
+                                if (!fact.isEmpty()) SmartMemory.manuallyRemember(memCtx, fact);
                             }
                         }
                     }

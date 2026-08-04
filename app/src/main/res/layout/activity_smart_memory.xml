@@ -58,7 +58,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:hint="Add a memory fact…"
-            android:hintTextColor="#1A4A6A"
+            android:textColorHint="#1A4A6A"
             android:textColor="#00D4FF"
             android:textSize="14sp"
             android:background="@null"

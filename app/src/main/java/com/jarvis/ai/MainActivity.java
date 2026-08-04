@@ -3350,6 +3350,94 @@ public class MainActivity extends AppCompatActivity {
             speak(clean, extractEmotion(reply)); saveHistory(); return;
         }
 
+        // ── Google Workspace (Docs / Sheets / Slides) ─────────────────────────
+        if (GoogleWorkspaceHelper.isDocCommand(userText)) {
+            GoogleWorkspaceHelper.DocType docType = GoogleWorkspaceHelper.detectType(userText);
+            String docTitle = GoogleWorkspaceHelper.extractTitle(userText);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            saveHistory();
+            String typeName = GoogleWorkspaceHelper.typeName(docType);
+            addJarvisMsg("Creating your " + typeName + " titled **\"" + docTitle + "\"**…");
+            speak("Creating your " + typeName + " now, sir.", "excited");
+            setState(OrbView.OrbState.THINKING);
+            GoogleWorkspaceHelper.create(docTitle, docType, null, new GoogleWorkspaceHelper.Callback() {
+                @Override public void onSuccess(String url, String title, GoogleWorkspaceHelper.DocType type) {
+                    mainHandler.post(() -> {
+                        setState(OrbView.OrbState.IDLE);
+                        String msg = "[EMOTION:proud]\n**" + typeName + " created!**\n\nTitle: " + title + "\n\n[Open →](" + url + ")";
+                        String clean = stripEmotionTag(msg);
+                        history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+                        speak("Your " + typeName + " is ready, sir. Opening now.", "proud");
+                        saveHistory();
+                        // Show dialog to open in browser
+                        new android.app.AlertDialog.Builder(MainActivity.this)
+                            .setTitle(typeName + " Ready")
+                            .setMessage("\"" + title + "\" has been created.\n\n" + url)
+                            .setPositiveButton("Open", (d, w) -> GoogleWorkspaceHelper.openInBrowser(MainActivity.this, url))
+                            .setNegativeButton("Later", null)
+                            .show();
+                    });
+                }
+                @Override public void onError(String reason) {
+                    mainHandler.post(() -> {
+                        setState(OrbView.OrbState.IDLE);
+                        // Fallback: open Google Workspace directly
+                        String fallbackUrl = docType == GoogleWorkspaceHelper.DocType.SHEETS
+                            ? "https://sheets.new"
+                            : docType == GoogleWorkspaceHelper.DocType.SLIDES
+                            ? "https://slides.new"
+                            : "https://docs.new";
+                        String reply = "I'll open " + typeName + " for you directly, sir.";
+                        history.add(new HistoryItem("model", reply)); addJarvisMsg(reply);
+                        speak(reply, "neutral"); saveHistory();
+                        GoogleWorkspaceHelper.openInBrowser(MainActivity.this, fallbackUrl);
+                    });
+                }
+            });
+            return;
+        }
+
+        // ── HENRY Brain Map ─────────────────────────────────────────────────────
+        {
+            String brainLower = userText.toLowerCase(java.util.Locale.US);
+            if (brainLower.matches(".*(open|show|launch|start).*(brain|neural|mental|mind map|imagination|sensory|dmn|default mode|plasticity).*") ||
+                brainLower.equals("brain") || brainLower.equals("open brain") || brainLower.contains("henry brain")) {
+                startActivity(new android.content.Intent(this, BrainActivity.class));
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "Opening your neural command center, sir.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                speak(r, "excited"); saveHistory(); return;
+            }
+            if (brainLower.matches(".*(mental imagery|visualization|visualize|imagine a scene|guided imagery).*")) {
+                startActivity(new android.content.Intent(this, MentalImageryActivity.class));
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "Opening mental imagery mode, sir.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                speak(r, "warm"); saveHistory(); return;
+            }
+            if (brainLower.matches(".*(sensory substitution|cross.*modal|synesthesia|color.*sound|sound.*color).*")) {
+                startActivity(new android.content.Intent(this, SensorySubstitutionActivity.class));
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "Activating sensory substitution, sir.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                speak(r, "excited"); saveHistory(); return;
+            }
+            if (brainLower.matches(".*(neural plasticity|brain training|brain train|cognitive|neuroplasticity|brain exercise).*")) {
+                startActivity(new android.content.Intent(this, NeuralPlasticityActivity.class));
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "Loading neural plasticity training, sir.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                speak(r, "excited"); saveHistory(); return;
+            }
+            if (brainLower.matches(".*(default mode|mind wander|daydream|reflect|dmn|incubat|future self|empathy expand).*")) {
+                startActivity(new android.content.Intent(this, DefaultModeNetworkActivity.class));
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "Entering default mode network, sir. Let your mind expand.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                speak(r, "warm"); saveHistory(); return;
+            }
+        }
+
         // ── Story: ask before reading aloud ───────────────────────────────────
         // Detect story requests; ask user whether HENRY should read it aloud
         {

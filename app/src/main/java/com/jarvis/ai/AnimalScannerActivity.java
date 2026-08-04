@@ -73,11 +73,13 @@ public class AnimalScannerActivity extends AppCompatActivity {
         int wrapContent = LinearLayout.LayoutParams.WRAP_CONTENT;
         float density   = getResources().getDisplayMetrics().density;
 
+        // Root
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(0xFF020C1B);
         setContentView(root);
 
+        // ── Top bar ──────────────────────────────────────────────────────────
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
@@ -102,10 +104,12 @@ public class AnimalScannerActivity extends AppCompatActivity {
         top.addView(btnClose);
         root.addView(top);
 
+        // Divider
         View div1 = new View(this);
         div1.setBackgroundColor(0xFF0A2040);
         root.addView(div1, new LinearLayout.LayoutParams(matchParent, 1));
 
+        // ── Scrollable body ──────────────────────────────────────────────────
         ScrollView sv = new ScrollView(this);
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.VERTICAL);
@@ -120,6 +124,7 @@ public class AnimalScannerActivity extends AppCompatActivity {
         hintLp.bottomMargin = dp(14,density);
         body.addView(tvHint, hintLp);
 
+        // Preview
         ivPreview = new ImageView(this);
         ivPreview.setBackgroundColor(0xFF051828);
         ivPreview.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -128,6 +133,7 @@ public class AnimalScannerActivity extends AppCompatActivity {
         prevLp.bottomMargin = dp(14,density);
         body.addView(ivPreview, prevLp);
 
+        // Camera / Gallery row
         LinearLayout btnRow = new LinearLayout(this);
         btnRow.setOrientation(LinearLayout.HORIZONTAL);
         btnCamera  = new Button(this);
@@ -149,6 +155,7 @@ public class AnimalScannerActivity extends AppCompatActivity {
         btnRow.addView(btnGallery, galLp);
         body.addView(btnRow, new LinearLayout.LayoutParams(matchParent, wrapContent));
 
+        // Scan button
         btnScan = new Button(this);
         btnScan.setText("🔬  IDENTIFY ANIMAL");
         btnScan.setTextColor(0xFF000000);
@@ -161,12 +168,14 @@ public class AnimalScannerActivity extends AppCompatActivity {
         scanLp.topMargin = dp(12,density);
         body.addView(btnScan, scanLp);
 
+        // Progress bar
         progressBar = new ProgressBar(this);
         progressBar.setVisibility(View.GONE);
         LinearLayout.LayoutParams pbLp = new LinearLayout.LayoutParams(matchParent, wrapContent);
         pbLp.topMargin = dp(10,density);
         body.addView(progressBar, pbLp);
 
+        // Result divider
         View resDivider = new View(this);
         resDivider.setBackgroundColor(0xFF0A2040);
         LinearLayout.LayoutParams rdLp = new LinearLayout.LayoutParams(matchParent, 1);
@@ -174,6 +183,7 @@ public class AnimalScannerActivity extends AppCompatActivity {
         rdLp.bottomMargin = dp(14,density);
         body.addView(resDivider, rdLp);
 
+        // Result block
         layoutResult = new LinearLayout(this);
         layoutResult.setOrientation(LinearLayout.VERTICAL);
         layoutResult.setVisibility(View.GONE);
@@ -209,12 +219,14 @@ public class AnimalScannerActivity extends AppCompatActivity {
         sv.addView(body);
         root.addView(sv, new LinearLayout.LayoutParams(matchParent, 0, 1f));
 
+        // ── Listeners ────────────────────────────────────────────────────────
         btnCamera.setOnClickListener(v -> doCamera());
         btnGallery.setOnClickListener(v -> doGallery());
         btnScan.setOnClickListener(v -> doScan());
         btnSendChat.setOnClickListener(v -> sendToChat());
     }
 
+    // ── Camera ───────────────────────────────────────────────────────────────
     private void doCamera() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
@@ -226,7 +238,7 @@ public class AnimalScannerActivity extends AppCompatActivity {
             String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
             File dir  = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
             File file = File.createTempFile("ANIMAL_" + stamp, ".jpg", dir);
-            cameraUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
+            cameraUri = FileProvider.getUriForFile(this, getPackageName() + ".provider", file);
             Intent i = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
             i.putExtra(MediaStore.EXTRA_OUTPUT, cameraUri);
             startActivityForResult(i, REQ_CAMERA);
@@ -274,6 +286,7 @@ public class AnimalScannerActivity extends AppCompatActivity {
             doCamera();
     }
 
+    // ── Scan ─────────────────────────────────────────────────────────────────
     private void doScan() {
         if (pickedBitmap == null) return;
         btnScan.setEnabled(false);
@@ -357,6 +370,7 @@ public class AnimalScannerActivity extends AppCompatActivity {
         finish();
     }
 
+    // ── Helpers ──────────────────────────────────────────────────────────────
     private Bitmap scaleBitmap(Bitmap src, int maxPx) {
         int w = src.getWidth(), h = src.getHeight();
         if (w <= maxPx && h <= maxPx) return src;

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#020C1B">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp"
+        android:background="#040F1D">
+
+        <Button
+            android:id="@+id/sm_back"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="← BACK"
+            android:textColor="#FFDD00"
+            android:background="@null"
+            android:textSize="11sp"/>
+
+        <TextView
+            android:id="@+id/sm_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="◈ MEMORY BANKS"
+            android:textColor="#FFDD00"
+            android:textSize="14sp"
+            android:letterSpacing="0.25"
+            android:fontFamily="monospace"
+            android:gravity="center"/>
+
+        <Button
+            android:id="@+id/sm_btn_clear"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="CLEAR"
+            android:textColor="#FF4444"
+            android:background="@null"
+            android:textSize="10sp"/>
+    </LinearLayout>
+
+    <!-- Add new fact -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:background="#040F1D">
+
+        <EditText
+            android:id="@+id/sm_new_fact"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Add a memory fact…"
+            android:hintTextColor="#1A4A6A"
+            android:textColor="#00D4FF"
+            android:textSize="14sp"
+            android:background="@null"
+            android:paddingEnd="8dp"/>
+
+        <Button
+            android:id="@+id/sm_btn_add"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="+ ADD"
+            android:textColor="#FFDD00"
+            android:background="@drawable/bg_chip"
+            android:textSize="11sp"/>
+    </LinearLayout>
+
+    <!-- Memory list -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="8dp">
+
+        <LinearLayout
+            android:id="@+id/sm_memory_list"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"/>
+    </ScrollView>
+</LinearLayout>

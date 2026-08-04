@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#020C1B">
+
+    <!-- Top bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp"
+        android:background="#040F1D">
+
+        <Button
+            android:id="@+id/vision_btn_back"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="← BACK"
+            android:textColor="#00D4FF"
+            android:background="@null"
+            android:textSize="11sp"/>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:id="@+id/vision_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="◈ VISION INTELLIGENCE"
+                android:textColor="#00D4FF"
+                android:textSize="13sp"
+                android:letterSpacing="0.2"
+                android:fontFamily="monospace"/>
+
+            <TextView
+                android:id="@+id/vision_mode_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#2A6A8A"
+                android:textSize="9sp"
+                android:letterSpacing="0.15"/>
+        </LinearLayout>
+
+        <View android:layout_width="60dp" android:layout_height="1dp"/>
+    </LinearLayout>
+
+    <!-- Progress bar -->
+    <ProgressBar
+        android:id="@+id/vision_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:indeterminate="true"
+        android:progressTint="#00D4FF"
+        android:visibility="gone"/>
+
+    <!-- Camera layout (tracking mode) -->
+    <FrameLayout
+        android:id="@+id/vision_camera_layout"
+        android:layout_width="match_parent"
+        android:layout_height="260dp"
+        android:visibility="gone">
+
+        <androidx.camera.view.PreviewView
+            android:id="@+id/vision_preview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"/>
+
+        <com.jarvis.ai.VisionOverlayView
+            android:id="@+id/vision_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"/>
+    </FrameLayout>
+
+    <!-- Menu (mode selector) -->
+    <ScrollView
+        android:id="@+id/vision_menu_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:id="@+id/vision_menu"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="12dp"/>
+    </ScrollView>
+
+    <!-- Result area -->
+    <ScrollView
+        android:id="@+id/vision_result_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="12dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/vision_result"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="#C0E8FF"
+            android:textSize="14sp"
+            android:lineSpacingMultiplier="1.5"
+            android:fontFamily="monospace"/>
+    </ScrollView>
+
+    <!-- Action buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:background="#040F1D">
+
+        <Button
+            android:id="@+id/vision_btn_gallery"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="4dp"
+            android:text="🖼 GALLERY"
+            android:textColor="#00D4FF"
+            android:background="@drawable/bg_chip"
+            android:textSize="12sp"
+            android:visibility="gone"/>
+
+        <Button
+            android:id="@+id/vision_btn_camera"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:text="📷 CAMERA"
+            android:textColor="#00D4FF"
+            android:background="@drawable/bg_chip"
+            android:textSize="12sp"
+            android:visibility="gone"/>
+
+        <Button
+            android:id="@+id/vision_btn_switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:text="🔄"
+            android:textColor="#00D4FF"
+            android:background="@drawable/bg_chip"
+            android:textSize="16sp"
+            android:visibility="gone"/>
+    </LinearLayout>
+</LinearLayout>

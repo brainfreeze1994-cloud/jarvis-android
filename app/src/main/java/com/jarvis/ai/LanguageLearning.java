@@ -95,8 +95,9 @@ public class LanguageLearning {
         else if (lower.contains("beginner") || lower.contains("basic")) level = "beginner";
         prefs.edit().putString(KEY_LEVEL, level).apply();
 
-        final String finalLang = lang;
-        final int finalStreak  = streak;
+        final String finalLang   = lang;
+        final int    finalStreak = streak;
+        final String finalLevel  = level;
 
         boolean isFlashcard = lower.contains("flashcard") || lower.contains("quiz") || lower.contains("test me");
         boolean isPhrases   = lower.contains("phrase") || lower.contains("sentence") || lower.contains("say");
@@ -151,7 +152,7 @@ public class LanguageLearning {
                     String reply = j.optString("reply", "");
                     reply = reply.replaceAll("\\[EMOTION:\\w+\\]\\s*", "").trim();
                     cb.onResult("[EMOTION:excited] 🌍 **" + finalLang + " Lesson — " +
-                        capitalize(level) + " | Streak: " + finalStreak + " day(s)**\n\n" + reply);
+                        capitalize(finalLevel) + " | Streak: " + finalStreak + " day(s)**\n\n" + reply);
                 }
             } catch (Exception e) {
                 cb.onError("[EMOTION:concerned] Language error: " + e.getMessage());

@@ -186,7 +186,8 @@ public class MainActivity extends AppCompatActivity {
     private boolean sleepModeActive = false;
 
     // Sleep tracker
-    private SleepTracker sleepTracker;
+    private SleepTracker  sleepTracker;
+    private FitnessCoach  fitnessCoach;
 
     // ── onCreate ──────────────────────────────────────────────────────────────
     @Override
@@ -232,6 +233,15 @@ public class MainActivity extends AppCompatActivity {
             handleWakeWord();
         }
         if (intent.getBooleanExtra("start_listening", false)) {
+            mainHandler.postDelayed(this::startListening, 600);
+        }
+        // [v17] Handle widget button command
+        String widgetCmd = intent.getStringExtra("widget_command");
+        if (widgetCmd != null && !widgetCmd.isEmpty()) {
+            hideWelcome();
+            final String cmd = widgetCmd;
+            mainHandler.postDelayed(() -> processUserInput(cmd), 600);
+        } else if (VoiceShortcutWidget.ACTION_MIC.equals(intent.getAction())) {
             mainHandler.postDelayed(this::startListening, 600);
         }
         // Handle shared content from ShareReceiver
@@ -330,7 +340,8 @@ public class MainActivity extends AppCompatActivity {
         fitnessTracker.start();
 
         // Sleep tracker (singleton)
-        sleepTracker = SleepTracker.getInstance(this);
+        sleepTracker  = SleepTracker.getInstance(this);
+        fitnessCoach  = FitnessCoach.getInstance(this);
 
         // Button listeners
         if (orbView   != null) orbView.setOnClickListener(v -> toggleListening());
@@ -361,6 +372,15 @@ public class MainActivity extends AppCompatActivity {
         } else {
             hideWelcome();
         }
+
+        // [v17] Proactive suggestion — time/context aware nudge
+        mainHandler.postDelayed(() -> {
+            String nudge = ProactiveSuggestions.getSuggestion(this, userProfile, history);
+            if (nudge != null) {
+                addJarvisMsg(stripEmotionTag(nudge));
+                speak(stripEmotionTag(nudge), extractEmotion(nudge));
+            }
+        }, 4500);
 
         // Word of the Day — show once per day after greeting
         if (WordOfTheDay.shouldShowToday(this)) {
@@ -2945,6 +2965,252 @@ public class MainActivity extends AppCompatActivity {
             toggleScreenAlwaysOn();
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
             saveHistory(); return;
+        }
+
+        // ── [v17] Smart Memory ────────────────────────────────────────────────
+        SmartMemory.learnFromMessage(this, userText);
+        if (SmartMemory.isMemoryCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply = SmartMemory.handle(this, userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+
+        // ── [v17] AI Image Generation ─────────────────────────────────────────
+        if (ImageGenerator.isImageCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING);
+            String prompt = ImageGenerator.extractPrompt(userText);
+            String imgUrl = ImageGenerator.buildImageUrl(prompt);
+            String teaser = "[EMOTION:excited] Generating \"" + prompt + "\" for you, sir…";
+            addJarvisMsg(stripEmotionTag(teaser));
+            speak("Generating image now, sir.", "excited");
+            // Show image inline as URL image
+            messages.add(new Message(Message.TYPE_URL_IMAGE, null, imgUrl));
+            adapter.notifyItemInserted(messages.size() - 1);
+            scrollToBottom();
+            String done = "[EMOTION:proud] Here's your image, sir! Tap to view full size.";
+            history.add(new HistoryItem("model", "Generated image: " + prompt));
+            addJarvisMsg(stripEmotionTag(done));
+            setState(OrbView.OrbState.IDLE); saveHistory(); return;
+        }
+
+        // ── [v17] Meeting Recorder ────────────────────────────────────────────
+        if (MeetingRecorder.isRecordingCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            if (lower.contains("stop") || lower.contains("end")) {
+                if (MeetingRecorder.isRecording()) {
+                    addJarvisMsg("Stopping and summarising, sir…");
+                    speak("Stopping recording, sir.", "neutral");
+                    setState(OrbView.OrbState.THINKING); showTyping();
+                    MeetingRecorder.stopAndSummarise(this, httpClient, new MeetingRecorder.Callback() {
+                        @Override public void onResult(String summary) {
+                            mainHandler.post(() -> {
+                                hideTyping();
+                                String clean = stripEmotionTag(summary);
+                                history.add(new HistoryItem("model", clean));
+                                addJarvisMsg(clean);
+                                speak("Summary ready, sir.", extractEmotion(summary));
+                                saveHistory(); setState(OrbView.OrbState.IDLE);
+                            });
+                        }
+                        @Override public void onError(String e) {
+                            mainHandler.post(() -> { hideTyping(); addJarvisMsg(e); saveHistory(); setState(OrbView.OrbState.IDLE); });
+                        }
+                    });
+                } else {
+                    String r = "[EMOTION:neutral] No active recording to stop, sir.";
+                    addJarvisMsg(stripEmotionTag(r)); speak(stripEmotionTag(r), "neutral");
+                }
+            } else if (lower.contains("list") || lower.contains("my recording")) {
+                String r = MeetingRecorder.listRecordings(this);
+                String clean = stripEmotionTag(r);
+                history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+                speak("Here are your recordings, sir.", "neutral");
+            } else if (lower.contains("status")) {
+                String r = MeetingRecorder.isRecording()
+                    ? "[EMOTION:excited] Currently recording, sir. Say 'stop recording' when done."
+                    : "[EMOTION:neutral] No active recording, sir. Say 'record meeting' to start.";
+                String clean = stripEmotionTag(r); history.add(new HistoryItem("model", clean));
+                addJarvisMsg(clean); speak(clean, extractEmotion(r));
+            } else {
+                // Start recording
+                String r = MeetingRecorder.startRecording(this);
+                String clean = stripEmotionTag(r);
+                history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+                speak(clean, extractEmotion(r));
+            }
+            saveHistory(); return;
+        }
+
+        // ── [v17] Smart File Manager ──────────────────────────────────────────
+        if (SmartFileManager.isFileCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String result = SmartFileManager.handle(this, userText);
+            if (result != null && result.startsWith("SHARE:")) {
+                String path = result.substring(6);
+                android.content.Intent shareIntent = SmartFileManager.buildShareIntent(this, path);
+                if (shareIntent != null) startActivity(shareIntent);
+                result = "[EMOTION:neutral] Sharing that file, sir.";
+            }
+            String clean = stripEmotionTag(result);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean.length() > 60 ? "Here are your files, sir." : clean, extractEmotion(result));
+            saveHistory(); return;
+        }
+
+        // ── [v17] Fitness Coach ────────────────────────────────────────────────
+        if (FitnessCoach.isFitnessCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String sync = fitnessCoach.handle(userText, userProfile, new FitnessCoach.Callback() {
+                @Override public void onResult(String reply) {
+                    mainHandler.post(() -> {
+                        hideTyping();
+                        String clean = stripEmotionTag(reply);
+                        history.add(new HistoryItem("model", clean));
+                        addJarvisMsg(clean);
+                        speak("Workout plan ready, sir.", extractEmotion(reply));
+                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                    });
+                }
+                @Override public void onError(String e) {
+                    mainHandler.post(() -> { hideTyping(); addJarvisMsg(e); setState(OrbView.OrbState.IDLE); });
+                }
+            });
+            if (sync != null) {
+                String clean = stripEmotionTag(sync);
+                history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+                speak(clean, extractEmotion(sync)); saveHistory();
+            } else {
+                setState(OrbView.OrbState.THINKING); showTyping();
+            }
+            return;
+        }
+
+        // ── [v17] Live Subtitles ───────────────────────────────────────────────
+        if (LiveSubtitles.isSubtitleCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply;
+            if (lower.contains("stop") || lower.contains("off") || lower.contains("hide")) {
+                stopService(new android.content.Intent(this, LiveSubtitles.class));
+                reply = "[EMOTION:neutral] Live captions off, sir.";
+            } else if (LiveSubtitles.isRunning()) {
+                reply = "[EMOTION:neutral] Live captions are already running, sir.";
+            } else {
+                if (android.provider.Settings.canDrawOverlays(this)) {
+                    android.content.Intent si = new android.content.Intent(this, LiveSubtitles.class);
+                    si.setAction(LiveSubtitles.ACTION_START);
+                    startService(si);
+                    reply = "[EMOTION:excited] Live captions on, sir! Subtitles will appear at the bottom of your screen.";
+                } else {
+                    android.content.Intent perm = new android.content.Intent(
+                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        android.net.Uri.parse("package:" + getPackageName()));
+                    startActivity(perm);
+                    reply = "[EMOTION:neutral] Please grant overlay permission, sir, then try again.";
+                }
+            }
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+
+        // ── [v17] WhatsApp Helper ─────────────────────────────────────────────
+        if (WhatsAppHelper.isWhatsAppCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING); showTyping();
+            addJarvisMsg("Drafting your message, sir…");
+            WhatsAppHelper.draftReply(userText, userProfile, new WhatsAppHelper.Callback() {
+                @Override public void onResult(String draft, String contact) {
+                    mainHandler.post(() -> {
+                        hideTyping();
+                        String display = "[EMOTION:excited] **WhatsApp draft for " + contact + ":**\n\n" + draft +
+                            "\n\n_Tap to open WhatsApp and send, sir._";
+                        String clean = stripEmotionTag(display);
+                        history.add(new HistoryItem("model", draft));
+                        addJarvisMsg(clean);
+                        speak("Draft ready, sir.", "excited");
+                        // Open WhatsApp with pre-filled message
+                        android.content.Intent wa = WhatsAppHelper.buildWhatsAppIntent(MainActivity.this, contact, draft);
+                        if (wa != null) {
+                            try { startActivity(wa); } catch (Exception ignored) {}
+                        }
+                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                    });
+                }
+                @Override public void onError(String e) {
+                    mainHandler.post(() -> { hideTyping(); addJarvisMsg(e); setState(OrbView.OrbState.IDLE); });
+                }
+            });
+            return;
+        }
+
+        // ── [v17] Email Drafter ───────────────────────────────────────────────
+        if (EmailDrafter.isEmailCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING); showTyping();
+            addJarvisMsg("Composing your email, sir…");
+            EmailDrafter.draft(userText, userProfile, new EmailDrafter.Callback() {
+                @Override public void onResult(String subject, String body, String recipient) {
+                    mainHandler.post(() -> {
+                        hideTyping();
+                        String display = "[EMOTION:excited] **Email Draft:**\n**Subject:** " + subject + "\n\n" + body;
+                        String clean = stripEmotionTag(display);
+                        history.add(new HistoryItem("model", "Email: " + subject));
+                        addJarvisMsg(clean);
+                        speak("Email drafted, sir. Opening your mail app now.", "excited");
+                        android.content.Intent emailIntent = EmailDrafter.buildEmailIntent(recipient, subject, body);
+                        try { startActivity(emailIntent); } catch (Exception ignored) {}
+                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                    });
+                }
+                @Override public void onError(String e) {
+                    mainHandler.post(() -> { hideTyping(); addJarvisMsg(e); setState(OrbView.OrbState.IDLE); });
+                }
+            });
+            return;
+        }
+
+        // ── [v17] Social Caption Generator ────────────────────────────────────
+        if (SocialCaptionGenerator.isCaptionCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING); showTyping();
+            addJarvisMsg("Writing your caption, sir…");
+            SocialCaptionGenerator.generate(userText, userProfile, new SocialCaptionGenerator.Callback() {
+                @Override public void onResult(String caption) {
+                    mainHandler.post(() -> {
+                        hideTyping();
+                        String clean = stripEmotionTag(caption);
+                        history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+                        speak("Caption ready, sir.", extractEmotion(caption));
+                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                    });
+                }
+                @Override public void onError(String e) {
+                    mainHandler.post(() -> { hideTyping(); addJarvisMsg(e); setState(OrbView.OrbState.IDLE); });
+                }
+            });
+            return;
+        }
+
+        // ── [v17] Birthday Tracker ────────────────────────────────────────────
+        if (BirthdayTracker.isBirthdayCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply = BirthdayTracker.handle(this, userText, userProfile);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean.length() > 80 ? "Here's the birthday info, sir." : clean, extractEmotion(reply));
+            saveHistory(); return;
+        }
+
+        // ── [v17] Voice Shortcut Widget setup ─────────────────────────────────
+        if (VoiceShortcutWidget.isWidgetCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply = VoiceShortcutWidget.handleWidgetSetup(this, userText);
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
         }
 
         // ── PDF context injection ──────────────────────────────────────────────

@@ -63,9 +63,11 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
         }
 
         if (m.type == Message.TYPE_URL_IMAGE) {
+            // Show caption
             if (h.tvMsg != null) {
                 h.tvMsg.setText("Here is your generated image, sir.");
             }
+            // Load image from URL in background
             if (h.ivImage != null && m.imageUrl != null) {
                 h.ivImage.setImageResource(android.R.drawable.ic_menu_gallery);
                 final String url = m.imageUrl;
@@ -73,8 +75,8 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
                 new Thread(() -> {
                     try {
                         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-                        conn.setConnectTimeout(15000);
-                        conn.setReadTimeout(30000);
+                        conn.setConnectTimeout(20000);
+                        conn.setReadTimeout(90000);
                         conn.connect();
                         InputStream is = conn.getInputStream();
                         Bitmap bmp = BitmapFactory.decodeStream(is);
@@ -82,8 +84,25 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
                         if (bmp != null) {
                             mainHandler.post(() -> iv.setImageBitmap(bmp));
                         }
-                    } catch (Exception ignored) {}
+                    } catch (Exception e) {
+                        // Show error placeholder
+                        mainHandler.post(() -> {
+                            if (h.tvMsg != null) h.tvMsg.setText("⚠ Image failed to load. Tap to retry.");
+                            iv.setOnClickListener(v2 -> {
+                                iv.setImageResource(android.R.drawable.ic_menu_gallery);
+                                new Thread(() -> {
+                                    try {
+                                        HttpURLConnection c2 = (HttpURLConnection) new URL(url).openConnection();
+                                        c2.setConnectTimeout(20000); c2.setReadTimeout(90000); c2.connect();
+                                        Bitmap b2 = BitmapFactory.decodeStream(c2.getInputStream());
+                                        if (b2 != null) mainHandler.post(() -> iv.setImageBitmap(b2));
+                                    } catch (Exception ignored2) {}
+                                }).start();
+                            });
+                        });
+                    }
                 }).start();
+                // Tap image to open in browser
                 h.ivImage.setOnClickListener(v -> {
                     Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
                     v.getContext().startActivity(intent);
@@ -94,7 +113,7 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
 
         if (h.tvMsg != null) h.tvMsg.setText(m.text);
         if (h.tvAvatar != null) {
-           h.tvAvatar.setText(m.type == Message.TYPE_USER ? "YOU" : "HNR");
+            h.tvAvatar.setText(m.type == Message.TYPE_USER ? "YOU" : "HNR");
         }
     }
 

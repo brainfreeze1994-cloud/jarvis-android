@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#060410">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp"
+        android:background="#08041A">
+
+        <Button
+            android:id="@+id/dmn_back"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="← BACK"
+            android:textColor="#CC88FF"
+            android:background="@null"
+            android:textSize="11sp"/>
+
+        <TextView
+            android:id="@+id/dmn_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="◈ DEFAULT MODE NETWORK"
+            android:textColor="#CC88FF"
+            android:textSize="12sp"
+            android:letterSpacing="0.2"
+            android:fontFamily="monospace"
+            android:gravity="center"/>
+
+        <View android:layout_width="60dp" android:layout_height="1dp"/>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/dmn_prompt"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textColor="#C8A8FF"
+        android:textSize="16sp"
+        android:padding="20dp"
+        android:lineSpacingMultiplier="1.6"
+        android:minHeight="80dp"/>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="12dp">
+
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                android:id="@+id/dmn_menu"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"/>
+
+            <LinearLayout
+                android:id="@+id/dmn_active"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"/>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- DMN Journal full-page -->
+    <ScrollView
+        android:id="@+id/dmn_journal_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="16dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/dmn_journal_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="#9060CC"
+            android:textSize="13sp"
+            android:fontFamily="monospace"
+            android:lineSpacingMultiplier="1.5"/>
+    </ScrollView>
+
+    <TextView
+        android:id="@+id/dmn_output"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textColor="#CC88FF"
+        android:textSize="13sp"
+        android:padding="16dp"
+        android:minHeight="60dp"
+        android:background="#080418"
+        android:lineSpacingMultiplier="1.4"/>
+</LinearLayout>

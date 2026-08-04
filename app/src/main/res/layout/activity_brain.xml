@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#020C1B">
+
+    <!-- Top bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp"
+        android:background="#040F1D">
+
+        <TextView
+            android:id="@+id/brain_back"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="← BACK"
+            android:textColor="#00D4FF"
+            android:textSize="11sp"
+            android:letterSpacing="0.2"
+            android:paddingEnd="16dp"
+            android:paddingVertical="12dp"/>
+
+        <TextView
+            android:id="@+id/brain_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="H.E.N.R.Y BRAIN"
+            android:textColor="#00D4FF"
+            android:textSize="14sp"
+            android:letterSpacing="0.3"
+            android:fontFamily="monospace"
+            android:gravity="center"/>
+
+        <View android:layout_width="60dp" android:layout_height="1dp"/>
+    </LinearLayout>
+
+    <!-- Brain canvas — fills remaining space -->
+    <com.jarvis.ai.BrainActivity$BrainView
+        android:id="@+id/brain_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"/>
+
+</LinearLayout>

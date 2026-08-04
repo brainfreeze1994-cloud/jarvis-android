@@ -48,8 +48,8 @@
     <!-- Floating bubble overlay -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
-    <!-- SOS — send SMS directly -->
-    <uses-permission android:name="android.permission.SEND_SMS" />
+    <!-- SOS emergency call -->
+    <uses-permission android:name="android.permission.CALL_PRIVILEGED" />
 
     <uses-feature android:name="android.hardware.microphone" android:required="false"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>

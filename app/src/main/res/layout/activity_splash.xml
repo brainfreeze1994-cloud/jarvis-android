@@ -2,54 +2,138 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#020C1B"
-    android:gravity="center">
+    android:background="#020C1B">
 
-    <!-- Blue top accent line -->
+    <!-- Top accent line -->
     <View
         android:id="@+id/splash_top_line"
         android:layout_width="match_parent"
         android:layout_height="2dp"
-        android:background="#00BEFF"
+        android:background="#00D4FF"
         android:layout_alignParentTop="true"/>
 
-    <!-- Orb icon -->
-    <ImageView
-        android:id="@+id/splash_orb"
-        android:layout_width="160dp"
-        android:layout_height="160dp"
+    <!-- Corner brackets TL -->
+    <View android:layout_width="24dp" android:layout_height="2dp"
+        android:background="#00D4FF" android:layout_alignParentTop="true"
+        android:layout_alignParentStart="true" android:layout_marginTop="14dp" android:layout_marginStart="14dp"/>
+    <View android:layout_width="2dp" android:layout_height="24dp"
+        android:background="#00D4FF" android:layout_alignParentTop="true"
+        android:layout_alignParentStart="true" android:layout_marginTop="14dp" android:layout_marginStart="14dp"/>
+    <!-- Corner brackets TR -->
+    <View android:layout_width="24dp" android:layout_height="2dp"
+        android:background="#00D4FF" android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true" android:layout_marginTop="14dp" android:layout_marginEnd="14dp"/>
+    <View android:layout_width="2dp" android:layout_height="24dp"
+        android:background="#00D4FF" android:layout_alignParentTop="true"
+        android:layout_alignParentEnd="true" android:layout_marginTop="14dp" android:layout_marginEnd="14dp"/>
+    <!-- Corner brackets BL -->
+    <View android:layout_width="24dp" android:layout_height="2dp"
+        android:background="#00D4FF" android:layout_alignParentBottom="true"
+        android:layout_alignParentStart="true" android:layout_marginBottom="14dp" android:layout_marginStart="14dp"/>
+    <View android:layout_width="2dp" android:layout_height="24dp"
+        android:background="#00D4FF" android:layout_alignParentBottom="true"
+        android:layout_alignParentStart="true" android:layout_marginBottom="14dp" android:layout_marginStart="14dp"/>
+    <!-- Corner brackets BR -->
+    <View android:layout_width="24dp" android:layout_height="2dp"
+        android:background="#00D4FF" android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true" android:layout_marginBottom="14dp" android:layout_marginEnd="14dp"/>
+    <View android:layout_width="2dp" android:layout_height="24dp"
+        android:background="#00D4FF" android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true" android:layout_marginBottom="14dp" android:layout_marginEnd="14dp"/>
+
+    <!-- Center content group -->
+    <LinearLayout
+        android:id="@+id/splash_center"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_centerInParent="true"
-        android:layout_marginBottom="48dp"
-        android:src="@mipmap/ic_launcher"
-        android:contentDescription="HENRY Orb" />
+        android:orientation="vertical"
+        android:gravity="center">
 
-    <!-- H.E.N.R.Y title -->
-    <TextView
-        android:id="@+id/splash_title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/splash_orb"
-        android:layout_centerHorizontal="true"
-        android:text="H.E.N.R.Y"
-        android:textSize="30sp"
-        android:textColor="#00BEFF"
-        android:letterSpacing="0.35"
-        android:fontFamily="sans-serif-medium"
-        android:visibility="invisible" />
+        <!-- Orb icon -->
+        <ImageView
+            android:id="@+id/splash_orb"
+            android:layout_width="140dp"
+            android:layout_height="140dp"
+            android:src="@mipmap/ic_launcher"
+            android:contentDescription="HENRY Orb" />
 
-    <!-- Subtitle -->
-    <TextView
-        android:id="@+id/splash_subtitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/splash_title"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="8dp"
-        android:text="HIGHLY ENHANCED NEURAL REASONING FOR YOU"
-        android:textSize="8sp"
-        android:textColor="#0A3A5A"
-        android:letterSpacing="0.15"
-        android:visibility="invisible" />
+        <!-- H.E.N.R.Y title -->
+        <TextView
+            android:id="@+id/splash_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="H·E·N·R·Y"
+            android:textSize="32sp"
+            android:textColor="#00D4FF"
+            android:letterSpacing="0.4"
+            android:fontFamily="sans-serif-medium"
+            android:visibility="invisible" />
+
+        <!-- Subtitle -->
+        <TextView
+            android:id="@+id/splash_subtitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="HIGHLY ENHANCED NEURAL REASONING FOR YOU"
+            android:textSize="7.5sp"
+            android:textColor="#2A6A8A"
+            android:letterSpacing="0.14"
+            android:visibility="invisible" />
+
+        <!-- Boot status line -->
+        <TextView
+            android:id="@+id/splash_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="INITIALIZING..."
+            android:textSize="9sp"
+            android:textColor="#00D4FF"
+            android:letterSpacing="0.2"
+            android:fontFamily="monospace"
+            android:visibility="invisible" />
+
+        <!-- Progress bar track -->
+        <FrameLayout
+            android:layout_width="220dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:visibility="invisible"
+            android:id="@+id/splash_progress_container">
+
+            <!-- Background track -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="3dp"
+                android:layout_gravity="center_vertical"
+                android:background="#0A2A3A"/>
+
+            <!-- Progress fill -->
+            <View
+                android:id="@+id/splash_progress_fill"
+                android:layout_width="0dp"
+                android:layout_height="3dp"
+                android:layout_gravity="start|center_vertical"
+                android:background="#00D4FF"/>
+        </FrameLayout>
+
+        <!-- Progress percent -->
+        <TextView
+            android:id="@+id/splash_percent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="0%"
+            android:textSize="8sp"
+            android:textColor="#2A6A8A"
+            android:letterSpacing="0.15"
+            android:fontFamily="monospace"
+            android:visibility="invisible"/>
+
+    </LinearLayout>
 
     <!-- Bottom version -->
     <TextView
@@ -57,12 +141,12 @@
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
-        android:layout_marginBottom="32dp"
-        android:text="v14.0.0"
-        android:textSize="11sp"
-        android:textColor="#071525" />
+        android:layout_marginBottom="28dp"
+        android:text="v21.0.0 · HENRY AI"
+        android:textSize="9sp"
+        android:textColor="#0A2535" />
 
-    <!-- Blue bottom accent line -->
+    <!-- Bottom accent line -->
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"

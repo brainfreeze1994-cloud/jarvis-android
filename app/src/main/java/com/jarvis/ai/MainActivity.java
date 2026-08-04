@@ -185,6 +185,9 @@ public class MainActivity extends AppCompatActivity {
     // Sleep mode state
     private boolean sleepModeActive = false;
 
+    // Sleep tracker
+    private SleepTracker sleepTracker;
+
     // ── onCreate ──────────────────────────────────────────────────────────────
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -325,6 +328,9 @@ public class MainActivity extends AppCompatActivity {
         // Fitness tracker
         fitnessTracker = new FitnessTracker(this);
         fitnessTracker.start();
+
+        // Sleep tracker (singleton)
+        sleepTracker = SleepTracker.getInstance(this);
 
         // Button listeners
         if (orbView   != null) orbView.setOnClickListener(v -> toggleListening());
@@ -1726,6 +1732,147 @@ public class MainActivity extends AppCompatActivity {
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
             String clean = stripEmotionTag(hint);
             addJarvisMsg(clean); speak(clean, "neutral"); saveHistory(); return;
+        }
+
+        // ── [v16] Code Runner ─────────────────────────────────────────────────
+        if (CodeRunner.isRunCommand(userText)) {
+            String[] parsed = CodeRunner.parse(userText);
+            if (parsed != null) {
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                setState(OrbView.OrbState.THINKING);
+                addJarvisMsg("Running **" + parsed[0] + "** code, sir…");
+                showTyping(); saveHistory();
+                CodeRunner.run(parsed[0], parsed[1], parsed[2], new CodeRunner.Callback() {
+                    @Override public void onResult(String output, String lang, String code) {
+                        mainHandler.post(() -> {
+                            hideTyping();
+                            String reply = "[EMOTION:excited] ✅ **" + capitalize(lang) + " Output:**\n```\n" + output + "\n```";
+                            String clean = stripEmotionTag(reply);
+                            history.add(new HistoryItem("model", clean));
+                            addJarvisMsg(clean);
+                            speak("Execution complete, sir.", "excited");
+                            saveHistory(); setState(OrbView.OrbState.IDLE);
+                        });
+                    }
+                    @Override public void onError(String reason) {
+                        mainHandler.post(() -> {
+                            hideTyping();
+                            String clean = stripEmotionTag(reason);
+                            addJarvisMsg(clean); speak(clean, "concerned");
+                            setState(OrbView.OrbState.IDLE);
+                        });
+                    }
+                });
+                return;
+            }
+        }
+
+        // ── [v16] Language Learning ───────────────────────────────────────────
+        if (LanguageLearning.isLangCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING);
+            addJarvisMsg("Preparing your language lesson, sir…");
+            showTyping(); saveHistory();
+            LanguageLearning.handle(this, userText, httpClient, userProfile, new LanguageLearning.Callback() {
+                @Override public void onResult(String content) {
+                    mainHandler.post(() -> {
+                        hideTyping();
+                        String clean   = stripEmotionTag(content);
+                        String emotion = extractEmotion(content);
+                        history.add(new HistoryItem("model", clean));
+                        addJarvisMsg(clean); speak("Lesson ready, sir.", emotion);
+                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                    });
+                }
+                @Override public void onError(String reason) {
+                    mainHandler.post(() -> {
+                        hideTyping(); addJarvisMsg(stripEmotionTag(reason));
+                        setState(OrbView.OrbState.IDLE);
+                    });
+                }
+            });
+            return;
+        }
+
+        // ── [v16] In-App Browser ──────────────────────────────────────────────
+        if (InAppBrowser.isBrowserCommand(userText)) {
+            String url = InAppBrowser.parseUrl(userText);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply = "[EMOTION:excited] Opening browser, sir.";
+            addJarvisMsg(stripEmotionTag(reply)); speak(reply, "excited");
+            InAppBrowser.open(this, url);
+            saveHistory(); return;
+        }
+
+        // ── [v16] Car Mode ────────────────────────────────────────────────────
+        if (lower.contains("car mode") || lower.equals("driving mode") ||
+            lower.contains("start car mode") || lower.contains("hands free")) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply = "[EMOTION:excited] Switching to car mode, sir. Stay safe.";
+            addJarvisMsg(stripEmotionTag(reply)); speak(reply, "excited");
+            startActivity(new Intent(this, CarModeActivity.class));
+            saveHistory(); return;
+        }
+
+        // ── [v16] Breathing Exercise ──────────────────────────────────────────
+        if (BreathingExercise.isBreathingCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            BreathingExercise.Mode mode = BreathingExercise.Mode.BOX;
+            if (lower.contains("4-7-8") || lower.contains("478") || lower.contains("sleep breath"))
+                mode = BreathingExercise.Mode.FOUR_SEVEN_EIGHT;
+            else if (lower.contains("deep breath") || lower.contains("simple"))
+                mode = BreathingExercise.Mode.DEEP;
+            String reply = "[EMOTION:calm] Opening **" + mode.name + "**, sir. Follow the orb.";
+            addJarvisMsg(stripEmotionTag(reply)); speak("Starting breathing exercise, sir.", "calm");
+            final BreathingExercise.Mode finalMode = mode;
+            mainHandler.postDelayed(() ->
+                BreathingExercise.show(this, finalMode, text -> speak(text, "calm")), 800);
+            saveHistory(); return;
+        }
+
+        // ── [v16] Sleep Tracker ───────────────────────────────────────────────
+        if (SleepTracker.isSleepCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply;
+            if (lower.contains("stop") || lower.contains("end") || lower.contains("report") ||
+                lower.contains("how did") || lower.contains("quality") || lower.contains("score")) {
+                if (sleepTracker.isActive()) reply = sleepTracker.stop();
+                else reply = sleepTracker.generateReport();
+            } else {
+                reply = sleepTracker.start();
+            }
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+
+        // ── [v16] Meal Planner ────────────────────────────────────────────────
+        if (MealPlanner.isMealCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING);
+            boolean withList = userText.toLowerCase().contains("shopping") ||
+                               userText.toLowerCase().contains("week");
+            addJarvisMsg("Planning your meals, sir…");
+            showTyping(); saveHistory();
+            MealPlanner.generate(userText, httpClient, userProfile, withList, new MealPlanner.Callback() {
+                @Override public void onResult(String plan) {
+                    mainHandler.post(() -> {
+                        hideTyping();
+                        String clean   = stripEmotionTag(plan);
+                        String emotion = extractEmotion(plan);
+                        history.add(new HistoryItem("model", clean));
+                        addJarvisMsg(clean); speak("Meal plan ready, sir.", emotion);
+                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                    });
+                }
+                @Override public void onError(String reason) {
+                    mainHandler.post(() -> {
+                        hideTyping(); addJarvisMsg(stripEmotionTag(reason));
+                        setState(OrbView.OrbState.IDLE);
+                    });
+                }
+            });
+            return;
         }
 
         // ── [v15] Daily Summary ───────────────────────────────────────────────

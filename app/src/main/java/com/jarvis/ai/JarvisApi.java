@@ -140,6 +140,100 @@ public class JarvisApi {
         }).start();
     }
 
+    /**
+     * v20 — Full call with emotion, relationship context, tournament, chain thinking.
+     */
+    public static void askV20(List<HistoryItem> history, String imageBase64,
+                               String responseMode, UserProfile profile,
+                               String queryType, android.content.Context memCtx,
+                               String emotionState, String relationshipContext,
+                               boolean enableTournament, boolean enableChainThinking,
+                               Callback cb) {
+        new Thread(() -> {
+            try {
+                JSONArray messages = new JSONArray();
+                for (HistoryItem item : history) {
+                    JSONObject msg = new JSONObject();
+                    msg.put("role", item.role);
+                    msg.put("text", item.text);
+                    messages.put(msg);
+                }
+
+                JSONObject body = new JSONObject();
+                body.put("messages",     messages);
+                body.put("responseMode", responseMode != null ? responseMode : "balanced");
+
+                if (imageBase64 != null && !imageBase64.isEmpty())
+                    body.put("imageBase64", imageBase64);
+                if (profile != null && !profile.isEmpty())
+                    body.put("userProfile", profile.toJson());
+                if (queryType != null && !queryType.isEmpty())
+                    body.put("queryType", queryType);
+                if (emotionState != null && !emotionState.equals("normal"))
+                    body.put("emotionState", emotionState);
+                if (relationshipContext != null && !relationshipContext.isEmpty())
+                    body.put("relationshipContext", relationshipContext);
+                if (enableTournament) body.put("enableTournament", true);
+                if (enableChainThinking) body.put("enableChainThinking", true);
+
+                // Send stored memory facts
+                if (memCtx != null) {
+                    String memStr = SmartMemory.buildMemoryContext(memCtx);
+                    if (!memStr.isEmpty()) {
+                        JSONArray factsArr = new JSONArray();
+                        for (String f : memStr.replace("Known facts about user: ", "").split(";")) {
+                            String t = f.trim();
+                            if (!t.isEmpty()) factsArr.put(t);
+                        }
+                        if (factsArr.length() > 0) body.put("memoryFacts", factsArr);
+                    }
+                }
+
+                RequestBody rb = RequestBody.create(body.toString(), JSON);
+                Request req = new Request.Builder()
+                    .url(API_URL)
+                    .post(rb)
+                    .addHeader("Content-Type", "application/json")
+                    .build();
+
+                try (Response resp = client.newCall(req).execute()) {
+                    String bodyStr = resp.body() != null ? resp.body().string() : "";
+                    if (!resp.isSuccessful()) { cb.onError("Server error " + resp.code()); return; }
+                    JSONObject data = new JSONObject(bodyStr);
+                    String reply    = data.optString("reply", "I have no response.");
+                    String imageUrl = data.optString("imageUrl", null);
+                    if ("null".equals(imageUrl)) imageUrl = null;
+
+                    List<String> followUps = new ArrayList<>();
+                    if (data.has("followUps")) {
+                        JSONArray fuArr = data.optJSONArray("followUps");
+                        if (fuArr != null) {
+                            for (int i = 0; i < fuArr.length(); i++) {
+                                String q = fuArr.optString(i, "").trim();
+                                if (!q.isEmpty()) followUps.add(q);
+                            }
+                        }
+                    }
+
+                    // Auto-save memory facts detected by backend
+                    if (memCtx != null && data.has("newFacts")) {
+                        JSONArray nf = data.optJSONArray("newFacts");
+                        if (nf != null) {
+                            for (int i = 0; i < nf.length(); i++) {
+                                String fact = nf.optString(i, "").trim();
+                                if (!fact.isEmpty()) SmartMemory.manuallyRemember(memCtx, fact);
+                            }
+                        }
+                    }
+
+                    cb.onSuccess(reply, imageUrl, followUps);
+                }
+            } catch (Exception e) {
+                cb.onError(e.getMessage() != null ? e.getMessage() : "Network error");
+            }
+        }).start();
+    }
+
     // ── Client-side intent classifier (mirrors backend logic) ─────────────────
     public static String classifyIntent(String msg) {
         if (msg == null || msg.isEmpty()) return "chat";

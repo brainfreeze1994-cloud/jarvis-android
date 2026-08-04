@@ -243,6 +243,48 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- HENRY Brain Map -->
+        <activity
+            android:name=".BrainActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.Jarvis" />
+
+        <!-- Mental Imagery -->
+        <activity
+            android:name=".MentalImageryActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.Jarvis" />
+
+        <!-- Sensory Substitution -->
+        <activity
+            android:name=".SensorySubstitutionActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.Jarvis" />
+
+        <!-- Neural Plasticity -->
+        <activity
+            android:name=".NeuralPlasticityActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.Jarvis" />
+
+        <!-- Default Mode Network -->
+        <activity
+            android:name=".DefaultModeNetworkActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.Jarvis" />
+
+        <!-- Smart Memory Viewer -->
+        <activity
+            android:name=".SmartMemoryActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.Jarvis" />
+
     </application>
 
 </manifest>

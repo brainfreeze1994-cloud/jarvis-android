@@ -41,7 +41,7 @@
     </LinearLayout>
 
     <!-- Brain canvas — fills remaining space -->
-    <com.jarvis.ai.BrainActivity$BrainView
+    <com.jarvis.ai.HenryBrainView
         android:id="@+id/brain_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"

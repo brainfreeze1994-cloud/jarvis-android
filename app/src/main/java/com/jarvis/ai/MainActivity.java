@@ -3243,9 +3243,9 @@ public class MainActivity extends AppCompatActivity {
         RelationshipBrain.learnFromMessage(this, userText);
 
         // [v20] Dubai transit detection — add deep-link buttons after response
-        final boolean isTransit = DubaiTransitHelper.isTransitQuery(userText);
+        final boolean isTransit = TransitHelper.isTransitQuery(userText);
         final boolean isLegal   = UAELawHelper.isLegalQuery(userText);
-        final String[] transitRoute = isTransit ? DubaiTransitHelper.extractRoute(userText) : null;
+        final String[] transitRoute = isTransit ? TransitHelper.extractRoute(userText) : null;
         final UAELawHelper.LegalCategory legalCat = isLegal ? UAELawHelper.classify(userText) : null;
 
         // [v18] Dynamic thinking message based on intent
@@ -3638,20 +3638,21 @@ public class MainActivity extends AppCompatActivity {
             for (int i = history.size()-1; i >= 0; i--) {
                 if ("user".equals(history.get(i).role)) { lastUserMsg = history.get(i).text; break; }
             }
-            String[] route = DubaiTransitHelper.extractRoute(lastUserMsg);
+            String[] route = TransitHelper.extractRoute(lastUserMsg);
             String origin = route != null && route.length > 0 ? route[0] : "";
-            String dest   = route != null && route.length > 1 ? route[1] : (route != null ? route[0] : "Dubai Mall");
-            DubaiTransitHelper.openGoogleMapsTransit(this, origin, dest);
-        } else if (text.contains("RTA Journey")) {
-            DubaiTransitHelper.openRtaJourneyPlanner(this);
-        } else if (text.contains("Careem")) {
+            String dest   = route != null && route.length > 1 ? route[1] : (route != null ? route[0] : "");
+            TransitHelper.openGoogleMapsTransit(this, origin, dest);
+        } else if (text.contains("RTA Journey") || text.contains("Transit Map")) {
+            // Open Google Maps transit mode globally instead of Dubai-only portal
+            TransitHelper.openGoogleMapsTransit(this, "", "");
+        } else if (text.contains("Careem") || text.contains("Uber") || text.contains("Ride")) {
             String lastUserMsg = "";
             for (int i = history.size()-1; i >= 0; i--) {
                 if ("user".equals(history.get(i).role)) { lastUserMsg = history.get(i).text; break; }
             }
-            String[] route = DubaiTransitHelper.extractRoute(lastUserMsg);
-            String dest = route != null && route.length > 1 ? route[1] : "Dubai";
-            DubaiTransitHelper.openCareem(this, dest);
+            String[] route = TransitHelper.extractRoute(lastUserMsg);
+            String dest = route != null && route.length > 1 ? route[1] : lastUserMsg;
+            TransitHelper.openBestRideApp(this, dest);
         } else if (text.contains("File complaint")) {
             // Extract category from button text and open portal
             UAELawHelper.LegalCategory cat = UAELawHelper.LegalCategory.GENERAL;
@@ -3680,7 +3681,7 @@ public class MainActivity extends AppCompatActivity {
         HenryMood.Mood mood = HenryMood.getCurrentMood();
         // Orb hint phrase
         String phrase = HenryMood.getStatusPhrase(mood);
-        if (tvOrbHint != null && appState == OrbView.OrbState.IDLE) {
+        if (tvOrbHint != null && currentState == OrbView.OrbState.IDLE) {
             tvOrbHint.setText(phrase);
         }
     }

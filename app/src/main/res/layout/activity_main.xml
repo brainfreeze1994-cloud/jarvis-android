@@ -86,6 +86,34 @@
             android:focusable="true"
             android:contentDescription="Voice settings"/>
 
+        <!-- Earth Map button -->
+        <TextView
+            android:id="@+id/btn_earth_map"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🌍"
+            android:textSize="20sp"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="4dp"
+            android:layout_marginEnd="4dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Earth Map"/>
+
+        <!-- Animal Scanner button -->
+        <TextView
+            android:id="@+id/btn_animal_scan"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🐾"
+            android:textSize="20sp"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="4dp"
+            android:layout_marginEnd="4dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Animal Scanner"/>
+
         <!-- Clear button -->
         <ImageButton
             android:id="@+id/btn_clear"

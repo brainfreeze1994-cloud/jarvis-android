@@ -350,6 +350,14 @@ public class MainActivity extends AppCompatActivity {
         if (btnClear  != null) btnClear.setOnClickListener(v -> showClearMenu());
         if (btnVoice  != null) btnVoice.setOnClickListener(v -> showVoicePicker());
         if (btnAttach != null) btnAttach.setOnClickListener(v -> showAttachDialog());
+
+        // 🌍 Earth Map button
+        android.widget.TextView btnEarthMap = findViewById(R.id.btn_earth_map);
+        if (btnEarthMap != null) btnEarthMap.setOnClickListener(v -> openEarthMap(null));
+
+        // 🐾 Animal Scanner button
+        android.widget.TextView btnAnimalScan = findViewById(R.id.btn_animal_scan);
+        if (btnAnimalScan != null) btnAnimalScan.setOnClickListener(v -> openAnimalScanner());
         if (ivAttachPreview != null) ivAttachPreview.setOnClickListener(v -> clearAttachment());
         if (etInput != null) {
             etInput.setOnEditorActionListener((v, id, e) -> {
@@ -1217,6 +1225,47 @@ public class MainActivity extends AppCompatActivity {
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
         if (res != RESULT_OK) return;
+
+        // 🐾 Animal Scanner result
+        if (req == AnimalScannerActivity.REQUEST_CODE && data != null) {
+            String animalResult = data.getStringExtra(AnimalScannerActivity.EXTRA_RESULT);
+            if (animalResult != null && !animalResult.isEmpty()) {
+                String clean   = animalResult.replaceAll("\\[EMOTION:[^\\]]+\\]", "").trim();
+                addJarvisMsg(clean);
+                speak(clean, "excited");
+                history.add(new HistoryItem("model", clean));
+                saveHistory();
+            }
+            return;
+        }
+
+        // 🌍 Earth Map result — country selected, ask HENRY about it
+        if (req == EarthMapActivity.REQUEST_CODE && data != null) {
+            String country = data.getStringExtra(EarthMapActivity.EXTRA_COUNTRY);
+            if (country != null && !country.isEmpty()) {
+                String prompt = "Tell me about " + country +
+                    " — history, culture, top tourist spots, traditional food, and estimated population. Be engaging.";
+                addUserMsg("Tell me about " + country);
+                history.add(new HistoryItem("user", prompt));
+                setState(OrbView.OrbState.THINKING); showTyping();
+                JarvisApi.ask(history, null, responseMode, userProfile, new JarvisApi.Callback() {
+                    @Override public void onSuccess(String reply, String imageUrl, java.util.List<String> followUps) {
+                        mainHandler.post(() -> {
+                            hideTyping();
+                            String clean   = stripEmotionTag(reply);
+                            String emotion = extractEmotion(reply);
+                            addJarvisMsg(clean); speak(clean, emotion);
+                            history.add(new HistoryItem("model", clean));
+                            saveHistory(); setState(OrbView.OrbState.IDLE);
+                        });
+                    }
+                    @Override public void onError(String error) {
+                        mainHandler.post(() -> { hideTyping(); setState(OrbView.OrbState.IDLE); });
+                    }
+                });
+            }
+            return;
+        }
 
         // Live camera result
         if (req == REQUEST_LIVE_CAM && data != null) {
@@ -3242,6 +3291,21 @@ public class MainActivity extends AppCompatActivity {
         // [v20] Relationship learning
         RelationshipBrain.learnFromMessage(this, userText);
 
+        // 🌍 Earth Map voice trigger
+        String lowerInput = userText.toLowerCase(java.util.Locale.US);
+        if (lowerInput.matches(".*(open|show|launch|earth|globe|world).*(map|globe|earth|world).*") ||
+            lowerInput.matches(".*(map|globe).*")) {
+            java.util.regex.Matcher mFly = java.util.regex.Pattern.compile(
+                "(?:show|fly to|go to|open|find|locate)\\s+(.+?)\\s+on\\s+(?:the\\s+)?(?:map|globe)",
+                java.util.regex.Pattern.CASE_INSENSITIVE).matcher(userText);
+            String flyTo = mFly.find() ? mFly.group(1).trim() : null;
+            openEarthMap(flyTo);
+        }
+        // 🐾 Animal Scanner voice trigger
+        if (lowerInput.matches(".*(scan|identify|what animal|animal scanner|what is this animal).*")) {
+            openAnimalScanner();
+        }
+
         // [v20] Dubai transit detection — add deep-link buttons after response
         final boolean isTransit = TransitHelper.isTransitQuery(userText);
         final boolean isLegal   = UAELawHelper.isLegalQuery(userText);
@@ -3674,6 +3738,21 @@ public class MainActivity extends AppCompatActivity {
             // Default — treat as normal chat
             askJarvis(text);
         }
+    }
+
+    // ── 🌍 Open Earth Map ─────────────────────────────────────────────────────
+    private void openEarthMap(String flyToCountry) {
+        Intent intent = new Intent(this, EarthMapActivity.class);
+        if (flyToCountry != null && !flyToCountry.isEmpty()) {
+            intent.putExtra("fly_to", flyToCountry);
+        }
+        startActivityForResult(intent, EarthMapActivity.REQUEST_CODE);
+    }
+
+    // ── 🐾 Open Animal Scanner ────────────────────────────────────────────────
+    private void openAnimalScanner() {
+        Intent intent = new Intent(this, AnimalScannerActivity.class);
+        startActivityForResult(intent, AnimalScannerActivity.REQUEST_CODE);
     }
 
     // ── v20: Update orb accent color based on HENRY's mood ───────────────────

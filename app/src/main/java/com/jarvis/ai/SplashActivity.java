@@ -4,6 +4,7 @@ import android.app.AlertDialog;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.animation.AlphaAnimation;
@@ -14,17 +15,33 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 
 public class SplashActivity extends AppCompatActivity {
 
     private static final String CRASH_FILE = "henry_crash.txt";
+    private final Handler handler = new Handler(Looper.getMainLooper());
+
+    private static final String[] BOOT_LINES = {
+        "INITIALIZING NEURAL CORE...",
+        "LOADING LANGUAGE MODULES...",
+        "CALIBRATING VOICE ENGINE...",
+        "CONNECTING TO HENRY SERVERS...",
+        "RUNNING SELF-DIAGNOSTICS...",
+        "LOADING MEMORY BANKS...",
+        "ALL SYSTEMS NOMINAL.",
+        "WELCOME BACK, SIR."
+    };
+
+    // Progress milestones for each boot line (0–100)
+    private static final int[] BOOT_PROGRESS = { 5, 20, 38, 55, 68, 80, 92, 100 };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // Install crash handler
         final File crashFile = new File(getFilesDir(), CRASH_FILE);
         Thread.setDefaultUncaughtExceptionHandler((thread, ex) -> {
             try {
@@ -39,11 +56,12 @@ public class SplashActivity extends AppCompatActivity {
             android.os.Process.killProcess(android.os.Process.myPid());
         });
 
+        // Check for crash from previous run
         if (crashFile.exists()) {
             String crashMsg = readCrashFile(crashFile);
             crashFile.delete();
             new AlertDialog.Builder(this)
-                .setTitle("HENRY Crash Report — share with developer")
+                .setTitle("HENRY Crash Report")
                 .setMessage(crashMsg)
                 .setPositiveButton("OK", (d, w) -> launchSplash())
                 .setCancelable(false)
@@ -66,61 +84,104 @@ public class SplashActivity extends AppCompatActivity {
 
             setContentView(R.layout.activity_splash);
 
-            TextView titleView    = findViewById(R.id.splash_title);
-            TextView subtitleView = findViewById(R.id.splash_subtitle);
-            View     orbView      = findViewById(R.id.splash_orb);
+            View     orbView         = findViewById(R.id.splash_orb);
+            TextView titleView       = findViewById(R.id.splash_title);
+            TextView subtitleView    = findViewById(R.id.splash_subtitle);
+            TextView statusView      = findViewById(R.id.splash_status);
+            View     progressContainer = findViewById(R.id.splash_progress_container);
+            View     progressFill    = findViewById(R.id.splash_progress_fill);
+            TextView percentView     = findViewById(R.id.splash_percent);
 
+            // Step 1 — Orb pulses in (scale + fade)
             ScaleAnimation scaleAnim = new ScaleAnimation(
-                0.3f, 1.0f, 0.3f, 1.0f,
+                0.2f, 1.0f, 0.2f, 1.0f,
                 Animation.RELATIVE_TO_SELF, 0.5f,
                 Animation.RELATIVE_TO_SELF, 0.5f);
-            scaleAnim.setDuration(800);
-            scaleAnim.setFillAfter(true);
+            scaleAnim.setDuration(700);
+            AlphaAnimation fadeIn = new AlphaAnimation(0f, 1f);
+            fadeIn.setDuration(700);
+            AnimationSet orbAnim = new AnimationSet(true);
+            orbAnim.addAnimation(scaleAnim);
+            orbAnim.addAnimation(fadeIn);
+            orbAnim.setFillAfter(true);
+            orbView.startAnimation(orbAnim);
 
-            AlphaAnimation fadeAnim = new AlphaAnimation(0f, 1f);
-            fadeAnim.setDuration(800);
-            fadeAnim.setFillAfter(true);
-
-            AnimationSet orbSet = new AnimationSet(true);
-            orbSet.addAnimation(scaleAnim);
-            orbSet.addAnimation(fadeAnim);
-            if (orbView != null) orbView.startAnimation(orbSet);
-
-            new Handler().postDelayed(() -> {
+            // Step 2 — Title fades in after orb
+            handler.postDelayed(() -> {
                 if (titleView != null) {
-                    AlphaAnimation tf = new AlphaAnimation(0f, 1f);
-                    tf.setDuration(600); tf.setFillAfter(true);
-                    titleView.startAnimation(tf);
                     titleView.setVisibility(View.VISIBLE);
+                    AlphaAnimation a = new AlphaAnimation(0f, 1f);
+                    a.setDuration(500);
+                    a.setFillAfter(true);
+                    titleView.startAnimation(a);
                 }
-            }, 400);
+            }, 750);
 
-            new Handler().postDelayed(() -> {
+            // Step 3 — Subtitle fades in
+            handler.postDelayed(() -> {
                 if (subtitleView != null) {
-                    AlphaAnimation sf = new AlphaAnimation(0f, 1f);
-                    sf.setDuration(600); sf.setFillAfter(true);
-                    subtitleView.startAnimation(sf);
                     subtitleView.setVisibility(View.VISIBLE);
+                    AlphaAnimation a = new AlphaAnimation(0f, 1f);
+                    a.setDuration(400);
+                    a.setFillAfter(true);
+                    subtitleView.startAnimation(a);
                 }
-            }, 700);
+            }, 1100);
 
-            new Handler().postDelayed(() -> {
-                startActivity(new Intent(SplashActivity.this, MainActivity.class));
-                finish();
-                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
-            }, 2500);
+            // Step 4 — Show progress + status, start boot sequence
+            handler.postDelayed(() -> {
+                if (statusView != null) statusView.setVisibility(View.VISIBLE);
+                if (progressContainer != null) progressContainer.setVisibility(View.VISIBLE);
+                if (percentView != null) percentView.setVisibility(View.VISIBLE);
+                runBootSequence(statusView, progressFill, percentView, 0);
+            }, 1400);
 
-        } catch (Throwable t) {
-            String msg = t.getClass().getSimpleName() + ": " + t.getMessage()
-                       + "\n\n" + android.util.Log.getStackTraceString(t);
-            try {
-                new AlertDialog.Builder(this)
-                    .setTitle("HENRY Splash Error")
-                    .setMessage(msg)
-                    .setPositiveButton("OK", null)
-                    .show();
-            } catch (Exception ignored) {}
+        } catch (Exception e) {
+            new AlertDialog.Builder(this)
+                .setTitle("Launch Error")
+                .setMessage(e.getMessage())
+                .setPositiveButton("OK", (d, w) -> finish())
+                .show();
         }
+    }
+
+    private void runBootSequence(TextView statusView, View progressFill, TextView percentView, int index) {
+        if (index >= BOOT_LINES.length) {
+            // All done — launch MainActivity
+            handler.postDelayed(this::goToMain, 400);
+            return;
+        }
+
+        // Update status text
+        if (statusView != null) statusView.setText(BOOT_LINES[index]);
+
+        // Animate progress fill
+        int targetPercent = BOOT_PROGRESS[index];
+        animateProgress(progressFill, percentView, targetPercent);
+
+        // Schedule next line (interval varies: faster in middle, pause at end)
+        int delay = (index == BOOT_LINES.length - 1) ? 700
+                  : (index < 2)                       ? 320
+                  : 260;
+        handler.postDelayed(() -> runBootSequence(statusView, progressFill, percentView, index + 1), delay);
+    }
+
+    private void animateProgress(View fill, TextView pct, int targetPct) {
+        if (fill == null) return;
+        fill.post(() -> {
+            int parentWidth = ((View) fill.getParent()).getWidth();
+            int targetPx = (int) (parentWidth * targetPct / 100f);
+            android.view.ViewGroup.LayoutParams lp = fill.getLayoutParams();
+            lp.width = targetPx;
+            fill.setLayoutParams(lp);
+            if (pct != null) pct.setText(targetPct + "%");
+        });
+    }
+
+    private void goToMain() {
+        startActivity(new Intent(this, MainActivity.class));
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+        finish();
     }
 
     private String readCrashFile(File f) {
@@ -131,7 +192,7 @@ public class SplashActivity extends AppCompatActivity {
             fis.close();
             return new String(data, "UTF-8");
         } catch (Exception e) {
-            return "Could not read crash file: " + e.getMessage();
+            return "Could not read crash log.";
         }
     }
 }

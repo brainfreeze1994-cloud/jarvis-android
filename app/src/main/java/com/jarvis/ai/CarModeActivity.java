@@ -320,14 +320,16 @@ public class CarModeActivity extends AppCompatActivity {
     }
 
     private void handleMusicToggle() {
-       AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
-if (am != null) {
-    am.dispatchMediaKeyEvent(
-        new android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN,
-            android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE));
-    am.dispatchMediaKeyEvent(
-        new android.view.KeyEvent(android.view.KeyEvent.ACTION_UP,
-            android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE));
+        AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
+        if (am != null) {
+            am.dispatchMediaKeyEvent(
+                new android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN,
+                    android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE));
+            am.dispatchMediaKeyEvent(
+                new android.view.KeyEvent(android.view.KeyEvent.ACTION_UP,
+                    android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE));
+        }
+        showResponse("Music toggled, sir.");
     }
 
     private void speak(String text) {

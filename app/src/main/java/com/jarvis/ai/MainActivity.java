@@ -1642,6 +1642,48 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void askJarvis(String userText) {
+        // ── HENRY Brain modules — checked FIRST before any other handler ──────
+        {
+            String bl = userText.toLowerCase(java.util.Locale.US).trim();
+            if (bl.matches(".*(open|show|launch|start).*(brain|neural map|mind map).*")
+                || bl.equals("brain") || bl.equals("henry brain") || bl.equals("open brain")) {
+                startActivity(new android.content.Intent(this, BrainActivity.class));
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "Opening your neural command center, sir.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                speak(r, "excited"); saveHistory(); return;
+            }
+            if (bl.matches(".*(mental imagery|guided visualization|visuali[sz]e|imagine a scene).*")) {
+                startActivity(new android.content.Intent(this, MentalImageryActivity.class));
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "Opening mental imagery mode, sir.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                speak(r, "warm"); saveHistory(); return;
+            }
+            if (bl.matches(".*(sensory substitution|synesthesia|color.*sound|cross.?modal).*")) {
+                startActivity(new android.content.Intent(this, SensorySubstitutionActivity.class));
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "Activating sensory substitution, sir.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                speak(r, "excited"); saveHistory(); return;
+            }
+            if (bl.matches(".*(brain train|neural plasticity|neuroplasticity|cognitive exercise|brain exercise).*")) {
+                startActivity(new android.content.Intent(this, NeuralPlasticityActivity.class));
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "Loading neural plasticity training, sir.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                speak(r, "excited"); saveHistory(); return;
+            }
+            if (bl.matches(".*(default mode|mind wander|daydream|open dmn|incubat|future self|empathy expand).*")
+                || bl.equals("reflect") || bl.equals("mind wander")) {
+                startActivity(new android.content.Intent(this, DefaultModeNetworkActivity.class));
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "Entering default mode network, sir. Let your mind expand.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                speak(r, "warm"); saveHistory(); return;
+            }
+        }
+
         // ── Reminder detection ────────────────────────────────────────────────
         String reminderReply = ReminderManager.trySchedule(this, userText);
         if (reminderReply != null) {
@@ -3397,46 +3439,6 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // ── HENRY Brain Map ─────────────────────────────────────────────────────
-        {
-            String brainLower = userText.toLowerCase(java.util.Locale.US);
-            if (brainLower.matches(".*(open|show|launch|start).*(brain|neural|mental|mind map|imagination|sensory|dmn|default mode|plasticity).*") ||
-                brainLower.equals("brain") || brainLower.equals("open brain") || brainLower.contains("henry brain")) {
-                startActivity(new android.content.Intent(this, BrainActivity.class));
-                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-                String r = "Opening your neural command center, sir.";
-                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
-                speak(r, "excited"); saveHistory(); return;
-            }
-            if (brainLower.matches(".*(mental imagery|visualization|visualize|imagine a scene|guided imagery).*")) {
-                startActivity(new android.content.Intent(this, MentalImageryActivity.class));
-                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-                String r = "Opening mental imagery mode, sir.";
-                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
-                speak(r, "warm"); saveHistory(); return;
-            }
-            if (brainLower.matches(".*(sensory substitution|cross.*modal|synesthesia|color.*sound|sound.*color).*")) {
-                startActivity(new android.content.Intent(this, SensorySubstitutionActivity.class));
-                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-                String r = "Activating sensory substitution, sir.";
-                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
-                speak(r, "excited"); saveHistory(); return;
-            }
-            if (brainLower.matches(".*(neural plasticity|brain training|brain train|cognitive|neuroplasticity|brain exercise).*")) {
-                startActivity(new android.content.Intent(this, NeuralPlasticityActivity.class));
-                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-                String r = "Loading neural plasticity training, sir.";
-                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
-                speak(r, "excited"); saveHistory(); return;
-            }
-            if (brainLower.matches(".*(default mode|mind wander|daydream|reflect|dmn|incubat|future self|empathy expand).*")) {
-                startActivity(new android.content.Intent(this, DefaultModeNetworkActivity.class));
-                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-                String r = "Entering default mode network, sir. Let your mind expand.";
-                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
-                speak(r, "warm"); saveHistory(); return;
-            }
-        }
 
         // ── Story: ask before reading aloud ───────────────────────────────────
         // Detect story requests; ask user whether HENRY should read it aloud

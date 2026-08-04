@@ -140,50 +140,55 @@ public class EarthMapActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public void fetchCountryByLatLon(double lat, double lon) {
-            // Ask HENRY which country is at these coordinates
+            // Show loading in panel immediately
+            runOnUiThread(() -> webView.evaluateJavascript(
+                "document.getElementById('panel-idle').style.display='none';" +
+                "document.getElementById('panel-content').style.display='none';" +
+                "document.getElementById('panel-loading').style.display='block';" +
+                "document.getElementById('panel-loading').textContent='🔍 Identifying country…';", null));
+
             new Thread(() -> {
                 try {
-                    String prompt = "What country or territory is located at latitude " +
-                        String.format("%.2f", lat) + "°, longitude " +
-                        String.format("%.2f", lon) + "°? Reply with ONLY the country name. If ocean, reply Ocean.";
-                    org.json.JSONArray msgs = new org.json.JSONArray();
-                    org.json.JSONObject msg = new org.json.JSONObject();
-                    msg.put("role", "user");
-                    msg.put("text", prompt);
-                    msgs.put(msg);
-                    org.json.JSONObject body = new org.json.JSONObject();
-                    body.put("messages", msgs);
-                    body.put("overrideSystem", "You are a geography expert. Answer with only the country name or Ocean.");
+                    // Step 1: identify country from lat/lon
+                    String geoPrompt = "What country or territory is at latitude " +
+                        String.format("%.2f", lat) + ", longitude " +
+                        String.format("%.2f", lon) + "? Reply with ONLY the country name. If ocean, reply: Ocean.";
+                    org.json.JSONObject geoBody = new org.json.JSONObject();
+                    geoBody.put("messages", new org.json.JSONArray().put(
+                        new org.json.JSONObject().put("role","user").put("text", geoPrompt)));
+                    geoBody.put("overrideSystem", "Geography expert. Reply only with the country name or Ocean.");
                     okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder()
-                            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                            .build();
-                    okhttp3.Request req = new okhttp3.Request.Builder()
-                            .url("https://jarvis-ai-seven-dun.vercel.app/api/jarvis")
-                            .post(okhttp3.RequestBody.create(body.toString(),
-                                    okhttp3.MediaType.parse("application/json")))
-                            .build();
-                    okhttp3.Response resp = client.newCall(req).execute();
-                    String raw = resp.body() != null ? resp.body().string() : "{}";
-                    org.json.JSONObject json = new org.json.JSONObject(raw);
-                    String country = json.optString("reply", "")
-                            .replaceAll("\\[EMOTION:[^\\]]+\\]", "").trim()
-                            .split("\n")[0].replaceAll("[*_#]", "").trim();
-                    if (!country.isEmpty() && !country.toLowerCase().contains("ocean")) {
-                        String infoPrompt = "Give a concise briefing on " + country +
-                            ": flag emoji, capital, population, history (2 sentences), culture (2 sentences), top 3 tourist spots, top 3 foods, economy (1 sentence). Use headers: HISTORY, CULTURE, TOURISM, FOOD, ECONOMY.";
-                        fetchCountryInfo(country, infoPrompt);
-                    } else {
-                        runOnUiThread(() ->
-                            webView.evaluateJavascript(
-                                "document.getElementById('panel-idle').style.display='flex';" +
-                                "document.getElementById('panel-loading').style.display='none';", null));
+                        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                        .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS).build();
+                    okhttp3.Response r1 = client.newCall(new okhttp3.Request.Builder()
+                        .url("https://jarvis-ai-seven-dun.vercel.app/api/jarvis")
+                        .post(okhttp3.RequestBody.create(geoBody.toString(),
+                            okhttp3.MediaType.parse("application/json"))).build()).execute();
+                    String raw1 = r1.body() != null ? r1.body().string() : "{}";
+                    String country = new org.json.JSONObject(raw1).optString("reply","")
+                        .replaceAll("\\[EMOTION:[^\\]]+\\]","").trim()
+                        .split("\n")[0].replaceAll("[*_#]","").trim();
+
+                    if (country.isEmpty() || country.toLowerCase().contains("ocean")) {
+                        runOnUiThread(() -> webView.evaluateJavascript(
+                            "document.getElementById('panel-loading').style.display='none';" +
+                            "document.getElementById('panel-idle').style.display='block';" +
+                            "document.getElementById('panel-idle').textContent='🌊 Ocean — tap a land area.';", null));
+                        return;
                     }
+
+                    // Step 2: send country name back to MainActivity via Intent and close
+                    final String finalCountry = country;
+                    runOnUiThread(() -> {
+                        Intent result = new Intent();
+                        result.putExtra(EXTRA_COUNTRY, finalCountry);
+                        setResult(Activity.RESULT_OK, result);
+                        finish();
+                    });
                 } catch (Exception e) {
-                    runOnUiThread(() ->
-                        webView.evaluateJavascript(
-                            "document.getElementById('panel-idle').style.display='flex';" +
-                            "document.getElementById('panel-loading').style.display='none';", null));
+                    runOnUiThread(() -> webView.evaluateJavascript(
+                        "document.getElementById('panel-loading').style.display='none';" +
+                        "document.getElementById('panel-idle').style.display='block';", null));
                 }
             }).start();
         }

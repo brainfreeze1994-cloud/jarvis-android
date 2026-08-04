@@ -1728,6 +1728,124 @@ public class MainActivity extends AppCompatActivity {
             addJarvisMsg(clean); speak(clean, "neutral"); saveHistory(); return;
         }
 
+        // ── [v15] Daily Summary ───────────────────────────────────────────────
+        if (DailySummary.isSummaryCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING);
+            addJarvisMsg("Compiling your daily summary, sir…");
+            showTyping(); saveHistory();
+            DailySummary.generate(this, history, httpClient, userProfile, new DailySummary.Callback() {
+                @Override public void onResult(String summary) {
+                    mainHandler.post(() -> {
+                        hideTyping();
+                        String clean   = stripEmotionTag(summary);
+                        String emotion = extractEmotion(summary);
+                        history.add(new HistoryItem("model", clean));
+                        addJarvisMsg(clean); speak(clean, emotion);
+                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                    });
+                }
+                @Override public void onError(String reason) {
+                    mainHandler.post(() -> {
+                        hideTyping(); addJarvisMsg(stripEmotionTag(reason));
+                        setState(OrbView.OrbState.IDLE);
+                    });
+                }
+            });
+            return;
+        }
+
+        // ── [v15] Debate Mode ─────────────────────────────────────────────────
+        if (DebateMode.isDebateCommand(userText)) {
+            String topic = DebateMode.parseTopic(userText);
+            if (!topic.isEmpty()) {
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                setState(OrbView.OrbState.THINKING);
+                addJarvisMsg("Preparing debate on **" + topic + "**, sir…");
+                showTyping(); saveHistory();
+                DebateMode.debate(topic, httpClient, userProfile, new DebateMode.Callback() {
+                    @Override public void onResult(String debate) {
+                        mainHandler.post(() -> {
+                            hideTyping();
+                            String clean   = stripEmotionTag(debate);
+                            String emotion = extractEmotion(debate);
+                            history.add(new HistoryItem("model", clean));
+                            addJarvisMsg(clean); speak("Debate ready, sir.", emotion);
+                            saveHistory(); setState(OrbView.OrbState.IDLE);
+                        });
+                    }
+                    @Override public void onError(String reason) {
+                        mainHandler.post(() -> {
+                            hideTyping(); addJarvisMsg(stripEmotionTag(reason));
+                            setState(OrbView.OrbState.IDLE);
+                        });
+                    }
+                });
+                return;
+            }
+        }
+
+        // ── [v15] Focus Mode ──────────────────────────────────────────────────
+        if (FocusMode.isFocusCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply;
+            boolean stopping = lower.contains("stop") || lower.contains("end") ||
+                               lower.contains("disable") || lower.contains("exit");
+            if (stopping && FocusMode.isActive()) {
+                reply = FocusMode.deactivate(this);
+            } else if (!stopping) {
+                reply = FocusMode.activate(this, userProfile);
+            } else {
+                reply = "[EMOTION:neutral] Focus mode isn't active, sir.";
+            }
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+
+        // ── [v15] Commands Dashboard ──────────────────────────────────────────
+        if (CommandsDashboard.isDashboardCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            // Check for category-specific request
+            String[] categories = {"AI","Weather","Maps","Finance","Health","Productivity",
+                                   "Notes","Device","Contacts","Camera","Apps","Memory"};
+            String catMatch = null;
+            for (String cat : categories)
+                if (lower.contains(cat.toLowerCase(Locale.US))) { catMatch = cat; break; }
+
+            String reply;
+            if (catMatch != null) {
+                reply = CommandsDashboard.formatCategory(catMatch);
+            } else {
+                reply = CommandsDashboard.formatSummary();
+            }
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak("Here's the command overview, sir.", "excited"); saveHistory(); return;
+        }
+
+        // ── [v15] Smart Clipboard ─────────────────────────────────────────────
+        if (ClipboardManager2.isCopyCommand(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            if (lower.contains("history") || lower.contains("what did i copy")) {
+                String hist = ClipboardManager2.getHistory(this);
+                String clean = stripEmotionTag(hist);
+                addJarvisMsg(clean); speak("Here's your clipboard history, sir.", "neutral");
+                history.add(new HistoryItem("model", clean)); saveHistory(); return;
+            }
+            // Find last HENRY message to copy
+            String lastReply = null;
+            for (int i = messages.size() - 1; i >= 0; i--) {
+                if (messages.get(i).type == Message.TYPE_JARVIS) {
+                    lastReply = messages.get(i).text; break;
+                }
+            }
+            String reply = ClipboardManager2.copy(this, lastReply, "HENRY reply");
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, extractEmotion(reply)); saveHistory(); return;
+        }
+
         // ── [v14] Notification Summary ────────────────────────────────────────
         if (NotificationSummary.isSummaryCommand(userText)) {
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);

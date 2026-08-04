@@ -3232,7 +3232,12 @@ public class MainActivity extends AppCompatActivity {
         }
         saveHistory();
         setState(OrbView.OrbState.THINKING);
-        showTyping();
+
+        // [v18] Dynamic thinking message based on intent
+        String intentType = (pendingImageBase64 != null) ? "vision"
+                          : JarvisApi.classifyIntent(userText);
+        showTypingWithHint(intentType);
+
         if (btnSend != null) btnSend.setEnabled(false);
         String imageB64 = pendingImageBase64;
         clearAttachment();
@@ -3240,12 +3245,11 @@ public class MainActivity extends AppCompatActivity {
         // Build history for API call — inject PDF text in last user message if present
         List<HistoryItem> apiHistory = new ArrayList<>(history);
         if (!effectiveUserText.equals(userText) && !apiHistory.isEmpty()) {
-            // Replace last user entry with the enriched version
             apiHistory.set(apiHistory.size() - 1, new HistoryItem("user", effectiveUserText));
         }
 
-        JarvisApi.ask(apiHistory, imageB64, responseMode, userProfile, new JarvisApi.Callback() {
-            @Override public void onSuccess(String reply, String imageUrl) {
+        JarvisApi.ask(apiHistory, imageB64, responseMode, userProfile, intentType, new JarvisApi.Callback() {
+            @Override public void onSuccess(String reply, String imageUrl, java.util.List<String> followUps) {
                 mainHandler.post(() -> {
                     hideTyping();
                     String emotion    = extractEmotion(reply);
@@ -3259,6 +3263,10 @@ public class MainActivity extends AppCompatActivity {
                     } else {
                         addJarvisMsg(cleanReply);
                         speak(cleanReply, emotion);
+                    }
+                    // [v18] Show follow-up suggestion chips if provided
+                    if (followUps != null && !followUps.isEmpty()) {
+                        showFollowUpChips(followUps);
                     }
                     saveHistory();
                     if (btnSend != null) btnSend.setEnabled(true);
@@ -3456,7 +3464,26 @@ public class MainActivity extends AppCompatActivity {
     }
     private void addJarvisMsg(String text) {
         messages.add(new Message(Message.TYPE_JARVIS, text));
-        adapter.notifyItemInserted(messages.size() - 1); scrollToBottom();
+        int pos = messages.size() - 1;
+        adapter.notifyItemInserted(pos);
+        scrollToBottom();
+        // [v18] Long-press any HENRY message to copy it
+        mainHandler.post(() -> {
+            android.view.View v = recycler.findViewHolderForAdapterPosition(pos) != null
+                ? recycler.findViewHolderForAdapterPosition(pos).itemView : null;
+            if (v != null) {
+                final String copyText = text;
+                v.setOnLongClickListener(lv -> {
+                    android.content.ClipboardManager cm =
+                        (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    if (cm != null) {
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("HENRY", copyText));
+                        android.widget.Toast.makeText(this, "Copied to clipboard", android.widget.Toast.LENGTH_SHORT).show();
+                    }
+                    return true;
+                });
+            }
+        });
     }
     private void scrollToBottom() {
         recycler.post(() -> {
@@ -3468,11 +3495,70 @@ public class MainActivity extends AppCompatActivity {
         typingPos = messages.size() - 1;
         adapter.notifyItemInserted(typingPos); scrollToBottom();
     }
+
+    // [v18] Dynamic thinking message based on intent type
+    private void showTypingWithHint(String intentType) {
+        String hint;
+        switch (intentType != null ? intentType : "chat") {
+            case "search":  hint = "Searching the web…";        break;
+            case "news":    hint = "Fetching latest news…";     break;
+            case "crypto":  hint = "Checking live prices…";     break;
+            case "forex":   hint = "Getting exchange rates…";   break;
+            case "math":    hint = "Calculating…";              break;
+            case "vision":  hint = "Analysing image…";          break;
+            case "reason":  hint = "Thinking step by step…";    break;
+            default:        hint = "Thinking…";                 break;
+        }
+        if (tvOrbHint != null) tvOrbHint.setText(hint.toUpperCase());
+        showTyping();
+    }
+
     private void hideTyping() {
         if (typingPos >= 0 && typingPos < messages.size()) {
             messages.remove(typingPos);
             adapter.notifyItemRemoved(typingPos); typingPos = -1;
         }
+        if (tvOrbHint != null) tvOrbHint.setText("WHAT CAN I DO FOR YOU, SIR?");
+    }
+
+    // [v18] Show contextual follow-up chips after HENRY replies
+    private void showFollowUpChips(java.util.List<String> suggestions) {
+        if (suggestions == null || suggestions.isEmpty()) return;
+        // Temporarily override chip 1-3 with suggestions, restore after 20s
+        int[] chipIds = { R.id.chip1, R.id.chip2, R.id.chip3 };
+        for (int i = 0; i < Math.min(suggestions.size(), chipIds.length); i++) {
+            final int idx  = i;
+            final String q = suggestions.get(i);
+            View chip = findViewById(chipIds[i]);
+            if (chip == null) continue;
+            if (chip instanceof android.widget.Button) {
+                ((android.widget.Button) chip).setText(q);
+            } else if (chip instanceof android.widget.TextView) {
+                ((android.widget.TextView) chip).setText(q);
+            }
+            chip.setOnClickListener(v -> {
+                hideWelcome();
+                // Restore chip after click
+                restoreChip(chipIds[idx], idx);
+                askJarvis(q);
+            });
+        }
+        // Auto-restore after 25 seconds
+        mainHandler.postDelayed(() -> {
+            for (int i = 0; i < chipIds.length; i++) restoreChip(chipIds[i], i);
+        }, 25000);
+    }
+
+    private void restoreChip(int chipId, int index) {
+        View chip = findViewById(chipId);
+        if (chip == null) return;
+        String text = ChipPrefs.get(this, index);
+        if (chip instanceof android.widget.Button) {
+            ((android.widget.Button) chip).setText(text);
+        } else if (chip instanceof android.widget.TextView) {
+            ((android.widget.TextView) chip).setText(text);
+        }
+        chip.setOnClickListener(v -> { hideWelcome(); askJarvis(ChipPrefs.get(this, index)); });
     }
     private void setState(OrbView.OrbState state) {
         currentState = state;

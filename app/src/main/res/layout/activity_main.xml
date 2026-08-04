@@ -6,16 +6,16 @@
     android:layout_height="match_parent"
     android:background="#020C1B">
 
-    <!-- Blue top accent line -->
+    <!-- ── Blue top accent line ── -->
     <View
         android:id="@+id/top_line"
         android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="#00BEFF"
+        android:layout_height="2dp"
+        android:background="@drawable/bg_gradient_line"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"/>
 
-    <!-- Top bar -->
+    <!-- ── Top bar ── -->
     <LinearLayout
         android:id="@+id/topbar"
         android:layout_width="match_parent"
@@ -28,36 +28,55 @@
         app:layout_constraintTop_toBottomOf="@id/top_line"
         app:layout_constraintStart_toStartOf="parent">
 
-        <TextView
-            android:id="@+id/tv_title"
+        <!-- Logo + subtitle -->
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="H.E.N.R.Y"
-            android:textColor="#00BEFF"
-            android:textSize="15sp"
-            android:letterSpacing="0.3"
-            android:fontFamily="sans-serif-medium"/>
+            android:orientation="vertical">
 
+            <TextView
+                android:id="@+id/tv_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="H·E·N·R·Y"
+                android:textColor="#00D4FF"
+                android:textSize="14sp"
+                android:letterSpacing="0.32"
+                android:fontFamily="sans-serif-medium"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="STARK INDUSTRIES"
+                android:textColor="#1E4A66"
+                android:textSize="7sp"
+                android:letterSpacing="0.18"/>
+
+        </LinearLayout>
+
+        <!-- Status badge -->
         <TextView
             android:id="@+id/tv_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="STANDBY"
             android:textColor="#004466"
-            android:textSize="9sp"
-            android:letterSpacing="0.15"
+            android:textSize="8sp"
+            android:letterSpacing="0.16"
             android:paddingHorizontal="8dp"
             android:paddingVertical="3dp"
-            android:layout_marginEnd="4dp"/>
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/bg_status_badge"/>
 
+        <!-- Voice button -->
         <TextView
             android:id="@+id/btn_voice"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="VOICE"
             android:textColor="#00BEFF"
-            android:textSize="9sp"
+            android:textSize="8sp"
             android:letterSpacing="0.1"
             android:paddingHorizontal="10dp"
             android:paddingVertical="5dp"
@@ -67,6 +86,7 @@
             android:focusable="true"
             android:contentDescription="Voice settings"/>
 
+        <!-- Clear button -->
         <ImageButton
             android:id="@+id/btn_clear"
             android:layout_width="34dp"
@@ -78,7 +98,7 @@
 
     </LinearLayout>
 
-    <!-- Divider -->
+    <!-- ── Top bar divider ── -->
     <View
         android:id="@+id/top_bar_line"
         android:layout_width="match_parent"
@@ -87,7 +107,7 @@
         app:layout_constraintTop_toBottomOf="@id/topbar"
         app:layout_constraintStart_toStartOf="parent"/>
 
-    <!-- Scrollable content -->
+    <!-- ── Scrollable content ── -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scroll_main"
         android:layout_width="match_parent"
@@ -103,75 +123,88 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Welcome / Orb section -->
+            <!-- ── ORB SECTION ── -->
             <LinearLayout
                 android:id="@+id/orb_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:paddingTop="36dp"
-                android:paddingBottom="8dp">
+                android:paddingTop="28dp"
+                android:paddingBottom="4dp">
 
-                <!-- Corner bracket frame + orb -->
+                <!-- Corner brackets + larger orb -->
                 <FrameLayout
-                    android:layout_width="180dp"
-                    android:layout_height="180dp"
+                    android:layout_width="220dp"
+                    android:layout_height="220dp"
                     android:gravity="center">
 
-                    <!-- Corner brackets — blue -->
-                    <View android:layout_width="26dp" android:layout_height="2dp"
-                        android:background="#00BEFF" android:layout_gravity="top|start"/>
-                    <View android:layout_width="2dp" android:layout_height="26dp"
-                        android:background="#00BEFF" android:layout_gravity="top|start"/>
-                    <View android:layout_width="26dp" android:layout_height="2dp"
-                        android:background="#00BEFF" android:layout_gravity="top|end"/>
-                    <View android:layout_width="2dp" android:layout_height="26dp"
-                        android:background="#00BEFF" android:layout_gravity="top|end"/>
-                    <View android:layout_width="26dp" android:layout_height="2dp"
-                        android:background="#00BEFF" android:layout_gravity="bottom|start"/>
-                    <View android:layout_width="2dp" android:layout_height="26dp"
-                        android:background="#00BEFF" android:layout_gravity="bottom|start"/>
-                    <View android:layout_width="26dp" android:layout_height="2dp"
-                        android:background="#00BEFF" android:layout_gravity="bottom|end"/>
-                    <View android:layout_width="2dp" android:layout_height="26dp"
-                        android:background="#00BEFF" android:layout_gravity="bottom|end"/>
+                    <!-- Top-left corner -->
+                    <View android:layout_width="30dp" android:layout_height="2dp"
+                        android:background="#00D4FF" android:layout_gravity="top|start"/>
+                    <View android:layout_width="2dp" android:layout_height="30dp"
+                        android:background="#00D4FF" android:layout_gravity="top|start"/>
+                    <!-- Top-right corner -->
+                    <View android:layout_width="30dp" android:layout_height="2dp"
+                        android:background="#00D4FF" android:layout_gravity="top|end"/>
+                    <View android:layout_width="2dp" android:layout_height="30dp"
+                        android:background="#00D4FF" android:layout_gravity="top|end"/>
+                    <!-- Bottom-left corner -->
+                    <View android:layout_width="30dp" android:layout_height="2dp"
+                        android:background="#00D4FF" android:layout_gravity="bottom|start"/>
+                    <View android:layout_width="2dp" android:layout_height="30dp"
+                        android:background="#00D4FF" android:layout_gravity="bottom|start"/>
+                    <!-- Bottom-right corner -->
+                    <View android:layout_width="30dp" android:layout_height="2dp"
+                        android:background="#00D4FF" android:layout_gravity="bottom|end"/>
+                    <View android:layout_width="2dp" android:layout_height="30dp"
+                        android:background="#00D4FF" android:layout_gravity="bottom|end"/>
 
+                    <!-- Decorative mid-line (horizontal scan) -->
+                    <View android:layout_width="match_parent" android:layout_height="1dp"
+                        android:background="#06203A" android:layout_gravity="center"/>
+
+                    <!-- THE ORB — larger now -->
                     <com.jarvis.ai.OrbView
                         android:id="@+id/orb_view"
-                        android:layout_width="136dp"
-                        android:layout_height="136dp"
+                        android:layout_width="176dp"
+                        android:layout_height="176dp"
                         android:layout_gravity="center"
                         android:clickable="true"
                         android:focusable="true"/>
+
                 </FrameLayout>
 
+                <!-- HENRY name -->
                 <TextView
                     android:id="@+id/tv_henry_name"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="H.E.N.R.Y"
-                    android:textColor="#00BEFF"
-                    android:textSize="30sp"
-                    android:letterSpacing="0.35"
+                    android:text="H·E·N·R·Y"
+                    android:textColor="#00D4FF"
+                    android:textSize="26sp"
+                    android:letterSpacing="0.38"
                     android:fontFamily="sans-serif-medium"
-                    android:layout_marginTop="22dp"/>
+                    android:layout_marginTop="18dp"/>
 
+                <!-- Sub-divider -->
                 <View
                     android:layout_width="300dp"
                     android:layout_height="1dp"
                     android:background="#081830"
-                    android:layout_marginTop="8dp"/>
+                    android:layout_marginTop="7dp"/>
 
+                <!-- Tagline -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="HIGHLY ENHANCED NEURAL REASONING FOR YOU"
                     android:textColor="#0A3A5A"
-                    android:textSize="8sp"
-                    android:letterSpacing="0.15"
-                    android:layout_marginTop="6dp"/>
+                    android:textSize="7sp"
+                    android:letterSpacing="0.16"
+                    android:layout_marginTop="5dp"/>
 
+                <!-- Orb status hint -->
                 <TextView
                     android:id="@+id/tv_orb_hint"
                     android:layout_width="wrap_content"
@@ -180,11 +213,17 @@
                     android:textColor="#004466"
                     android:textSize="10sp"
                     android:letterSpacing="0.1"
-                    android:layout_marginTop="18dp"/>
+                    android:layout_marginTop="14dp"/>
+
+                <!-- ── HUD TICKER ── -->
+                <com.jarvis.ai.HudTickerView
+                    android:layout_width="match_parent"
+                    android:layout_height="18dp"
+                    android:layout_marginTop="14dp"/>
 
             </LinearLayout>
 
-            <!-- Chips row 1 -->
+            <!-- ── Chips row 1 ── -->
             <LinearLayout
                 android:id="@+id/chips_row1"
                 android:layout_width="match_parent"
@@ -192,7 +231,7 @@
                 android:orientation="horizontal"
                 android:gravity="center"
                 android:paddingHorizontal="12dp"
-                android:layout_marginTop="14dp">
+                android:layout_marginTop="12dp">
 
                 <Button
                     android:id="@+id/chip1"
@@ -223,7 +262,7 @@
 
             </LinearLayout>
 
-            <!-- Chips row 2 -->
+            <!-- ── Chips row 2 ── -->
             <LinearLayout
                 android:id="@+id/chips_row2"
                 android:layout_width="match_parent"
@@ -262,7 +301,7 @@
 
             </LinearLayout>
 
-            <!-- Chips row 3 -->
+            <!-- ── Chips row 3 ── -->
             <LinearLayout
                 android:id="@+id/chips_row3"
                 android:layout_width="match_parent"
@@ -271,7 +310,7 @@
                 android:gravity="center"
                 android:paddingHorizontal="12dp"
                 android:layout_marginTop="8dp"
-                android:layout_marginBottom="14dp">
+                android:layout_marginBottom="12dp">
 
                 <Button
                     android:id="@+id/chip5"
@@ -302,7 +341,7 @@
 
             </LinearLayout>
 
-            <!-- Chat RecyclerView -->
+            <!-- ── Chat RecyclerView ── -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/recycler_chat"
                 android:layout_width="match_parent"
@@ -317,7 +356,7 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Line above input -->
+    <!-- ── Bottom divider ── -->
     <View
         android:id="@+id/bottom_bar_line"
         android:layout_width="match_parent"
@@ -326,7 +365,7 @@
         app:layout_constraintBottom_toTopOf="@id/input_container"
         app:layout_constraintStart_toStartOf="parent"/>
 
-    <!-- Input bar -->
+    <!-- ── Input bar ── -->
     <LinearLayout
         android:id="@+id/input_container"
         android:layout_width="match_parent"
@@ -394,10 +433,10 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:background="@null"
-                android:textColor="#00BEFF"
+                android:textColor="#00D4FF"
                 android:textColorHint="#0A2A3A"
                 android:textSize="13sp"
-                android:hint="Command HENRY..."
+                android:hint="Command HENRY…"
                 android:maxLines="4"
                 android:inputType="textMultiLine|textCapSentences"
                 android:imeOptions="actionSend"/>
@@ -409,7 +448,7 @@
                 android:background="@android:color/transparent"
                 android:src="@drawable/ic_mic"
                 android:contentDescription="Voice input"
-                android:tint="#00BEFF"/>
+                android:tint="#00D4FF"/>
 
             <ImageButton
                 android:id="@+id/btn_send"

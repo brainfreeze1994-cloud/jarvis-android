@@ -3233,16 +3233,33 @@ public class MainActivity extends AppCompatActivity {
         saveHistory();
         setState(OrbView.OrbState.THINKING);
 
+        // [v20] Emotion detection — adapt orb hint and tell backend
+        EmotionDetector.EmotionalState userEmotion = EmotionDetector.detect(userText);
+        String emotionStr = EmotionDetector.toApiString(userEmotion);
+        String emotionHint = EmotionDetector.getOrbHint(userEmotion, "PROCESSING…");
+        if (tvOrbHint != null) tvOrbHint.setText(emotionHint);
+
+        // [v20] Relationship learning
+        RelationshipBrain.learnFromMessage(this, userText);
+
+        // [v20] Dubai transit detection — add deep-link buttons after response
+        final boolean isTransit = DubaiTransitHelper.isTransitQuery(userText);
+        final boolean isLegal   = UAELawHelper.isLegalQuery(userText);
+        final String[] transitRoute = isTransit ? DubaiTransitHelper.extractRoute(userText) : null;
+        final UAELawHelper.LegalCategory legalCat = isLegal ? UAELawHelper.classify(userText) : null;
+
         // [v18] Dynamic thinking message based on intent
         String intentType = (pendingImageBase64 != null) ? "vision"
-                          : JarvisApi.classifyIntent(userText);
+                : isTransit ? "transit"
+                : isLegal   ? "legal"
+                : JarvisApi.classifyIntent(userText);
         showTypingWithHint(intentType);
 
         if (btnSend != null) btnSend.setEnabled(false);
         String imageB64 = pendingImageBase64;
         clearAttachment();
 
-        // Build history for API call — inject PDF text in last user message if present
+        // Build history for API call
         List<HistoryItem> apiHistory = new ArrayList<>(history);
         if (!effectiveUserText.equals(userText) && !apiHistory.isEmpty()) {
             apiHistory.set(apiHistory.size() - 1, new HistoryItem("user", effectiveUserText));
@@ -3251,13 +3268,24 @@ public class MainActivity extends AppCompatActivity {
         // [v19] Auto-learn from user message before sending
         SmartMemory.learnFromMessage(this, userText);
 
-        JarvisApi.ask(apiHistory, imageB64, responseMode, userProfile, intentType, this, new JarvisApi.Callback() {
+        // [v20] Build relationship context for backend
+        String relCtx = RelationshipBrain.buildContext(this);
+
+        // [v20] Determine if tournament or chain thinking needed
+        boolean useTournament = isImportantQuery(userText);
+        boolean useChain      = isDeepReasoningQuery(userText);
+
+        JarvisApi.askV20(apiHistory, imageB64, responseMode, userProfile, intentType,
+                this, emotionStr, relCtx.isEmpty() ? null : relCtx,
+                useTournament, useChain,
+                new JarvisApi.Callback() {
             @Override public void onSuccess(String reply, String imageUrl, java.util.List<String> followUps) {
                 mainHandler.post(() -> {
                     hideTyping();
                     String emotion    = extractEmotion(reply);
                     String cleanReply = stripEmotionTag(reply);
                     history.add(new HistoryItem("model", cleanReply));
+
                     if (imageUrl != null && !imageUrl.isEmpty()) {
                         messages.add(new Message(Message.TYPE_URL_IMAGE, cleanReply, null, imageUrl));
                         adapter.notifyItemInserted(messages.size() - 1);
@@ -3267,12 +3295,27 @@ public class MainActivity extends AppCompatActivity {
                         addJarvisMsg(cleanReply);
                         speak(cleanReply, emotion);
                     }
-                    // [v18] Show follow-up suggestion chips if provided
+
+                    // [v20] Transit action buttons
+                    if (isTransit) {
+                        showTransitActions(transitRoute);
+                    }
+
+                    // [v20] Legal action button
+                    if (isLegal && legalCat != null) {
+                        showLegalAction(legalCat);
+                    }
+
+                    // [v18] Follow-up chips
                     if (followUps != null && !followUps.isEmpty()) {
                         showFollowUpChips(followUps);
                     }
+
                     saveHistory();
                     if (btnSend != null) btnSend.setEnabled(true);
+
+                    // [v20] Update orb mood after response
+                    updateMoodOrb();
                 });
             }
             @Override public void onError(String error) {
@@ -3510,6 +3553,8 @@ public class MainActivity extends AppCompatActivity {
             case "math":    hint = "Calculating…";              break;
             case "vision":  hint = "Analysing image…";          break;
             case "reason":  hint = "Thinking step by step…";    break;
+            case "transit": hint = "Planning your route…";      break;
+            case "legal":   hint = "Checking UAE law…";         break;
             default:        hint = "Thinking…";                 break;
         }
         if (tvOrbHint != null) tvOrbHint.setText(hint.toUpperCase());
@@ -3541,15 +3586,118 @@ public class MainActivity extends AppCompatActivity {
             }
             chip.setOnClickListener(v -> {
                 hideWelcome();
-                // Restore chip after click
                 restoreChip(chipIds[idx], idx);
-                askJarvis(q);
+                // [v20] Route special actions differently
+                if (q.startsWith("🗺") || q.startsWith("🚌") || q.startsWith("🚕")
+                    || q.startsWith("📋") || q.startsWith("📞") || q.startsWith("📝")) {
+                    handleSpecialChipAction(q);
+                } else {
+                    askJarvis(q);
+                }
             });
         }
         // Auto-restore after 25 seconds
         mainHandler.postDelayed(() -> {
             for (int i = 0; i < chipIds.length; i++) restoreChip(chipIds[i], i);
         }, 25000);
+    }
+
+    // ── v20: Transit action buttons after transit response ────────────────────
+    private void showTransitActions(String[] route) {
+        final String origin = (route != null && route.length > 0) ? route[0] : "";
+        final String dest   = (route != null && route.length > 1) ? route[1] : "";
+        if (dest.isEmpty() && origin.isEmpty()) return;
+
+        String actionMsg = "**Quick actions:**";
+        addJarvisMsg(actionMsg);
+
+        // Build a chip row for transit options
+        final String finalDest = dest.isEmpty() ? origin : dest;
+        final String finalOrigin = origin;
+        java.util.List<String> actions = new java.util.ArrayList<>();
+        actions.add("🗺 Open Google Maps");
+        actions.add("🚌 RTA Journey Planner");
+        actions.add("🚕 Book Careem");
+        showFollowUpChips(actions);
+    }
+
+    // ── v20: UAE Law complaint button ─────────────────────────────────────────
+    private void showLegalAction(UAELawHelper.LegalCategory cat) {
+        java.util.List<String> actions = new java.util.ArrayList<>();
+        actions.add("📋 File complaint with " + UAELawHelper.getPortalName(cat));
+        actions.add("📞 Hotline: " + UAELawHelper.getHotline(cat));
+        actions.add("📝 Draft a formal notice");
+        showFollowUpChips(actions);
+    }
+
+    // ── v20: Handle transit/legal chip actions ────────────────────────────────
+    private void handleSpecialChipAction(String text) {
+        if (text.contains("Google Maps")) {
+            // Try to extract last asked route from history
+            String lastUserMsg = "";
+            for (int i = history.size()-1; i >= 0; i--) {
+                if ("user".equals(history.get(i).role)) { lastUserMsg = history.get(i).text; break; }
+            }
+            String[] route = DubaiTransitHelper.extractRoute(lastUserMsg);
+            String origin = route != null && route.length > 0 ? route[0] : "";
+            String dest   = route != null && route.length > 1 ? route[1] : (route != null ? route[0] : "Dubai Mall");
+            DubaiTransitHelper.openGoogleMapsTransit(this, origin, dest);
+        } else if (text.contains("RTA Journey")) {
+            DubaiTransitHelper.openRtaJourneyPlanner(this);
+        } else if (text.contains("Careem")) {
+            String lastUserMsg = "";
+            for (int i = history.size()-1; i >= 0; i--) {
+                if ("user".equals(history.get(i).role)) { lastUserMsg = history.get(i).text; break; }
+            }
+            String[] route = DubaiTransitHelper.extractRoute(lastUserMsg);
+            String dest = route != null && route.length > 1 ? route[1] : "Dubai";
+            DubaiTransitHelper.openCareem(this, dest);
+        } else if (text.contains("File complaint")) {
+            // Extract category from button text and open portal
+            UAELawHelper.LegalCategory cat = UAELawHelper.LegalCategory.GENERAL;
+            if (text.contains("RERA")) cat = UAELawHelper.LegalCategory.TENANCY;
+            else if (text.contains("MOHRE")) cat = UAELawHelper.LegalCategory.LABOUR;
+            else if (text.contains("DED")) cat = UAELawHelper.LegalCategory.CONSUMER;
+            else if (text.contains("RTA")) cat = UAELawHelper.LegalCategory.TRAFFIC;
+            else if (text.contains("CBUAE")) cat = UAELawHelper.LegalCategory.FINANCIAL;
+            UAELawHelper.openComplaintPortal(this, cat);
+        } else if (text.contains("Hotline:")) {
+            String number = text.replaceAll(".*Hotline:\\s*","").trim().replaceAll("[^0-9]","");
+            if (!number.isEmpty()) {
+                startActivity(new android.content.Intent(android.content.Intent.ACTION_DIAL,
+                    android.net.Uri.parse("tel:" + number)));
+            }
+        } else if (text.contains("Draft a formal")) {
+            askJarvis("Please draft a formal legal notice letter for my situation");
+        } else {
+            // Default — treat as normal chat
+            askJarvis(text);
+        }
+    }
+
+    // ── v20: Update orb accent color based on HENRY's mood ───────────────────
+    private void updateMoodOrb() {
+        HenryMood.Mood mood = HenryMood.getCurrentMood();
+        // Orb hint phrase
+        String phrase = HenryMood.getStatusPhrase(mood);
+        if (tvOrbHint != null && appState == OrbView.OrbState.IDLE) {
+            tvOrbHint.setText(phrase);
+        }
+    }
+
+    // ── v20: Detect if query warrants multi-model tournament ─────────────────
+    private boolean isImportantQuery(String text) {
+        if (text == null) return false;
+        String t = text.toLowerCase(Locale.US);
+        return t.matches(".*\\b(should i invest|is it safe|medical|diagnosis|symptoms|treatment|doctor|hospital|legal advice|court|financial decision|mortgage|loan|insurance|life-changing|career|should i quit|should i move)\\b.*");
+    }
+
+    // ── v20: Detect deep reasoning query ─────────────────────────────────────
+    private boolean isDeepReasoningQuery(String text) {
+        if (text == null) return false;
+        String t = text.toLowerCase(Locale.US);
+        return t.matches(".*\\b(explain deeply|step by step|walk me through|break it down|analyse|analyze in detail|compare thoroughly|pros and cons of|help me understand|how exactly does)\\b.*")
+            && text.length() > 40;
     }
 
     private void restoreChip(int chipId, int index) {

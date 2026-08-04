@@ -955,7 +955,7 @@ public class MainActivity extends AppCompatActivity {
                 List<HistoryItem> transHistory = new ArrayList<>();
                 transHistory.add(new HistoryItem("user", prompt));
                 JarvisApi.ask(transHistory, null, MODE_DETAILED, userProfile, new JarvisApi.Callback() {
-                    @Override public void onSuccess(String reply, String imageUrl) {
+                    @Override public void onSuccess(String reply, String imageUrl, java.util.List<String> followUps) {
                         mainHandler.post(() -> {
                             hideTyping();
                             String clean = stripEmotionTag(reply);
@@ -1249,7 +1249,7 @@ public class MainActivity extends AppCompatActivity {
                         List<HistoryItem> scanHist = new ArrayList<>();
                         scanHist.add(new HistoryItem("user", prompt));
                         JarvisApi.ask(scanHist, null, responseMode, userProfile, new JarvisApi.Callback() {
-                            @Override public void onSuccess(String reply, String imageUrl) {
+                            @Override public void onSuccess(String reply, String imageUrl, java.util.List<String> followUps) {
                                 mainHandler.post(() -> {
                                     hideTyping();
                                     String clean   = stripEmotionTag(reply);
@@ -1301,7 +1301,7 @@ public class MainActivity extends AppCompatActivity {
                             h2.add(new HistoryItem("user", prompt));
                             showTyping();
                             JarvisApi.ask(h2, null, responseMode, userProfile, new JarvisApi.Callback() {
-                                @Override public void onSuccess(String reply, String imageUrl) {
+                                @Override public void onSuccess(String reply, String imageUrl, java.util.List<String> followUps) {
                                     mainHandler.post(() -> {
                                         hideTyping();
                                         String clean = stripEmotionTag(reply);
@@ -2768,7 +2768,7 @@ public class MainActivity extends AppCompatActivity {
                     List<HistoryItem> screenHist = new ArrayList<>();
                     screenHist.add(new HistoryItem("user", prompt));
                     JarvisApi.ask(screenHist, null, MODE_BALANCED, userProfile, new JarvisApi.Callback() {
-                        @Override public void onSuccess(String reply, String imageUrl) {
+                        @Override public void onSuccess(String reply, String imageUrl, java.util.List<String> followUps) {
                             mainHandler.post(() -> {
                                 hideTyping();
                                 String clean   = stripEmotionTag(reply);

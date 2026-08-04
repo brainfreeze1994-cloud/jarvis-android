@@ -1,164 +1,92 @@
 package com.jarvis.ai;
 
-import android.content.Context;
-import android.content.SharedPreferences;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import java.util.Locale;
 
 /**
- * RelationshipBrain — HENRY remembers every person you mention.
- * "My boss Sarah said..." → Boss = Sarah
- * "My wife loves Italian" → Stored for future reference
- * "Draft an email to Sarah" → HENRY knows Sarah is your boss, adjusts tone
+ * EmotionDetector — reads HOW the user types and classifies their emotional state.
+ * HENRY responds differently based on detected emotion.
  */
-public class RelationshipBrain {
+public class EmotionDetector {
 
-    private static final String PREFS    = "henry_relationships";
-    private static final String KEY_REL  = "relationships";
-    private static final int    MAX_REL  = 40;
-
-    public static class Person {
-        public String name;
-        public String relationship; // boss, wife, friend, etc.
-        public String notes;        // extra details learned over time
-        public String lastMentioned;
+    public enum EmotionalState {
+        NORMAL, FRUSTRATED, STRESSED, SAD, EXCITED
     }
 
-    // ── Auto-extract from user message ────────────────────────────────────
-    public static void learnFromMessage(Context ctx, String msg) {
-        if (msg == null || msg.length() < 5) return;
-        String lower = msg.toLowerCase(Locale.US);
+    public static EmotionalState detect(String text) {
+        if (text == null || text.isEmpty()) return EmotionalState.NORMAL;
 
-        // "My boss/wife/friend [Name]..."
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
-            "(?:my|the)\\s+(boss|wife|husband|girlfriend|boyfriend|partner|friend|brother|sister|mother|father|mum|dad|son|daughter|colleague|manager|team|assistant|doctor|lawyer|neighbour|landlord)\\s+(?:is\\s+)?([A-Z][a-z]{1,20})",
-            java.util.regex.Pattern.CASE_INSENSITIVE
-        ).matcher(msg);
+        String lower = text.toLowerCase(Locale.US);
+        int words    = text.trim().split("\\s+").length;
 
-        while (m.find()) {
-            String rel  = m.group(1).toLowerCase(Locale.US);
-            String name = m.group(2);
-            savePerson(ctx, name, rel, "");
+        // Count caps ratio
+        int letters = 0, caps = 0;
+        for (char c : text.toCharArray()) {
+            if (Character.isLetter(c)) { letters++; if (Character.isUpperCase(c)) caps++; }
+        }
+        float capsRatio = letters > 0 ? (float) caps / letters : 0;
+
+        // Count exclamations
+        int excl = 0;
+        for (char c : text.toCharArray()) if (c == '!') excl++;
+
+        // FRUSTRATED — mostly caps, angry words, or multiple exclamations
+        if (capsRatio > 0.55f && letters > 5) return EmotionalState.FRUSTRATED;
+        if (excl > 2) return EmotionalState.FRUSTRATED;
+        if (containsAny(lower, "hate", "terrible", "worst", "stupid", "useless", "idiot",
+                "broken", "garbage", "trash", "ridiculous", "awful", "horrible")) {
+            return EmotionalState.FRUSTRATED;
         }
 
-        // "email/call/text/message [Name]" — likely a known contact
-        java.util.regex.Matcher m2 = java.util.regex.Pattern.compile(
-            "(?:email|call|text|message|WhatsApp|contact)\\s+([A-Z][a-z]{1,20})",
-            java.util.regex.Pattern.CASE_INSENSITIVE
-        ).matcher(msg);
-        while (m2.find()) {
-            String name = m2.group(1);
-            // Only save if not a common verb
-            if (!name.toLowerCase(Locale.US).matches("me|him|her|them|you|us|back|again|now|soon")) {
-                savePerson(ctx, name, "contact", "");
-            }
+        // STRESSED — urgent/desperate keywords, or very short panicked messages
+        if (containsAny(lower, "stressed", "overwhelmed", "can't cope", "help me",
+                "urgent", "emergency", "asap", "panic", "freaking out", "losing my mind",
+                "don't know what to do", "please help", "need help now")) {
+            return EmotionalState.STRESSED;
+        }
+        if (words <= 4 && lower.endsWith("?") && containsAny(lower, "how","what","why","help","fix")) {
+            return EmotionalState.STRESSED;
+        }
+
+        // SAD — sadness keywords
+        if (containsAny(lower, "sad", "depressed", "lonely", "crying", "alone",
+                "hopeless", "worthless", "tired of", "exhausted", "can't take it",
+                "give up", "miss you", "heartbroken", "devastated")) {
+            return EmotionalState.SAD;
+        }
+
+        // EXCITED — positive high-energy
+        if (containsAny(lower, "amazing", "awesome", "excited", "love it", "fantastic",
+                "great news", "finally", "cant wait", "can't wait", "thrilled",
+                "so happy", "yay", "yes!!", "let's go", "incredible")) {
+            return EmotionalState.EXCITED;
+        }
+
+        return EmotionalState.NORMAL;
+    }
+
+    public static String toApiString(EmotionalState state) {
+        switch (state) {
+            case FRUSTRATED: return "frustrated";
+            case STRESSED:   return "stressed";
+            case SAD:        return "sad";
+            case EXCITED:    return "excited";
+            default:         return "normal";
         }
     }
 
-    // ── Save a person ─────────────────────────────────────────────────────
-    public static void savePerson(Context ctx, String name, String relationship, String notes) {
-        try {
-            JSONArray arr = load(ctx);
-            // Update if exists
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject o = arr.getJSONObject(i);
-                if (o.getString("name").equalsIgnoreCase(name)) {
-                    if (relationship != null && !relationship.isEmpty() && !relationship.equals("contact"))
-                        o.put("relationship", relationship);
-                    if (notes != null && !notes.isEmpty())
-                        o.put("notes", o.optString("notes","") + "; " + notes);
-                    o.put("lastMentioned", today());
-                    save(ctx, arr);
-                    return;
-                }
-            }
-            // New person
-            JSONObject o = new JSONObject();
-            o.put("name", name);
-            o.put("relationship", relationship);
-            o.put("notes", notes != null ? notes : "");
-            o.put("lastMentioned", today());
-            arr.put(o);
-            if (arr.length() > MAX_REL) arr.remove(0);
-            save(ctx, arr);
-        } catch (Exception ignored) {}
+    /** Get a short display label for the orb status hint */
+    public static String getOrbHint(EmotionalState state, String defaultHint) {
+        switch (state) {
+            case FRUSTRATED: return "I HEAR YOU, SIR. LET'S FIX THIS.";
+            case STRESSED:   return "FOCUS. I'VE GOT YOU, SIR.";
+            case SAD:        return "I'M HERE, SIR. ALWAYS.";
+            case EXCITED:    return "EXCELLENT NEWS, SIR!";
+            default:         return defaultHint;
+        }
     }
 
-    // ── Build context string for API ──────────────────────────────────────
-    public static String buildContext(Context ctx) {
-        try {
-            JSONArray arr = load(ctx);
-            if (arr.length() == 0) return "";
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject o = arr.getJSONObject(i);
-                String name = o.optString("name","");
-                String rel  = o.optString("relationship","contact");
-                String notes= o.optString("notes","");
-                sb.append(name).append(" = user's ").append(rel);
-                if (!notes.isEmpty()) sb.append(" (").append(notes).append(")");
-                sb.append("; ");
-            }
-            return sb.toString().trim();
-        } catch (Exception e) { return ""; }
-    }
-
-    // ── Get context around a specific name ────────────────────────────────
-    public static String lookupPerson(Context ctx, String query) {
-        try {
-            JSONArray arr = load(ctx);
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject o = arr.getJSONObject(i);
-                if (o.optString("name","").equalsIgnoreCase(query)) {
-                    return o.optString("name") + " is user's " + o.optString("relationship","contact")
-                        + (o.optString("notes","").isEmpty() ? "" : ". " + o.optString("notes"));
-                }
-            }
-        } catch (Exception e) {}
-        return null;
-    }
-
-    // ── List all people ───────────────────────────────────────────────────
-    public static String getSummary(Context ctx) {
-        try {
-            JSONArray arr = load(ctx);
-            if (arr.length() == 0)
-                return "[EMOTION:neutral] I haven't learned about the people in your life yet, sir. Mention someone and I'll remember them.";
-            StringBuilder sb = new StringBuilder("[EMOTION:warm]\n**People HENRY knows about:**\n\n");
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject o = arr.getJSONObject(i);
-                sb.append("• **").append(o.optString("name")).append("** — ").append(o.optString("relationship","contact"));
-                if (!o.optString("notes","").isEmpty()) sb.append(" — ").append(o.optString("notes"));
-                sb.append("\n");
-            }
-            return sb.toString();
-        } catch (Exception e) { return "[EMOTION:neutral] Memory error, sir."; }
-    }
-
-    public static void forgetPerson(Context ctx, String name) {
-        try {
-            JSONArray arr = load(ctx), updated = new JSONArray();
-            for (int i = 0; i < arr.length(); i++) {
-                JSONObject o = arr.getJSONObject(i);
-                if (!o.optString("name","").equalsIgnoreCase(name)) updated.put(o);
-            }
-            save(ctx, updated);
-        } catch (Exception ignored) {}
-    }
-
-    public static void clearAll(Context ctx) {
-        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(KEY_REL).apply();
-    }
-
-    private static JSONArray load(Context ctx) {
-        try { return new JSONArray(ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_REL,"[]")); }
-        catch (Exception e) { return new JSONArray(); }
-    }
-    private static void save(Context ctx, JSONArray arr) {
-        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_REL, arr.toString()).apply();
-    }
-    private static String today() {
-        return new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new java.util.Date());
+    private static boolean containsAny(String text, String... keywords) {
+        for (String kw : keywords) if (text.contains(kw)) return true;
+        return false;
     }
 }

@@ -352,6 +352,12 @@ public class MainActivity extends AppCompatActivity {
         if (btnAttach != null) btnAttach.setOnClickListener(v -> showAttachDialog());
 
         // 🌍 Earth Map button
+        // 🧠 Brain button
+        android.widget.TextView btnBrain = findViewById(R.id.btn_brain);
+        if (btnBrain != null) btnBrain.setOnClickListener(v ->
+            startActivity(new android.content.Intent(this, BrainActivity.class)));
+
+        // 🌍 Earth Map button
         android.widget.TextView btnEarthMap = findViewById(R.id.btn_earth_map);
         if (btnEarthMap != null) btnEarthMap.setOnClickListener(v -> openEarthMap(null));
 

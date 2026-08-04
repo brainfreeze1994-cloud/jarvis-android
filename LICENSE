@@ -1,0 +1,124 @@
+H·E·N·R·Y™ PROPRIETARY LICENSE
+Hyperintelligence Engine Neural Reasoning Yield — Android Edition
+
+Copyright © 2026 H·E·N·R·Y Project. All rights reserved.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TRADEMARK NOTICE
+
+"H·E·N·R·Y", "HENRY", "Hyperintelligence Engine Neural
+Reasoning Yield", the H·E·N·R·Y orb design, the blue color
+scheme, and all associated branding are trademarks (™) of
+their creator. All rights reserved worldwide.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+TERMS & CONDITIONS
+
+1. OWNERSHIP
+   All source code, Java classes, XML layouts, drawable
+   resources, documentation, and intellectual property
+   in this repository are the exclusive property of the
+   H·E·N·R·Y Project creator. This includes but is not
+   limited to all 109 Java classes, UI designs, the
+   OrbView animation system, HenryBrainView, and the
+   H·E·N·R·Y personality and system design.
+
+2. PERMITTED USE
+   ✓ Personal, non-commercial use on your own device
+   ✓ Building and running the APK for personal use
+   ✓ Studying the code for educational purposes
+
+3. PROHIBITED USE
+   The following are strictly prohibited without explicit
+   written permission from the owner:
+
+   ✗ Commercial use, sale, or monetization of H·E·N·R·Y
+     or any derivative work
+   ✗ Redistribution of the APK or source code, in whole
+     or in part, on any platform including app stores
+   ✗ Publishing to Google Play, Samsung Galaxy Store,
+     Huawei AppGallery, or any other marketplace
+   ✗ Creating competing products based on this codebase
+   ✗ Removing, altering, or obscuring copyright notices
+   ✗ Using the H·E·N·R·Y name, orb logo, or branding
+     in any other project or product
+   ✗ Cloning this repository and publishing under a
+     different name or identity
+   ✗ Sublicensing or transferring any rights herein
+
+4. THIRD-PARTY COMPONENTS
+   This application uses the following third-party
+   services and libraries, each governed by their own
+   terms of service and licenses:
+
+   • Groq API          — groq.com/legal
+   • Cloudflare AI     — cloudflare.com/terms
+   • Microsoft Edge TTS— microsoft.com/en-us/legal
+   • Pollinations.ai   — pollinations.ai
+   • Google ML Kit     — Apache License 2.0
+   • OkHttp            — Apache License 2.0
+   • Gson              — Apache License 2.0
+   • AndroidX          — Apache License 2.0
+   • CameraX           — Apache License 2.0
+   • DuckDuckGo Search — duckduckgo.com/privacy
+   • wttr.in Weather   — wttr.in
+   • OpenStreetMap     — ODbL License
+
+   The H·E·N·R·Y Project claims no ownership over these
+   services. Their use is subject to their respective
+   free-tier terms and rate limits.
+
+5. APK DISTRIBUTION
+   The compiled APK file may only be distributed to
+   yourself and for personal use. Sharing the APK
+   publicly — including on websites, social media,
+   file-sharing platforms, or messaging groups — is
+   prohibited without written permission.
+
+6. DATA & PRIVACY
+   H·E·N·R·Y stores the following data locally on device:
+   • Chat history (SharedPreferences)
+   • Memory facts (SharedPreferences)
+   • User profile (SharedPreferences)
+   • Voice journal entries (local files)
+   • Expense logs (SharedPreferences)
+
+   No personal data is transmitted to third parties
+   except as required to call AI APIs (Groq, Cloudflare)
+   for generating responses. API calls contain only the
+   text/image you send.
+
+7. NO WARRANTY
+   This software is provided "as is", without warranty
+   of any kind, express or implied. The creator is not
+   liable for any damages, data loss, device issues, or
+   other consequences arising from the use or inability
+   to use this software.
+
+8. GOVERNING LAW
+   This license is governed by the laws of the United
+   Arab Emirates. Any disputes shall be subject to the
+   exclusive jurisdiction of the courts of Dubai, UAE.
+
+9. CONTACT & PERMISSIONS
+   For licensing inquiries, commercial use permissions,
+   partnership proposals, or any questions regarding
+   this license, contact the H·E·N·R·Y Project owner
+   directly through this GitHub repository.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ACKNOWLEDGMENT
+
+By downloading, installing, building, or using the
+H·E·N·R·Y Android application, you acknowledge that you
+have read, understood, and agree to be bound by the
+terms of this license.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+H·E·N·R·Y™ — Hyperintelligence Engine Neural Reasoning Yield
+Android Edition · Version 23.0.0
+© 2026 H·E·N·R·Y Project · All Rights Reserved

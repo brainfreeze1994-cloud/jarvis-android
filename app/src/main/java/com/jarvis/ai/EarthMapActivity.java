@@ -137,6 +137,56 @@ public class EarthMapActivity extends AppCompatActivity {
                 }
             }).start();
         }
+
+        @JavascriptInterface
+        public void fetchCountryByLatLon(double lat, double lon) {
+            // Ask HENRY which country is at these coordinates
+            new Thread(() -> {
+                try {
+                    String prompt = "What country or territory is located at latitude " +
+                        String.format("%.2f", lat) + "°, longitude " +
+                        String.format("%.2f", lon) + "°? Reply with ONLY the country name. If ocean, reply Ocean.";
+                    org.json.JSONArray msgs = new org.json.JSONArray();
+                    org.json.JSONObject msg = new org.json.JSONObject();
+                    msg.put("role", "user");
+                    msg.put("text", prompt);
+                    msgs.put(msg);
+                    org.json.JSONObject body = new org.json.JSONObject();
+                    body.put("messages", msgs);
+                    body.put("overrideSystem", "You are a geography expert. Answer with only the country name or Ocean.");
+                    okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder()
+                            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                            .build();
+                    okhttp3.Request req = new okhttp3.Request.Builder()
+                            .url("https://jarvis-ai-seven-dun.vercel.app/api/jarvis")
+                            .post(okhttp3.RequestBody.create(body.toString(),
+                                    okhttp3.MediaType.parse("application/json")))
+                            .build();
+                    okhttp3.Response resp = client.newCall(req).execute();
+                    String raw = resp.body() != null ? resp.body().string() : "{}";
+                    org.json.JSONObject json = new org.json.JSONObject(raw);
+                    String country = json.optString("reply", "")
+                            .replaceAll("\\[EMOTION:[^\\]]+\\]", "").trim()
+                            .split("\n")[0].replaceAll("[*_#]", "").trim();
+                    if (!country.isEmpty() && !country.toLowerCase().contains("ocean")) {
+                        String infoPrompt = "Give a concise briefing on " + country +
+                            ": flag emoji, capital, population, history (2 sentences), culture (2 sentences), top 3 tourist spots, top 3 foods, economy (1 sentence). Use headers: HISTORY, CULTURE, TOURISM, FOOD, ECONOMY.";
+                        fetchCountryInfo(country, infoPrompt);
+                    } else {
+                        runOnUiThread(() ->
+                            webView.evaluateJavascript(
+                                "document.getElementById('panel-idle').style.display='flex';" +
+                                "document.getElementById('panel-loading').style.display='none';", null));
+                    }
+                } catch (Exception e) {
+                    runOnUiThread(() ->
+                        webView.evaluateJavascript(
+                            "document.getElementById('panel-idle').style.display='flex';" +
+                            "document.getElementById('panel-loading').style.display='none';", null));
+                }
+            }).start();
+        }
     }
 
     @Override
@@ -467,14 +517,17 @@ public class EarthMapActivity extends AppCompatActivity {
         "  var hits=raycaster.intersectObject(globe);" +
         "  if(!hits.length) return;" +
         "  var uv=hits[0].uv;" +
-        "  var lon=(uv.x-0.5)*360, lat=(uv.y-0.5)*-180;" +
-        "  var found=null;" +
-        "  REGIONS.forEach(function(r){" +
-        "    if(lat>=r.la[0]&&lat<=r.la[1]&&lon>=r.lo[0]&&lon<=r.lo[1]) found=r;" +
-        "  });" +
-        "  if(found){selectedCountry=found; loadCountryInfo(found.n);}" +
-        "  else if(lat>65) loadCountryInfo('Arctic Ocean');" +
-        "  else if(lat<-60) loadCountryInfo('Antarctica');" +
+        "  var lon=(uv.x-0.5)*360, lat=(uv.y-0.5)*180;" +
+        "  try{ HenryGlobe.fetchCountryByLatLon(lat, lon); }" +
+        "  catch(e){" +
+        "    var found=null;" +
+        "    REGIONS.forEach(function(r){" +
+        "      if(lat>=r.la[0]&&lat<=r.la[1]&&lon>=r.lo[0]&&lon<=r.lo[1]) found=r;" +
+        "    });" +
+        "    if(found){selectedCountry=found; loadCountryInfo(found.n);}" +
+        "    else if(lat>65) loadCountryInfo('Arctic Ocean');" +
+        "    else if(lat<-60) loadCountryInfo('Antarctica');" +
+        "  }" +
         "}" +
 
         // Load country info via Android bridge

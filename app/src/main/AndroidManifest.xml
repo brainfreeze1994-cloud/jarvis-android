@@ -84,6 +84,18 @@
             android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
+        <!-- 🚀 Space Command Activity -->
+        <activity android:name=".SpaceActivity" android:exported="false"
+            android:screenOrientation="portrait" android:theme="@style/Theme.Jarvis"/>
+
+        <!-- 📈 Live Markets Activity -->
+        <activity android:name=".MarketsActivity" android:exported="false"
+            android:screenOrientation="portrait" android:theme="@style/Theme.Jarvis"/>
+
+        <!-- 🌐 Earth Radar Activity -->
+        <activity android:name=".EarthRadarActivity" android:exported="false"
+            android:screenOrientation="portrait" android:theme="@style/Theme.Jarvis"/>
+
         <!-- ✈ Flight Tracker Activity -->
         <activity
             android:name=".FlightActivity"

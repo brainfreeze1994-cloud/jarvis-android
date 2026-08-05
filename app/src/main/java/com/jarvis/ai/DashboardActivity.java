@@ -100,7 +100,7 @@ public class DashboardActivity extends AppCompatActivity {
         // Close button
         Button close = new Button(this);
         close.setText("← BACK TO HENRY");
-        close.setBackgroundColor(0xFF00D4FF22);
+        close.setBackgroundColor(0x2200D4FF);
         close.setTextColor(0xFF00D4FF);
         close.setTextSize(13f);
         close.setPadding(0, 20, 0, 20);

@@ -86,6 +86,62 @@
             android:focusable="true"
             android:contentDescription="Voice settings"/>
 
+        <!-- Space Command button -->
+        <TextView
+            android:id="@+id/btn_space"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🚀"
+            android:textSize="20sp"
+            android:paddingHorizontal="5dp"
+            android:paddingVertical="4dp"
+            android:layout_marginEnd="2dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Space Command"/>
+
+        <!-- Live Markets button -->
+        <TextView
+            android:id="@+id/btn_markets"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📈"
+            android:textSize="20sp"
+            android:paddingHorizontal="5dp"
+            android:paddingVertical="4dp"
+            android:layout_marginEnd="2dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Live Markets"/>
+
+        <!-- Earth Radar button -->
+        <TextView
+            android:id="@+id/btn_earth_radar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🌐"
+            android:textSize="20sp"
+            android:paddingHorizontal="5dp"
+            android:paddingVertical="4dp"
+            android:layout_marginEnd="2dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Earth Radar"/>
+
+        <!-- Flight Tracker button -->
+        <TextView
+            android:id="@+id/btn_flight"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="✈"
+            android:textSize="20sp"
+            android:paddingHorizontal="5dp"
+            android:paddingVertical="4dp"
+            android:layout_marginEnd="2dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Flight Tracker"/>
+
         <!-- Brain button -->
         <TextView
             android:id="@+id/btn_brain"
@@ -93,9 +149,9 @@
             android:layout_height="wrap_content"
             android:text="🧠"
             android:textSize="20sp"
-            android:paddingHorizontal="6dp"
+            android:paddingHorizontal="5dp"
             android:paddingVertical="4dp"
-            android:layout_marginEnd="4dp"
+            android:layout_marginEnd="2dp"
             android:clickable="true"
             android:focusable="true"
             android:contentDescription="Brain"/>
@@ -107,9 +163,9 @@
             android:layout_height="wrap_content"
             android:text="🌍"
             android:textSize="20sp"
-            android:paddingHorizontal="6dp"
+            android:paddingHorizontal="5dp"
             android:paddingVertical="4dp"
-            android:layout_marginEnd="4dp"
+            android:layout_marginEnd="2dp"
             android:clickable="true"
             android:focusable="true"
             android:contentDescription="Earth Map"/>
@@ -121,9 +177,9 @@
             android:layout_height="wrap_content"
             android:text="🐾"
             android:textSize="20sp"
-            android:paddingHorizontal="6dp"
+            android:paddingHorizontal="5dp"
             android:paddingVertical="4dp"
-            android:layout_marginEnd="4dp"
+            android:layout_marginEnd="2dp"
             android:clickable="true"
             android:focusable="true"
             android:contentDescription="Animal Scanner"/>

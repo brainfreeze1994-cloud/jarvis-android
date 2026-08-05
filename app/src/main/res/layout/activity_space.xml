@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#020C1B"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- TOP BAR -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView android:id="@+id/btn_space_back"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="← BACK" android:textColor="#00D4FF" android:textSize="14sp"
+                android:letterSpacing="0.12" android:paddingHorizontal="12dp" android:paddingVertical="8dp"
+                android:clickable="true" android:focusable="true"/>
+
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="🚀  SPACE COMMAND"
+                android:textColor="#00D4FF" android:textSize="17sp" android:letterSpacing="0.2"
+                android:gravity="center" android:fontFamily="sans-serif-medium"/>
+
+            <ProgressBar android:id="@+id/space_progress"
+                android:layout_width="20dp" android:layout_height="20dp"
+                android:indeterminate="true" android:indeterminateTint="#00D4FF"
+                android:visibility="gone"/>
+        </LinearLayout>
+
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="#081830" android:layout_marginBottom="20dp"/>
+
+        <!-- ISS CARD -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:background="#050F20"
+            android:padding="18dp" android:layout_marginBottom="14dp">
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="🛸  ISS LIVE POSITION" android:textColor="#005577"
+                android:textSize="11sp" android:letterSpacing="0.2" android:layout_marginBottom="10dp"/>
+
+            <TextView android:id="@+id/tv_iss_pos"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Loading…" android:textColor="#00D4FF"
+                android:textSize="22sp" android:fontFamily="monospace"
+                android:layout_marginBottom="6dp"/>
+
+            <TextView android:id="@+id/tv_iss_desc"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="#3a7aa0" android:textSize="13sp"
+                android:lineSpacingMultiplier="1.5" android:layout_marginBottom="12dp"/>
+
+            <TextView android:id="@+id/btn_spot_station"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="SPOT THE STATION — NASA  →"
+                android:textColor="#020C1B" android:textSize="13sp" android:letterSpacing="0.1"
+                android:gravity="center" android:background="#00D4FF"
+                android:paddingVertical="11dp" android:clickable="true" android:focusable="true"/>
+        </LinearLayout>
+
+        <!-- NASA APOD CARD -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:background="#050F20"
+            android:padding="18dp" android:layout_marginBottom="14dp">
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="🔭  NASA PHOTO OF THE DAY" android:textColor="#005577"
+                android:textSize="11sp" android:letterSpacing="0.2" android:layout_marginBottom="10dp"/>
+
+            <TextView android:id="@+id/tv_nasa_title"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Loading…" android:textColor="#c8e8f8"
+                android:textSize="17sp" android:fontFamily="sans-serif-medium"
+                android:layout_marginBottom="8dp"/>
+
+            <TextView android:id="@+id/tv_nasa_text"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="#3a7aa0" android:textSize="14sp"
+                android:lineSpacingMultiplier="1.6"/>
+        </LinearLayout>
+
+        <!-- ASTEROIDS CARD -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:background="#050F20"
+            android:padding="18dp" android:layout_marginBottom="14dp">
+
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="☄️  NEAR-EARTH ASTEROIDS TODAY" android:textColor="#005577"
+                android:textSize="11sp" android:letterSpacing="0.2" android:layout_marginBottom="10dp"/>
+
+            <TextView android:id="@+id/tv_ast_count"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Loading…" android:textColor="#00D4FF"
+                android:textSize="17sp" android:layout_marginBottom="6dp"/>
+
+            <TextView android:id="@+id/tv_ast_closest"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="#3a7aa0" android:textSize="14sp"
+                android:lineSpacingMultiplier="1.5"/>
+        </LinearLayout>
+
+        <!-- SPACE FACTS -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:background="#030D1A"
+            android:padding="14dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="⚡  HENRY SPACE INTEL" android:textColor="#003344"
+                android:textSize="10sp" android:letterSpacing="0.18" android:layout_marginBottom="8dp"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="The observable universe is 93 billion light-years in diameter.\nThere are more stars in the universe than grains of sand on Earth.\nLight from the Sun takes 8 minutes 20 seconds to reach us.\nThe Milky Way has 200–400 billion stars."
+                android:textColor="#1A5A7A" android:textSize="13sp" android:lineSpacingMultiplier="1.7"/>
+        </LinearLayout>
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

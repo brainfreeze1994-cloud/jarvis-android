@@ -1722,6 +1722,285 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        // ══════════════════════════════════════════════════════════════════════
+        // v24 — FINAL BIG UPDATE HANDLERS
+        // ══════════════════════════════════════════════════════════════════════
+
+        // ── Dashboard ─────────────────────────────────────────────────────────
+        {
+            String bl = userText.toLowerCase().trim();
+            if (bl.matches(".*(open|show|launch).*(dashboard|stats|usage|activity|analytics).*")
+                || bl.equals("dashboard") || bl.equals("my stats")) {
+                startActivity(new android.content.Intent(this, DashboardActivity.class));
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "[EMOTION:proud] Opening your HENRY dashboard, sir. All systems nominal.";
+                history.add(new HistoryItem("model", stripEmotionTag(r))); addJarvisMsg(stripEmotionTag(r));
+                speak(stripEmotionTag(r), "proud"); saveHistory(); return;
+            }
+        }
+
+        // ── Security — Biometric Lock ─────────────────────────────────────────
+        {
+            String bl = userText.toLowerCase().trim();
+            if (bl.contains("enable") && (bl.contains("lock") || bl.contains("biometric"))) {
+                BiometricLock.setLockEnabled(this, true);
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "[EMOTION:serious] Biometric lock enabled, sir. HENRY is now secured.";
+                history.add(new HistoryItem("model", stripEmotionTag(r))); addJarvisMsg(stripEmotionTag(r));
+                speak(stripEmotionTag(r), "serious"); saveHistory(); return;
+            }
+            if (bl.contains("stealth mode") || (bl.contains("stealth") && bl.contains("on"))) {
+                BiometricLock.setStealthMode(this, true);
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "[EMOTION:serious] Stealth mode activated, sir. HENRY will be invisible.";
+                history.add(new HistoryItem("model", stripEmotionTag(r))); addJarvisMsg(stripEmotionTag(r));
+                speak(stripEmotionTag(r), "serious"); saveHistory(); return;
+            }
+        }
+
+        // ── Flight Tracker ────────────────────────────────────────────────────
+        if (FlightTracker.isFlightQuery(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String flightNum = FlightTracker.extractFlightNumber(userText);
+            if (flightNum != null) {
+                addJarvisMsg("Tracking flight " + flightNum + "…");
+                DashboardActivity.incrementMessages(this);
+                FlightTracker.track(this, flightNum, new FlightTracker.Callback() {
+                    @Override public void onResult(String summary) {
+                        history.add(new HistoryItem("model", summary));
+                        runOnUiThread(() -> {
+                            addJarvisMsg(summary);
+                            speak(summary.substring(0, Math.min(120, summary.length())), "neutral");
+                        });
+                        saveHistory();
+                    }
+                    @Override public void onError(String msg) {
+                        runOnUiThread(() -> addJarvisMsg(msg));
+                    }
+                });
+            } else {
+                String r = "Please give me a flight number like 'EK201' and I'll track it for you, sir.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                speak(r, "neutral");
+            }
+            saveHistory(); return;
+        }
+
+        // ── Sports Tracker ────────────────────────────────────────────────────
+        if (SportsTracker.isSportsQuery(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            addJarvisMsg("Fetching live sports data…");
+            String sport = userText.toLowerCase().contains("basketball") || userText.toLowerCase().contains("nba")
+                ? "basketball" : "football";
+            SportsTracker.getLiveScores(sport, new SportsTracker.Callback() {
+                @Override public void onResult(String result) {
+                    history.add(new HistoryItem("model", result));
+                    runOnUiThread(() -> {
+                        addJarvisMsg(result);
+                        speak(result.substring(0, Math.min(100, result.length())), "excited");
+                    });
+                    saveHistory();
+                }
+                @Override public void onError(String msg) {
+                    runOnUiThread(() -> addJarvisMsg(msg));
+                }
+            });
+            return;
+        }
+
+        // ── Package Tracker ───────────────────────────────────────────────────
+        if (PackageTracker.isPackageQuery(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String trackNum = PackageTracker.extractTrackingNumber(userText);
+            String courier  = PackageTracker.detectCourier(userText);
+            if (trackNum != null) {
+                PackageTracker.track(this, trackNum, courier, new PackageTracker.Callback() {
+                    @Override public void onResult(String message, String url) {
+                        history.add(new HistoryItem("model", message));
+                        runOnUiThread(() -> {
+                            addJarvisMsg(message);
+                            speak("Opening tracker for " + trackNum, "neutral");
+                            PackageTracker.openTracker(MainActivity.this, url);
+                        });
+                        saveHistory();
+                    }
+                });
+            } else {
+                String r = "Give me the tracking number and I'll open the tracker, sir.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r); speak(r, "neutral");
+            }
+            saveHistory(); return;
+        }
+
+        // ── Smart Home ────────────────────────────────────────────────────────
+        if (SmartHomeHelper.isSmartHomeQuery(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String cmd    = SmartHomeHelper.parseCommand(userText);
+            String device = SmartHomeHelper.parseDevice(userText);
+            String bl2    = userText.toLowerCase();
+            if (bl2.contains("google home")) {
+                SmartHomeHelper.openGoogleHome(this, new SmartHomeHelper.Callback() {
+                    @Override public void onResult(String r) {
+                        history.add(new HistoryItem("model", r)); runOnUiThread(() -> { addJarvisMsg(r); speak(r, "neutral"); });
+                    }
+                    @Override public void onError(String e) { runOnUiThread(() -> addJarvisMsg(e)); }
+                });
+            } else if (bl2.contains("alexa")) {
+                SmartHomeHelper.openAlexa(this, new SmartHomeHelper.Callback() {
+                    @Override public void onResult(String r) {
+                        history.add(new HistoryItem("model", r)); runOnUiThread(() -> { addJarvisMsg(r); speak(r, "neutral"); });
+                    }
+                    @Override public void onError(String e) { runOnUiThread(() -> addJarvisMsg(e)); }
+                });
+            } else {
+                String guide = SmartHomeHelper.getSmartHomeSetupGuide(device, cmd);
+                history.add(new HistoryItem("model", guide)); addJarvisMsg(guide);
+                speak("Smart home command received, sir.", "neutral");
+            }
+            saveHistory(); return;
+        }
+
+        // ── Social Media ──────────────────────────────────────────────────────
+        if (SocialMediaHelper.isSocialMediaQuery(userText)) {
+            String platform = SocialMediaHelper.detectPlatform(userText);
+            String bl3      = userText.toLowerCase();
+            // If asking to generate caption
+            if (bl3.contains("caption") || bl3.contains("write") || bl3.contains("post") || bl3.contains("draft")) {
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                addJarvisMsg("Crafting your " + platform + " caption…");
+                String topic = userText.replaceAll("(?i)(write|create|make|draft|generate|caption|for|post|on|instagram|twitter|tiktok|linkedin|facebook)", "").trim();
+                if (topic.isEmpty()) topic = "my lifestyle";
+                List<HistoryItem> msgs = new java.util.ArrayList<>();
+                msgs.add(new HistoryItem("user", SocialMediaHelper.buildCaptionPrompt(platform, topic, null)));
+                JarvisApi.ask(msgs, null, "balanced", null, new JarvisApi.Callback() {
+                    @Override public void onSuccess(String reply, String imgUrl, java.util.List<String> fu) {
+                        String clean = reply.replaceAll("\\[EMOTION:[^]]+]", "").trim();
+                        history.add(new HistoryItem("model", clean));
+                        runOnUiThread(() -> { addJarvisMsg(clean); speak("Caption ready, sir.", "excited"); });
+                        saveHistory();
+                    }
+                    @Override public void onError(String e) { runOnUiThread(() -> addJarvisMsg("Could not generate caption: " + e)); }
+                });
+                return;
+            }
+            // Direct share
+            if (bl3.contains("tweet") || (bl3.contains("post") && bl3.contains("twitter"))) {
+                String text = userText.replaceAll("(?i)(tweet|post on twitter|share on x)", "").trim();
+                SocialMediaHelper.shareToTwitter(this, text.isEmpty() ? "Shared via H·E·N·R·Y™" : text);
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "Opening Twitter to post, sir.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r); speak(r, "excited");
+                saveHistory(); return;
+            }
+            if (bl3.contains("linkedin")) {
+                String text = userText.replaceAll("(?i)(post on linkedin|share on linkedin)", "").trim();
+                SocialMediaHelper.shareToLinkedIn(this, text.isEmpty() ? "Shared via H·E·N·R·Y™" : text);
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "Opening LinkedIn, sir.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r); speak(r, "excited");
+                saveHistory(); return;
+            }
+            if (bl3.contains("tiktok")) {
+                SocialMediaHelper.openTikTok(this);
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "Opening TikTok, sir.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r); speak(r, "excited");
+                saveHistory(); return;
+            }
+        }
+
+        // ── Games ─────────────────────────────────────────────────────────────
+        if (HenryGames.isGameQuery(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String bl4 = userText.toLowerCase().trim();
+            // Active game responses
+            if (HenryGames.isRiddleActive()) {
+                if (bl4.contains("give up") || bl4.contains("skip")) {
+                    String r = HenryGames.giveUpRiddle();
+                    history.add(new HistoryItem("model", r)); addJarvisMsg(r); speak(r, "amused");
+                    saveHistory(); return;
+                }
+                if (!bl4.contains("riddle") || bl4.startsWith("next")) {
+                    if (bl4.startsWith("next") || bl4.contains("another")) {
+                        String r = HenryGames.startRiddle();
+                        history.add(new HistoryItem("model", r)); addJarvisMsg(r); speak("New riddle coming up!", "excited");
+                    } else {
+                        String r = HenryGames.checkRiddleAnswer(userText);
+                        history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                        speak(r.startsWith("✓") ? "Brilliant!" : "Hmm, not quite.", r.startsWith("✓") ? "proud" : "amused");
+                    }
+                    saveHistory(); return;
+                }
+            }
+            if (HenryGames.isTriviaActive()) {
+                String r = HenryGames.checkTriviaAnswer(userText);
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                speak(r.contains("✓") ? "Correct!" : "Wrong.", r.contains("✓") ? "excited" : "amused");
+                saveHistory(); return;
+            }
+            if (HenryGames.is20QActive()) {
+                HenryGames.increment20Q();
+                List<HistoryItem> msgs = new java.util.ArrayList<>();
+                msgs.add(new HistoryItem("system", HenryGames.build20QSystemPrompt()));
+                msgs.add(new HistoryItem("user", userText));
+                JarvisApi.ask(msgs, null, "brief", null, new JarvisApi.Callback() {
+                    @Override public void onSuccess(String reply, String imgUrl, java.util.List<String> fu) {
+                        String clean = reply.replaceAll("\\[EMOTION:[^]]+]", "").trim();
+                        history.add(new HistoryItem("model", clean));
+                        runOnUiThread(() -> { addJarvisMsg(clean); speak(clean, "amused"); });
+                        saveHistory();
+                    }
+                    @Override public void onError(String e) { runOnUiThread(() -> addJarvisMsg(e)); }
+                });
+                return;
+            }
+            // Start new game
+            String game = HenryGames.detectGame(userText);
+            String r;
+            switch (game) {
+                case "riddle":   r = HenryGames.startRiddle(); speak("Riddle time!", "excited"); break;
+                case "trivia":   r = HenryGames.startTrivia(); speak("Trivia tournament starts now!", "excited"); break;
+                case "20q":      r = HenryGames.start20Questions(); speak("Twenty Questions — I'm thinking of something.", "amused"); break;
+                case "wyr":      r = HenryGames.wouldYouRather(); speak("Would you rather…", "amused"); break;
+                default:         r = HenryGames.startTrivia(); speak("Let's play trivia!", "excited"); break;
+            }
+            history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+            saveHistory(); return;
+        }
+
+        // ── Business Tools ────────────────────────────────────────────────────
+        if (BusinessTools.isBusinessQuery(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            addJarvisMsg("Generating your business document…");
+            String docType = BusinessTools.detectDocumentType(userText);
+            String prompt;
+            switch (docType) {
+                case "invoice":      prompt = BusinessTools.buildInvoicePrompt(userText); break;
+                case "contract":     prompt = BusinessTools.buildContractPrompt("service", userText); break;
+                case "pitch":        prompt = BusinessTools.buildPitchDeckPrompt("my business", userText); break;
+                case "business_plan":prompt = BusinessTools.buildBusinessPlanPrompt("my business", userText); break;
+                case "swot":         prompt = BusinessTools.buildSWOTPrompt(userText); break;
+                case "agenda":       prompt = BusinessTools.buildMeetingAgendaPrompt("our meeting", userText); break;
+                case "press_release":prompt = BusinessTools.buildPressReleasePrompt("my announcement", userText); break;
+                default:             prompt = "Generate a professional " + docType + " for: " + userText; break;
+            }
+            List<HistoryItem> msgs = new java.util.ArrayList<>();
+            msgs.add(new HistoryItem("user", prompt));
+            JarvisApi.ask(msgs, null, "detailed", null, new JarvisApi.Callback() {
+                @Override public void onSuccess(String reply, String imgUrl, java.util.List<String> fu) {
+                    String clean = reply.replaceAll("\\[EMOTION:[^]]+]", "").trim();
+                    history.add(new HistoryItem("model", clean));
+                    runOnUiThread(() -> {
+                        addJarvisMsg(clean);
+                        speak("Your " + docType.replace("_", " ") + " is ready, sir.", "proud");
+                    });
+                    saveHistory();
+                }
+                @Override public void onError(String e) { runOnUiThread(() -> addJarvisMsg("Could not generate document: " + e)); }
+            });
+            return;
+        }
+
         // ── Reminder detection ────────────────────────────────────────────────
         String reminderReply = ReminderManager.trySchedule(this, userText);
         if (reminderReply != null) {

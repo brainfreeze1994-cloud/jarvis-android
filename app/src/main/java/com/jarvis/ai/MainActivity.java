@@ -352,6 +352,21 @@ public class MainActivity extends AppCompatActivity {
         if (btnAttach != null) btnAttach.setOnClickListener(v -> showAttachDialog());
 
         // 🌍 Earth Map button
+        // 🚀 Space Command button
+        android.widget.TextView btnSpace = findViewById(R.id.btn_space);
+        if (btnSpace != null) btnSpace.setOnClickListener(v ->
+            startActivity(new android.content.Intent(this, SpaceActivity.class)));
+
+        // 📈 Live Markets button
+        android.widget.TextView btnMarkets = findViewById(R.id.btn_markets);
+        if (btnMarkets != null) btnMarkets.setOnClickListener(v ->
+            startActivity(new android.content.Intent(this, MarketsActivity.class)));
+
+        // 🌐 Earth Radar button
+        android.widget.TextView btnEarthRadar = findViewById(R.id.btn_earth_radar);
+        if (btnEarthRadar != null) btnEarthRadar.setOnClickListener(v ->
+            startActivity(new android.content.Intent(this, EarthRadarActivity.class)));
+
         // ✈ Flight Tracker button
         android.widget.TextView btnFlight = findViewById(R.id.btn_flight);
         if (btnFlight != null) btnFlight.setOnClickListener(v -> openFlightTracker(null));
@@ -3922,6 +3937,19 @@ public class MainActivity extends AppCompatActivity {
         if (lowerInput.matches(".*(scan|identify|what animal|animal scanner|what is this animal).*")) {
             openAnimalScanner();
         }
+        // 🚀 Space Command voice trigger
+        if (lowerInput.matches(".*(space station|iss|nasa|asteroid|open space|space command).*")) {
+            startActivity(new android.content.Intent(this, SpaceActivity.class));
+        }
+        // 📈 Markets voice trigger
+        if (lowerInput.matches(".*(stock market|live market|open market|bitcoin price|crypto price|nasdaq|dow jones).*")) {
+            startActivity(new android.content.Intent(this, MarketsActivity.class));
+        }
+        // 🌐 Earth Radar voice trigger
+        if (lowerInput.matches(".*(earthquake|seismic|earth radar|global weather|open radar).*")) {
+            startActivity(new android.content.Intent(this, EarthRadarActivity.class));
+        }
+
         // ✈ Flight Tracker voice trigger
         java.util.regex.Matcher mFlight = java.util.regex.Pattern.compile(
             "(?:track|check|status of|show|find)\\s+(?:flight\\s+)?([A-Za-z]{2}\\d{1,4})",

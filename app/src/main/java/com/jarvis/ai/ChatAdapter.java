@@ -10,6 +10,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
@@ -17,6 +18,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.List;
+import java.util.regex.Pattern;
 
 public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
 
@@ -54,7 +56,7 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
                 h.ivImage.setImageURI(Uri.parse(m.imageUri));
             }
             if (h.tvMsg != null && m.text != null && !m.text.isEmpty()) {
-                h.tvMsg.setText(m.text);
+                h.tvMsg.setText(stripMarkdown(m.text));
                 h.tvMsg.setVisibility(View.VISIBLE);
             } else if (h.tvMsg != null) {
                 h.tvMsg.setVisibility(View.GONE);
@@ -63,74 +65,89 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
         }
 
         if (m.type == Message.TYPE_URL_IMAGE) {
-            // Show caption
+            // Caption
             if (h.tvMsg != null) {
-                h.tvMsg.setText("Here is your generated image, sir.");
+                String caption = (m.text != null && !m.text.isEmpty()) ? stripMarkdown(m.text) : "Here is your generated image, sir.";
+                h.tvMsg.setText(caption);
             }
-            // Load image from URL in background
+            // Loading spinner visible until image loads
+            if (h.progressBar != null) h.progressBar.setVisibility(View.VISIBLE);
+            if (h.ivImage != null) h.ivImage.setVisibility(View.INVISIBLE);
+
             if (h.ivImage != null && m.imageUrl != null) {
-                h.ivImage.setImageResource(android.R.drawable.ic_menu_gallery);
                 final String url = m.imageUrl;
                 final ImageView iv = h.ivImage;
+                final ProgressBar pb = h.progressBar;
+
                 new Thread(() -> {
                     try {
                         Bitmap bmp = null;
                         if (url.startsWith("data:image")) {
-                            // Base64 data URI (from Cloudflare AI)
                             String b64 = url.substring(url.indexOf(',') + 1);
                             byte[] bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
                             bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
                         } else {
-                            // HTTP URL (from Pollinations)
-                            HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-                            conn.setConnectTimeout(20000);
-                            conn.setReadTimeout(90000);
-                            conn.connect();
-                            InputStream is = conn.getInputStream();
-                            bmp = BitmapFactory.decodeStream(is);
-                            is.close();
+                            // Try multiple times with increasing timeout
+                            for (int attempt = 0; attempt < 3 && bmp == null; attempt++) {
+                                try {
+                                    HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+                                    conn.setConnectTimeout(12000);
+                                    conn.setReadTimeout(30000);
+                                    conn.setInstanceFollowRedirects(true);
+                                    conn.connect();
+                                    if (conn.getResponseCode() == 200) {
+                                        InputStream is = conn.getInputStream();
+                                        bmp = BitmapFactory.decodeStream(is);
+                                        is.close();
+                                    }
+                                } catch (Exception retryEx) {
+                                    Thread.sleep(1500);
+                                }
+                            }
                         }
                         if (bmp != null) {
                             final Bitmap finalBmp = bmp;
-                            mainHandler.post(() -> iv.setImageBitmap(finalBmp));
+                            mainHandler.post(() -> {
+                                iv.setImageBitmap(finalBmp);
+                                iv.setVisibility(View.VISIBLE);
+                                if (pb != null) pb.setVisibility(View.GONE);
+                            });
+                        } else {
+                            mainHandler.post(() -> {
+                                if (pb != null) pb.setVisibility(View.GONE);
+                                iv.setVisibility(View.VISIBLE);
+                                iv.setImageResource(android.R.drawable.ic_menu_gallery);
+                                if (h.tvMsg != null) h.tvMsg.setText("Image could not be loaded. Tap to open in browser.");
+                            });
                         }
                     } catch (Exception e) {
-                        // Show error placeholder with retry
                         mainHandler.post(() -> {
-                            if (h.tvMsg != null) h.tvMsg.setText("⚠ Image failed to load. Tap to retry.");
-                            iv.setOnClickListener(v2 -> {
-                                iv.setImageResource(android.R.drawable.ic_menu_gallery);
-                                new Thread(() -> {
-                                    try {
-                                        if (url.startsWith("data:image")) {
-                                            String b64 = url.substring(url.indexOf(',') + 1);
-                                            byte[] bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
-                                            Bitmap b2 = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                                            if (b2 != null) mainHandler.post(() -> iv.setImageBitmap(b2));
-                                        } else {
-                                            HttpURLConnection c2 = (HttpURLConnection) new URL(url).openConnection();
-                                            c2.setConnectTimeout(20000); c2.setReadTimeout(90000); c2.connect();
-                                            Bitmap b2 = BitmapFactory.decodeStream(c2.getInputStream());
-                                            if (b2 != null) mainHandler.post(() -> iv.setImageBitmap(b2));
-                                        }
-                                    } catch (Exception ignored2) {}
-                                }).start();
-                            });
+                            if (pb != null) pb.setVisibility(View.GONE);
+                            iv.setVisibility(View.VISIBLE);
+                            iv.setImageResource(android.R.drawable.ic_menu_gallery);
+                            if (h.tvMsg != null) h.tvMsg.setText("Image failed to load. Tap to open in browser.");
                         });
                     }
                 }).start();
-                // Tap HTTP image to open in browser (skip for base64)
+
+                // Tap to open in browser
                 if (!url.startsWith("data:")) {
-                    h.ivImage.setOnClickListener(v -> {
-                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                        v.getContext().startActivity(intent);
+                    h.ivImage.setOnClickListener(v2 -> {
+                        try {
+                            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                            v2.getContext().startActivity(intent);
+                        } catch (Exception ignored) {}
                     });
                 }
             }
             return;
         }
 
-        if (h.tvMsg != null) h.tvMsg.setText(m.text);
+        // Normal JARVIS or USER message — strip markdown for clean display
+        if (h.tvMsg != null) {
+            String displayText = (m.type == Message.TYPE_USER) ? m.text : stripMarkdown(m.text);
+            h.tvMsg.setText(displayText);
+        }
         if (h.tvAvatar != null) {
             h.tvAvatar.setText(m.type == Message.TYPE_USER ? "YOU" : "HNR");
         }
@@ -138,15 +155,58 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
 
     @Override public int getItemCount() { return items.size(); }
 
+    /**
+     * Strip common Markdown so Android TextView shows clean text.
+     * Bold, italic, headers, code blocks, bullet lists, etc.
+     */
+    static String stripMarkdown(String text) {
+        if (text == null) return "";
+        return text
+            // Code blocks (```...```)
+            .replaceAll("```[\\s\\S]*?```", "[code]")
+            // Inline code (`...`)
+            .replaceAll("`([^`]+)`", "$1")
+            // Headers (## Title → Title)
+            .replaceAll("(?m)^#{1,6}\\s+", "")
+            // Bold + italic (***text*** or ___text___)
+            .replaceAll("\\*{3}(.+?)\\*{3}", "$1")
+            .replaceAll("_{3}(.+?)_{3}", "$1")
+            // Bold (**text** or __text__)
+            .replaceAll("\\*{2}(.+?)\\*{2}", "$1")
+            .replaceAll("_{2}(.+?)_{2}", "$1")
+            // Italic (*text* or _text_)
+            .replaceAll("(?<![\\*_])\\*(.+?)\\*(?![\\*_])", "$1")
+            .replaceAll("(?<![\\*_])_(.+?)_(?![\\*_])", "$1")
+            // Strikethrough (~~text~~)
+            .replaceAll("~~(.+?)~~", "$1")
+            // Links ([text](url)) → text
+            .replaceAll("\\[([^\\]]+)\\]\\([^)]+\\)", "$1")
+            // Images (![alt](url)) → [image]
+            .replaceAll("!\\[[^\\]]*\\]\\([^)]+\\)", "[image]")
+            // Blockquotes (> text)
+            .replaceAll("(?m)^>\\s*", "")
+            // Bullet lists (- item or * item or + item)
+            .replaceAll("(?m)^\\s*[-*+]\\s+", "• ")
+            // Numbered lists (1. item)
+            .replaceAll("(?m)^\\s*\\d+\\.\\s+", "• ")
+            // Horizontal rules (---, ***, ___)
+            .replaceAll("(?m)^([-*_]){3,}\\s*$", "─────")
+            // Trailing spaces from markdown line breaks
+            .replaceAll("  +$", "")
+            .trim();
+    }
+
     static class MsgVH extends RecyclerView.ViewHolder {
-        TextView  tvMsg, tvAvatar;
-        ImageView ivImage;
+        TextView    tvMsg, tvAvatar;
+        ImageView   ivImage;
+        ProgressBar progressBar;
 
         MsgVH(View v) {
             super(v);
-            tvMsg    = v.findViewById(R.id.tv_message);
-            tvAvatar = v.findViewById(R.id.tv_avatar);
-            ivImage  = v.findViewById(R.id.iv_image);
+            tvMsg       = v.findViewById(R.id.tv_message);
+            tvAvatar    = v.findViewById(R.id.tv_avatar);
+            ivImage     = v.findViewById(R.id.iv_image);
+            progressBar = v.findViewById(R.id.pb_loading);
         }
     }
 }

@@ -383,6 +383,10 @@ public class MainActivity extends AppCompatActivity {
         // 🐾 Animal Scanner button
         android.widget.TextView btnAnimalScan = findViewById(R.id.btn_animal_scan);
         if (btnAnimalScan != null) btnAnimalScan.setOnClickListener(v -> openAnimalScanner());
+
+        // 🌿 Plant Scanner button
+        android.widget.TextView btnPlantScan = findViewById(R.id.btn_plant_scan);
+        if (btnPlantScan != null) btnPlantScan.setOnClickListener(v -> openPlantScanner());
         if (ivAttachPreview != null) ivAttachPreview.setOnClickListener(v -> clearAttachment());
         if (etInput != null) {
             etInput.setOnEditorActionListener((v, id, e) -> {
@@ -1255,9 +1259,22 @@ public class MainActivity extends AppCompatActivity {
         if (req == AnimalScannerActivity.REQUEST_CODE && data != null) {
             String animalResult = data.getStringExtra(AnimalScannerActivity.EXTRA_RESULT);
             if (animalResult != null && !animalResult.isEmpty()) {
-                String clean   = animalResult.replaceAll("\\[EMOTION:[^\\]]+\\]", "").trim();
+                String clean = animalResult.replaceAll("\\[EMOTION:[^\\]]+\\]", "").trim();
                 addJarvisMsg(clean);
                 speak(clean, "excited");
+                history.add(new HistoryItem("model", clean));
+                saveHistory();
+            }
+            return;
+        }
+
+        // 🌿 Plant Scanner result
+        if (req == PlantScannerActivity.REQUEST_CODE && data != null) {
+            String plantResult = data.getStringExtra(PlantScannerActivity.EXTRA_RESULT);
+            if (plantResult != null && !plantResult.isEmpty()) {
+                String clean = plantResult.replaceAll("\\[EMOTION:[^\\]]+\\]", "").trim();
+                addJarvisMsg(clean);
+                speak(clean, "warm");
                 history.add(new HistoryItem("model", clean));
                 saveHistory();
             }
@@ -3934,8 +3951,12 @@ public class MainActivity extends AppCompatActivity {
             openEarthMap(flyTo);
         }
         // 🐾 Animal Scanner voice trigger
-        if (lowerInput.matches(".*(scan|identify|what animal|animal scanner|what is this animal).*")) {
+        if (lowerInput.matches(".*(what animal|animal scanner|identify animal|scan animal).*")) {
             openAnimalScanner();
+        }
+        // 🌿 Plant Scanner voice trigger
+        if (lowerInput.matches(".*(what plant|plant scanner|identify plant|scan plant|what flower|what tree|what herb).*")) {
+            openPlantScanner();
         }
         // 🚀 Space Command voice trigger
         if (lowerInput.matches(".*(space station|iss|nasa|asteroid|open space|space command).*")) {
@@ -4415,6 +4436,11 @@ public class MainActivity extends AppCompatActivity {
     private void openAnimalScanner() {
         Intent intent = new Intent(this, AnimalScannerActivity.class);
         startActivityForResult(intent, AnimalScannerActivity.REQUEST_CODE);
+    }
+
+    private void openPlantScanner() {
+        Intent intent = new Intent(this, PlantScannerActivity.class);
+        startActivityForResult(intent, PlantScannerActivity.REQUEST_CODE);
     }
 
     // ── v20: Update orb accent color based on HENRY's mood ───────────────────

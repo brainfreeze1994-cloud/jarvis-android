@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#020C1B"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- TOP BAR -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="52dp"
+            android:orientation="horizontal" android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView android:id="@+id/btn_radar_back"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="← BACK" android:textColor="#00D4FF" android:textSize="14sp"
+                android:letterSpacing="0.12" android:paddingHorizontal="12dp" android:paddingVertical="8dp"
+                android:clickable="true" android:focusable="true"/>
+
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="🌍  EARTH RADAR"
+                android:textColor="#00D4FF" android:textSize="17sp" android:letterSpacing="0.2"
+                android:gravity="center" android:fontFamily="sans-serif-medium"/>
+
+            <ProgressBar android:id="@+id/radar_progress"
+                android:layout_width="20dp" android:layout_height="20dp"
+                android:indeterminate="true" android:indeterminateTint="#00D4FF"
+                android:visibility="gone"/>
+        </LinearLayout>
+
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="#081830" android:layout_marginBottom="20dp"/>
+
+        <!-- EARTHQUAKES -->
+        <TextView android:id="@+id/tv_quake_header"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Loading earthquake data…" android:textColor="#00D4FF"
+            android:textSize="16sp" android:fontFamily="sans-serif-medium"
+            android:layout_marginBottom="10dp"/>
+
+        <LinearLayout android:id="@+id/quake_container"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:layout_marginBottom="8dp"/>
+
+        <TextView android:id="@+id/btn_usgs"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="OPEN USGS EARTHQUAKE MAP  →"
+            android:textColor="#020C1B" android:textSize="13sp" android:letterSpacing="0.1"
+            android:gravity="center" android:background="#00D4FF"
+            android:paddingVertical="12dp" android:clickable="true" android:focusable="true"
+            android:layout_marginBottom="24dp"/>
+
+        <!-- GLOBAL WEATHER SNAPSHOT -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="🌡  GLOBAL WEATHER SNAPSHOT" android:textColor="#005577"
+            android:textSize="11sp" android:letterSpacing="0.2" android:layout_marginBottom="10dp"/>
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:background="#050F20" android:padding="18dp">
+
+            <TextView android:id="@+id/tv_weather_result"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Loading…" android:textColor="#c8e8f8"
+                android:textSize="14sp" android:fontFamily="monospace"
+                android:lineSpacingMultiplier="1.9"/>
+        </LinearLayout>
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

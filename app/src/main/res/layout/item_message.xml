@@ -24,16 +24,18 @@
 
     <TextView
         android:id="@+id/tv_message"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:maxWidth="290dp"
+        android:layout_weight="1"
+        android:layout_marginEnd="12dp"
         android:background="@drawable/bg_bubble_jarvis"
-        android:textColor="#00BEFF"
-        android:textSize="16sp"
-        android:lineSpacingMultiplier="1.45"
+        android:textColor="#c8e8f8"
+        android:textSize="15sp"
+        android:lineSpacingMultiplier="1.5"
         android:paddingStart="12dp"
         android:paddingEnd="12dp"
         android:paddingTop="9dp"
-        android:paddingBottom="9dp"/>
+        android:paddingBottom="9dp"
+        android:autoLink="web"/>
 
 </LinearLayout>

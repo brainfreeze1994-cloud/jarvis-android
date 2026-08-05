@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#020C1B"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- TOP BAR -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView android:id="@+id/btn_markets_back"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="← BACK" android:textColor="#00D4FF" android:textSize="14sp"
+                android:letterSpacing="0.12" android:paddingHorizontal="12dp" android:paddingVertical="8dp"
+                android:clickable="true" android:focusable="true"/>
+
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="📈  LIVE MARKETS"
+                android:textColor="#00D4FF" android:textSize="17sp" android:letterSpacing="0.2"
+                android:gravity="center" android:fontFamily="sans-serif-medium"/>
+
+            <ProgressBar android:id="@+id/markets_progress"
+                android:layout_width="20dp" android:layout_height="20dp"
+                android:indeterminate="true" android:indeterminateTint="#00D4FF"
+                android:visibility="gone"/>
+
+            <TextView android:id="@+id/btn_markets_refresh"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="↺" android:textColor="#00D4FF" android:textSize="20sp"
+                android:paddingHorizontal="10dp" android:clickable="true" android:focusable="true"/>
+        </LinearLayout>
+
+        <View android:layout_width="match_parent" android:layout_height="1dp"
+            android:background="#081830" android:layout_marginBottom="20dp"/>
+
+        <!-- STOCKS -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="STOCKS · LIVE" android:textColor="#005577"
+            android:textSize="11sp" android:letterSpacing="0.2" android:layout_marginBottom="10dp"/>
+
+        <LinearLayout android:id="@+id/stocks_container"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:background="#050F20"
+            android:paddingHorizontal="16dp" android:layout_marginBottom="20dp"/>
+
+        <!-- CRYPTO -->
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="CRYPTO · LIVE" android:textColor="#005577"
+            android:textSize="11sp" android:letterSpacing="0.2" android:layout_marginBottom="10dp"/>
+
+        <LinearLayout android:id="@+id/crypto_container"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:background="#050F20"
+            android:paddingHorizontal="16dp" android:layout_marginBottom="20dp"/>
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Data: Yahoo Finance · CoinGecko · Prices in USD"
+            android:textColor="#003344" android:textSize="11sp" android:letterSpacing="0.08"/>
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

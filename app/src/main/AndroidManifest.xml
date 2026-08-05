@@ -245,6 +245,9 @@
 
         <!-- HENRY Brain Map -->
         <activity
+            android:name=".DashboardActivity"
+            android:theme="@style/Theme.AppCompat.NoActionBar"/>
+        <activity
             android:name=".BrainActivity"
             android:exported="false"
             android:screenOrientation="portrait"

@@ -352,6 +352,10 @@ public class MainActivity extends AppCompatActivity {
         if (btnAttach != null) btnAttach.setOnClickListener(v -> showAttachDialog());
 
         // 🌍 Earth Map button
+        // ✈ Flight Tracker button
+        android.widget.TextView btnFlight = findViewById(R.id.btn_flight);
+        if (btnFlight != null) btnFlight.setOnClickListener(v -> openFlightTracker(null));
+
         // 🧠 Brain button
         android.widget.TextView btnBrain = findViewById(R.id.btn_brain);
         if (btnBrain != null) btnBrain.setOnClickListener(v ->
@@ -3918,6 +3922,15 @@ public class MainActivity extends AppCompatActivity {
         if (lowerInput.matches(".*(scan|identify|what animal|animal scanner|what is this animal).*")) {
             openAnimalScanner();
         }
+        // ✈ Flight Tracker voice trigger
+        java.util.regex.Matcher mFlight = java.util.regex.Pattern.compile(
+            "(?:track|check|status of|show|find)\\s+(?:flight\\s+)?([A-Za-z]{2}\\d{1,4})",
+            java.util.regex.Pattern.CASE_INSENSITIVE).matcher(userText);
+        if (lowerInput.contains("flight tracker") || lowerInput.contains("open flight")) {
+            openFlightTracker(null);
+        } else if (mFlight.find()) {
+            openFlightTracker(mFlight.group(1).toUpperCase());
+        }
 
         // [v20] Dubai transit detection — add deep-link buttons after response
         final boolean isTransit = TransitHelper.isTransitQuery(userText);
@@ -4354,6 +4367,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // ── 🌍 Open Earth Map ─────────────────────────────────────────────────────
+    private void openFlightTracker(String flightNumber) {
+        Intent intent = new Intent(this, FlightActivity.class);
+        if (flightNumber != null && !flightNumber.isEmpty()) {
+            intent.putExtra("flight_number", flightNumber);
+        }
+        startActivity(intent);
+    }
+
     private void openEarthMap(String flyToCountry) {
         Intent intent = new Intent(this, EarthMapActivity.class);
         if (flyToCountry != null && !flyToCountry.isEmpty()) {

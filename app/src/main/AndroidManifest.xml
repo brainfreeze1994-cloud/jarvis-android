@@ -112,6 +112,13 @@
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:hardwareAccelerated="true"/>
 
+        <!-- 🌿 Plant Scanner Activity -->
+        <activity
+            android:name=".PlantScannerActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|keyboardHidden"/>
+
         <!-- 🐾 Animal Scanner Activity -->
         <activity
             android:name=".AnimalScannerActivity"

@@ -89,113 +89,113 @@
         <!-- Space Command button -->
         <TextView
             android:id="@+id/btn_space"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:text="🚀"
             android:textSize="20sp"
-            android:paddingHorizontal="5dp"
-            android:paddingVertical="4dp"
+            android:gravity="center"
             android:layout_marginEnd="2dp"
             android:clickable="true"
             android:focusable="true"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="Space Command"/>
 
         <!-- Live Markets button -->
         <TextView
             android:id="@+id/btn_markets"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:text="📈"
             android:textSize="20sp"
-            android:paddingHorizontal="5dp"
-            android:paddingVertical="4dp"
+            android:gravity="center"
             android:layout_marginEnd="2dp"
             android:clickable="true"
             android:focusable="true"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="Live Markets"/>
 
         <!-- Earth Radar button -->
         <TextView
             android:id="@+id/btn_earth_radar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:text="🌐"
             android:textSize="20sp"
-            android:paddingHorizontal="5dp"
-            android:paddingVertical="4dp"
+            android:gravity="center"
             android:layout_marginEnd="2dp"
             android:clickable="true"
             android:focusable="true"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="Earth Radar"/>
 
         <!-- Flight Tracker button -->
         <TextView
             android:id="@+id/btn_flight"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:text="✈"
             android:textSize="20sp"
-            android:paddingHorizontal="5dp"
-            android:paddingVertical="4dp"
+            android:gravity="center"
             android:layout_marginEnd="2dp"
             android:clickable="true"
             android:focusable="true"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="Flight Tracker"/>
 
         <!-- Brain button -->
         <TextView
             android:id="@+id/btn_brain"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:text="🧠"
             android:textSize="20sp"
-            android:paddingHorizontal="5dp"
-            android:paddingVertical="4dp"
+            android:gravity="center"
             android:layout_marginEnd="2dp"
             android:clickable="true"
             android:focusable="true"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="Brain"/>
 
         <!-- Earth Map button -->
         <TextView
             android:id="@+id/btn_earth_map"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:text="🌍"
             android:textSize="20sp"
-            android:paddingHorizontal="5dp"
-            android:paddingVertical="4dp"
+            android:gravity="center"
             android:layout_marginEnd="2dp"
             android:clickable="true"
             android:focusable="true"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="Earth Map"/>
 
         <!-- Animal Scanner button -->
         <TextView
             android:id="@+id/btn_animal_scan"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:text="🐾"
             android:textSize="20sp"
-            android:paddingHorizontal="5dp"
-            android:paddingVertical="4dp"
+            android:gravity="center"
             android:layout_marginEnd="2dp"
             android:clickable="true"
             android:focusable="true"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="Animal Scanner"/>
 
         <!-- Plant Scanner button -->
         <TextView
             android:id="@+id/btn_plant_scan"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:text="🌿"
             android:textSize="20sp"
-            android:paddingHorizontal="5dp"
-            android:paddingVertical="4dp"
+            android:gravity="center"
             android:layout_marginEnd="2dp"
             android:clickable="true"
             android:focusable="true"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="Plant Scanner"/>
 
         <!-- Clear button -->

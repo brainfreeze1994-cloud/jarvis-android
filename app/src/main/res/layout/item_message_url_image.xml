@@ -5,13 +5,14 @@
     android:orientation="horizontal"
     android:padding="4dp">
 
+    <!-- HNR Avatar -->
     <TextView
         android:id="@+id/tv_avatar"
         android:layout_width="30dp"
         android:layout_height="30dp"
         android:gravity="center"
         android:text="HNR"
-        android:textColor="#c9a84c"
+        android:textColor="#00BEFF"
         android:textSize="7sp"
         android:fontFamily="sans-serif-medium"
         android:background="@drawable/bg_avatar"
@@ -25,30 +26,45 @@
         android:layout_marginStart="8dp"
         android:layout_marginEnd="32dp">
 
+        <!-- Caption -->
         <TextView
             android:id="@+id/tv_message"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/bg_bubble_jarvis"
-            android:textColor="#c9a84c"
-            android:textSize="13sp"
+            android:textColor="#00BEFF"
+            android:textSize="14sp"
             android:padding="10dp"
-            android:layout_marginBottom="4dp"/>
+            android:layout_marginBottom="6dp"/>
 
+        <!-- Loading spinner (shown while image downloads) -->
+        <ProgressBar
+            android:id="@+id/pb_loading"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="4dp"
+            android:indeterminate="true"
+            android:indeterminateTint="#00BEFF"
+            android:visibility="visible"/>
+
+        <!-- Generated image (hidden until loaded) -->
         <ImageView
             android:id="@+id/iv_image"
             android:layout_width="match_parent"
-            android:layout_height="200dp"
+            android:layout_height="220dp"
             android:scaleType="centerCrop"
             android:background="@drawable/bg_bubble_jarvis"
-            android:clipToOutline="true"/>
+            android:clipToOutline="true"
+            android:visibility="invisible"/>
 
+        <!-- Hint -->
         <TextView
             android:id="@+id/tv_hint"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Tap image to open full size"
-            android:textColor="#5a4a22"
+            android:textColor="#3a7aa0"
             android:textSize="10sp"
             android:padding="4dp"/>
 

@@ -28,48 +28,32 @@
         app:layout_constraintTop_toBottomOf="@id/top_line"
         app:layout_constraintStart_toStartOf="parent">
 
-        <!-- Logo + subtitle wrapped in circle -->
-        <FrameLayout
+        <!-- Logo + subtitle -->
+        <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:gravity="center_vertical">
+            android:orientation="vertical">
 
-            <!-- Complete circle ring around the logo -->
-            <View
-                android:layout_width="140dp"
-                android:layout_height="44dp"
-                android:layout_gravity="center_vertical|start"
-                android:background="@drawable/bg_logo_ring"/>
-
-            <LinearLayout
+            <TextView
+                android:id="@+id/tv_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center_vertical|start"
-                android:layout_marginStart="12dp"
-                android:orientation="vertical">
+                android:text="H·E·N·R·Y"
+                android:textColor="#00D4FF"
+                android:textSize="14sp"
+                android:letterSpacing="0.32"
+                android:fontFamily="sans-serif-medium"/>
 
-                <TextView
-                    android:id="@+id/tv_title"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="H·E·N·R·Y"
-                    android:textColor="#00D4FF"
-                    android:textSize="14sp"
-                    android:letterSpacing="0.32"
-                    android:fontFamily="sans-serif-medium"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="HYPERINTELLIGENCE ENGINE NEURAL REASONING YIELD"
+                android:textColor="#1E4A66"
+                android:textSize="6sp"
+                android:letterSpacing="0.12"/>
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="HYPERINTELLIGENCE ENGINE NEURAL REASONING YIELD"
-                    android:textColor="#1E4A66"
-                    android:textSize="6sp"
-                    android:letterSpacing="0.12"/>
-
-            </LinearLayout>
-
-        </FrameLayout>
+        </LinearLayout>
 
         <!-- Status badge -->
         <TextView

@@ -21,7 +21,7 @@
         android:maxWidth="290dp"
         android:background="@drawable/bg_bubble_user"
         android:textColor="#80DFFF"
-        android:textSize="14sp"
+        android:textSize="16sp"
         android:lineSpacingMultiplier="1.45"
         android:paddingStart="12dp"
         android:paddingEnd="12dp"
@@ -36,7 +36,7 @@
         android:gravity="center"
         android:text="YOU"
         android:textColor="#004466"
-        android:textSize="6sp"
+        android:textSize="8sp"
         android:letterSpacing="0.05"
         android:fontFamily="sans-serif-medium"
         android:background="@drawable/bg_avatar_user"/>

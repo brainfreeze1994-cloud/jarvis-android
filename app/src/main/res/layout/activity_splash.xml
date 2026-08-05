@@ -65,7 +65,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
             android:text="H·E·N·R·Y"
-            android:textSize="32sp"
+            android:textSize="38sp"
             android:textColor="#00D4FF"
             android:letterSpacing="0.4"
             android:fontFamily="sans-serif-medium"
@@ -77,9 +77,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:text="HYPERINTELLIGENCE ENGINE NEURAL REASONING YIELD "
-            android:textSize="7.5sp"
-            android:textColor="#2A6A8A"
+            android:text="HYPERINTELLIGENCE ENGINE NEURAL REASONING YIELD"
+            android:textSize="10sp"
+            android:textColor="#4A8AAA"
             android:letterSpacing="0.14"
             android:visibility="invisible" />
 
@@ -90,7 +90,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
             android:text="INITIALIZING..."
-            android:textSize="9sp"
+            android:textSize="12sp"
             android:textColor="#00D4FF"
             android:letterSpacing="0.2"
             android:fontFamily="monospace"
@@ -127,8 +127,8 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:text="0%"
-            android:textSize="8sp"
-            android:textColor="#2A6A8A"
+            android:textSize="11sp"
+            android:textColor="#4A8AAA"
             android:letterSpacing="0.15"
             android:fontFamily="monospace"
             android:visibility="invisible"/>
@@ -143,8 +143,8 @@
         android:layout_centerHorizontal="true"
         android:layout_marginBottom="28dp"
         android:text="v21.0.0 · HENRY AI"
-        android:textSize="9sp"
-        android:textColor="#0A2535" />
+        android:textSize="12sp"
+        android:textColor="#2A5575" />
 
     <!-- Bottom accent line -->
     <View

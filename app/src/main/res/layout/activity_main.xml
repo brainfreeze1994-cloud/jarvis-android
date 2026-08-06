@@ -86,6 +86,20 @@
             android:focusable="true"
             android:contentDescription="Voice settings"/>
 
+        <!-- Feature icons — scrollable so they can't push the Clear button off-screen -->
+        <HorizontalScrollView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:scrollbars="none"
+            android:overScrollMode="never">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
         <!-- Space Command button -->
         <TextView
             android:id="@+id/btn_space"
@@ -198,11 +212,15 @@
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:contentDescription="Plant Scanner"/>
 
-        <!-- Clear button -->
+        </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- Clear button — kept OUTSIDE the scroll area so it's always visible/reachable -->
         <ImageButton
             android:id="@+id/btn_clear"
             android:layout_width="34dp"
             android:layout_height="34dp"
+            android:layout_marginStart="4dp"
             android:background="@android:color/transparent"
             android:src="@drawable/ic_delete"
             android:contentDescription="Clear"

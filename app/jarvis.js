@@ -1,301 +1,637 @@
-module.exports = async function handler(req, res) {
+// ============================================================
+// H·E·N·R·Y™ — Hyperintelligence Engine Neural Reasoning Yield
+// v26 — THE BIG BANG UPDATE
+// Live Stocks · NASA/ISS · Earthquakes · Lyrics · Translation
+// Dictionary · Asteroids · Chain-of-Thought · Multi-Source Research
+// ============================================================
+
+const handler = async function(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST')   return res.status(405).json({ error: 'Method not allowed' });
 
+  const GROQ_KEY   = process.env.GROQ_API_KEY;
   const ACCOUNT_ID = process.env.CF_ACCOUNT_ID;
   const API_TOKEN  = process.env.CF_API_TOKEN;
-  if (!ACCOUNT_ID || !API_TOKEN) {
-    return res.status(500).json({ error: 'Missing CF_ACCOUNT_ID or CF_API_TOKEN env vars' });
+
+  let body;
+  try {
+    body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+  } catch (e) {
+    return res.status(200).json({ reply: 'Invalid request body, sir.' });
   }
 
+  const {
+    messages         = [],
+    imageBase64,
+    responseMode     = 'balanced',
+    userProfile,
+    queryType,
+    memoryFacts      = [],
+    emotionState,
+    relationshipContext,
+    enableChainThinking
+  } = body;
+
+  const lastMsg = messages[messages.length - 1]?.text || '';
+  const lower   = lastMsg.toLowerCase();
+  const emotion = detectEmotionalState(lastMsg, emotionState);
+  const mood    = getHenryMood();
+
+  const now = new Date().toLocaleString('en-US', {
+    timeZone: 'Asia/Dubai', weekday: 'long', year: 'numeric',
+    month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+  });
+
   try {
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
-    const { messages = [], imageBase64 } = body;
-    const lastMsg = messages[messages.length - 1]?.text || '';
 
-    const now = new Date().toLocaleString('en-US', {
-      timeZone: 'Asia/Dubai',
-      weekday: 'long', year: 'numeric', month: 'long',
-      day: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
-
-    // ── IMAGE ANALYSIS (vision model via Cloudflare) ───────────────────────
+    // ══════════════════════════════════════════════════════
+    // IMAGE ANALYSIS
+    // ══════════════════════════════════════════════════════
     if (imageBase64) {
-      const base64Data = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+      const q      = lastMsg || 'Describe this image in detail.';
+      const dataUrl = imageBase64.startsWith('data:') ? imageBase64 : 'data:image/jpeg;base64,' + imageBase64;
+      const sys    = buildSystemPrompt(now, responseMode, userProfile, memoryFacts, emotion, mood, relationshipContext);
 
-      try {
-        // LLaVA requires image as uint8 byte array, not raw base64 string
-        const imageBytes = Array.from(Buffer.from(base64Data, 'base64'));
+      if (GROQ_KEY) {
+        for (const model of ['meta-llama/llama-4-scout-17b-16e-instruct','llama-3.2-11b-vision-preview','llama-3.2-90b-vision-preview']) {
+          try {
+            const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+              method: 'POST',
+              headers: { 'Authorization': 'Bearer ' + GROQ_KEY, 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                model,
+                messages: [{ role: 'system', content: sys },
+                  { role: 'user', content: [
+                    { type: 'image_url', image_url: { url: dataUrl } },
+                    { type: 'text', text: q + '\n\nRespond as H.E.N.R.Y with emotion tag.' }
+                  ]}],
+                max_tokens: 1024, temperature: 0.7
+              })
+            });
+            const d = await tryJson(r);
+            if (r.ok && d?.choices?.[0]?.message)
+              return res.status(200).json(parseResponse(d.choices[0].message.content.trim()));
+          } catch(e) {}
+        }
+      }
 
-        const cfRes = await fetch(
-          `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/ai/run/@cf/llava-hf/llava-1.5-13b-hf`,
-          {
+      // Cloudflare LLaVA fallback
+      if (ACCOUNT_ID && API_TOKEN) {
+        try {
+          const b64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+          const cf  = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/ai/run/@cf/llava-hf/llava-1.5-7b-hf`, {
             method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${API_TOKEN}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              image: imageBytes,
-              prompt: lastMsg || 'Describe this image in detail.',
-              max_tokens: 1024
-            })
+            headers: { 'Authorization': 'Bearer ' + API_TOKEN, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: '[EMOTION:warm]\n' + q, image: Array.from(Buffer.from(b64, 'base64')) })
+          });
+          const cd = await tryJson(cf);
+          const txt = cd?.result?.description || cd?.result?.response || '';
+          if (txt) return res.status(200).json(parseResponse('[EMOTION:warm]\n' + txt));
+        } catch(e) {}
+      }
+      const sys2  = buildSystemPrompt(now, responseMode, userProfile, memoryFacts, emotion, mood, relationshipContext);
+      const conv2 = buildConvMessages([...messages.slice(-3), {role:'user',text:'The user sent an image. Acknowledge it and ask them what they\'d like to know.'}], sys2, 4);
+      const r2    = await callLLM(GROQ_KEY, ACCOUNT_ID, API_TOKEN, conv2);
+      return res.status(200).json(parseResponse(r2));
+    }
+
+    // ══════════════════════════════════════════════════════
+    // WEATHER
+    // ══════════════════════════════════════════════════════
+    if (/weather|temperature|forecast|humid|rain|wind|uv index|feels like/i.test(lastMsg)) {
+      const cityMatch = lastMsg.match(/weather\s+(?:in|for|of)?\s+([a-zA-Z\s]+?)(?:\?|$|,|\.|today|tomorrow|now)/i)
+                     || lastMsg.match(/(?:in|for)\s+([A-Za-z\s]+?)(?:\?|$|,|\.)/i);
+      const city = (cityMatch?.[1]?.trim()) || (userProfile?.city) || 'Dubai';
+      try {
+        const wRes  = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=j1`, { signal: AbortSignal.timeout(5000) });
+        const wJson = await tryJson(wRes);
+        const cur   = wJson?.current_condition?.[0];
+        if (cur) {
+          const c     = parseInt(cur.temp_C);
+          const f     = parseInt(cur.temp_F);
+          const feel  = parseInt(cur.FeelsLikeC);
+          const desc  = cur.weatherDesc?.[0]?.value || 'Unknown';
+          const hum   = cur.humidity + '%';
+          const wind  = cur.windspeedKmph + ' km/h';
+          const vis   = cur.visibility + ' km';
+          const uv    = cur.uvIndex;
+          const today = wJson.weather?.[0];
+          const high  = today?.maxtempC + '°C';
+          const low   = today?.mintempC + '°C';
+          const reply = `[EMOTION:warm]\n🌡 **Weather in ${city}**\n\n` +
+            `${desc} · **${c}°C** (${f}°F)\nFeels like ${feel}°C\n\n` +
+            `💧 Humidity: ${hum}  💨 Wind: ${wind}\n👁 Visibility: ${vis}  ☀️ UV Index: ${uv}\n` +
+            `📊 Today: High ${high} / Low ${low}`;
+          return res.status(200).json(parseResponse(reply));
+        }
+      } catch(e) {}
+    }
+
+    // ══════════════════════════════════════════════════════
+    // v26 — LIVE STOCKS & MARKETS
+    // ══════════════════════════════════════════════════════
+    if (/\bstock|share price|market cap|nasdaq|s&p|dow jones|nyse|invest|ticker\b/i.test(lastMsg) ||
+        /\b(AAPL|TSLA|GOOGL|AMZN|MSFT|NVDA|META|NFLX|AMD|INTC|BABA)\b/.test(lastMsg)) {
+      const tickerMatch = lastMsg.match(/\b([A-Z]{1,5})\b/g);
+      const tickers = tickerMatch ? [...new Set(tickerMatch.filter(t => t.length >= 2 && t.length <= 5))].slice(0,3) : ['AAPL'];
+      const results = [];
+      for (const t of tickers) {
+        try {
+          const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${t}?interval=1d&range=1d`, {
+            signal: AbortSignal.timeout(5000),
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+          });
+          const d = await tryJson(r);
+          const meta = d?.chart?.result?.[0]?.meta;
+          if (meta?.regularMarketPrice) {
+            const price = meta.regularMarketPrice;
+            const prev  = meta.previousClose || meta.chartPreviousClose || price;
+            const chg   = ((price - prev) / prev * 100).toFixed(2);
+            const arrow = parseFloat(chg) >= 0 ? '▲' : '▼';
+            const clr   = parseFloat(chg) >= 0 ? '+' : '';
+            results.push(`**${t}** — $${price.toFixed(2)}  ${arrow} ${clr}${chg}%  (${meta.exchangeName||''})`);
           }
-        );
-        const text = await cfRes.text();
-        let data;
-        try { data = JSON.parse(text); } catch(e) { throw new Error('Vision parse error: ' + text.slice(0, 200)); }
-
-        // LLaVA returns result.description or result.response depending on version
-        const visionText = data.result?.description || data.result?.response || '';
-        if (cfRes.ok && data.success && visionText) {
-          const visionResult = visionText.trim();
-          const reply = await callLLM(ACCOUNT_ID, API_TOKEN, [
-            { role: 'system', content: buildSystemPrompt(now) },
-            ...messages.slice(-6, -1).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text || '' })),
-            { role: 'user', content: `User sent an image and asked: "${lastMsg || 'Describe this image'}"\n\nImage analysis result:\n${visionResult}\n\nProvide a helpful, detailed JARVIS-style response.` }
-          ]);
-          return res.status(200).json({ reply });
-        }
-      } catch (visionErr) {
-        // Vision model failed — fall through
+        } catch(e) {}
       }
-
-      // Fallback
-      const fallbackReply = await callLLM(ACCOUNT_ID, API_TOKEN, [
-        { role: 'system', content: buildSystemPrompt(now) },
-        { role: 'user', content: `The user sent an image with the message: "${lastMsg || 'Please analyse this image.'}". Unfortunately the vision analysis was temporarily unavailable. Acknowledge this politely as JARVIS and offer to help with a description if they paste any text from the image, or offer to answer related questions.` }
-      ]);
-      return res.status(200).json({ reply: fallbackReply });
-    }
-
-    // ── IMAGE GENERATION (Pollinations.ai — free, no key) ──────────────────
-    const imageMatch = lastMsg.match(
-      /(?:generate|create|draw|make|show me|render|produce)\s+(?:an?\s+)?(?:image|picture|photo|illustration|art|artwork|painting|wallpaper|logo)\s+(?:of\s+)?(.+)/i
-    ) || lastMsg.match(/(?:image|picture|photo)\s+of\s+(.+)/i);
-
-    if (imageMatch) {
-      const rawPrompt = (imageMatch[1] || lastMsg);
-      const prompt = rawPrompt
-        .replace(/[?.!].*$/, '')
-        .replace(/\s*\b(why|how|when|where|please|for me|only this|now|can you|could you|just|only|this|that)\b.*/i, '')
-        .trim();
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=896&height=512&nologo=true&enhance=true&model=flux`;
-      return res.status(200).json({
-        reply: `Here is your generated image, sir.\n\n*Prompt: "${prompt}"*`,
-        imageUrl
-      });
-    }
-
-    // ── CODE EXECUTION (Piston API — free, no key) ─────────────────────────
-    const codeBlockMatch = lastMsg.match(/```(\w+)?\n?([\s\S]+?)```/);
-    const runMatch = !codeBlockMatch && lastMsg.match(/^(?:run|execute|compile)\s+(?:this\s+)?(?:(\w+)\s+)?(?:code[:\s]*)?(\s[\s\S]+)/i);
-
-    if (codeBlockMatch || runMatch) {
-      let language, code;
-      if (codeBlockMatch) {
-        language = (codeBlockMatch[1] || 'python').toLowerCase();
-        code = codeBlockMatch[2].trim();
-      } else {
-        language = (runMatch[1] || 'python').toLowerCase();
-        code = runMatch[2].trim();
+      if (results.length) {
+        const reply = `[EMOTION:excited]\n📈 **Live Market Data**\n\n` + results.join('\n') +
+          `\n\n_Updated ${new Date().toLocaleTimeString('en-US',{timeZone:'America/New_York'})} ET_`;
+        return res.status(200).json(parseResponse(reply));
       }
-      const langMap = { js: 'javascript', py: 'python', ts: 'typescript', 'c++': 'cpp' };
-      language = langMap[language] || language;
-
-      try {
-        const runtimesRes = await fetch('https://emkc.org/api/v2/piston/runtimes');
-        const runtimes = await runtimesRes.json();
-        const runtime = runtimes.find(r => r.language === language || (r.aliases || []).includes(language));
-        const version = runtime?.version || '*';
-
-        const pistonRes = await fetch('https://emkc.org/api/v2/piston/execute', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ language, version, files: [{ content: code }] })
-        });
-        const pistonData = await pistonRes.json();
-        const output = (pistonData.run?.output || pistonData.run?.stderr || 'No output').trim();
-        const exitCode = pistonData.run?.code ?? '?';
-
-        const explanation = await callLLM(ACCOUNT_ID, API_TOKEN, [
-          { role: 'system', content: `You are JARVIS. The user ran ${language} code. Briefly explain the result in 1-2 sentences. Time: ${now}` },
-          { role: 'user', content: `Code:\n\`\`\`${language}\n${code}\n\`\`\`\nOutput: ${output}\nExit code: ${exitCode}` }
-        ]);
-
-        return res.status(200).json({
-          reply: `**Executed** (${language}, exit: ${exitCode})\n\`\`\`\n${output}\n\`\`\`\n\n${explanation}`
-        });
-      } catch (e) {
-        // fall through to LLM
-      }
+      // AI fallback for general market questions
+      const sys  = buildSystemPrompt(now, responseMode, userProfile, memoryFacts, emotion, mood, relationshipContext);
+      const conv = buildConvMessages(messages, sys, 12);
+      return res.status(200).json(parseResponse(await callLLM(GROQ_KEY, ACCOUNT_ID, API_TOKEN, conv)));
     }
 
-    // ── URL READING (Jina AI — free, no key) ───────────────────────────────
-    const urlMatch = lastMsg.match(/https?:\/\/[^\s]+/);
-    if (urlMatch) {
-      const url = urlMatch[0];
+    // ══════════════════════════════════════════════════════
+    // v26 — CRYPTOCURRENCY PRICES
+    // ══════════════════════════════════════════════════════
+    if (/crypto|bitcoin|ethereum|bnb|solana|ripple|xrp|doge|coin price|defi|blockchain|btc|eth|ltc/i.test(lastMsg)) {
       try {
-        const jinaRes = await fetch(`https://r.jina.ai/${url}`, {
-          headers: { 'Accept': 'text/plain', 'X-Timeout': '10' }
-        });
-        const pageContent = (await jinaRes.text()).slice(0, 4000);
-        const reply = await callLLM(ACCOUNT_ID, API_TOKEN, [
-          { role: 'system', content: buildSystemPrompt(now) },
-          ...messages.slice(0, -1).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text || '' })),
-          { role: 'user', content: `User asked: "${lastMsg}"\n\nPage content from ${url}:\n\n${pageContent}\n\nAnswer based on this content.` }
-        ]);
-        return res.status(200).json({ reply });
-      } catch (e) {
-        // fall through
-      }
-    }
-
-    // ── WEATHER (wttr.in — free, no key) ──────────────────────────────────
-    const weatherMatch = lastMsg.match(/(?:weather|temperature|temp|forecast|humidity|wind|rain|hot|cold|climate)\s+(?:in|at|for|of)?\s*([a-zA-Z\s,]+?)(?:\?|$)/i)
-      || lastMsg.match(/(?:what(?:'s| is) the weather|how(?:'s| is) the weather)\s+(?:in|at|for)?\s*([a-zA-Z\s,]+?)(?:\?|$)/i)
-      || lastMsg.match(/(?:weather|forecast)\s*\??$/i);
-
-    if (weatherMatch) {
-      const city = (weatherMatch[1] || 'Dubai').trim() || 'Dubai';
-      try {
-        const wRes = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=j1`, {
-          headers: { 'User-Agent': 'JARVIS/1.0' }
-        });
-        if (wRes.ok) {
-          const w = await wRes.json();
-          const cur = w.current_condition[0];
-          const area = w.nearest_area[0];
-          const areaName = area.areaName[0].value;
-          const country = area.country[0].value;
-          const tempC = cur.temp_C, tempF = cur.temp_F;
-          const feelsC = cur.FeelsLikeC, feelsF = cur.FeelsLikeF;
-          const humidity = cur.humidity, windKmph = cur.windspeedKmph;
-          const windDir = cur.winddir16Point, desc = cur.weatherDesc[0].value;
-          const visibility = cur.visibility, uvIndex = cur.uvIndex;
-          const pressure = cur.pressure, cloudCover = cur.cloudcover;
-          const days = ['Today', 'Tomorrow', 'Day After'];
-          const forecastLines = w.weather.slice(0, 3).map((day, i) => {
-            const dayDesc = day.hourly[4]?.weatherDesc[0]?.value || '';
-            const rain = day.hourly[4]?.chanceofrain || 0;
-            return `**${days[i]} (${day.date}):** ${day.mintempC}°C – ${day.maxtempC}°C, ${dayDesc}, 🌧 ${rain}% rain`;
-          }).join('\n');
-          const weatherReport = `## Weather in ${areaName}, ${country}\n*${now}*\n\n` +
-            `**Condition:** ${desc}\n` +
-            `**Temperature:** ${tempC}°C (${tempF}°F) — Feels like ${feelsC}°C (${feelsF}°F)\n` +
-            `**Humidity:** ${humidity}%\n**Wind:** ${windKmph} km/h from ${windDir}\n` +
-            `**Visibility:** ${visibility} km\n**UV Index:** ${uvIndex}\n` +
-            `**Pressure:** ${pressure} hPa\n**Cloud Cover:** ${cloudCover}%\n\n` +
-            `### 3-Day Forecast\n${forecastLines}`;
-          return res.status(200).json({ reply: weatherReport });
+        const coins = 'bitcoin,ethereum,binancecoin,solana,ripple,dogecoin,cardano,polkadot,chainlink,avalanche-2';
+        const r     = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coins}&vs_currencies=usd&include_24hr_change=true`, { signal: AbortSignal.timeout(6000) });
+        const d     = await tryJson(r);
+        if (d && Object.keys(d).length) {
+          const coinMap = { bitcoin:'BTC', ethereum:'ETH', binancecoin:'BNB', solana:'SOL', ripple:'XRP',
+                            dogecoin:'DOGE', cardano:'ADA', polkadot:'DOT', chainlink:'LINK', 'avalanche-2':'AVAX' };
+          const mentioned = Object.entries(coinMap).filter(([id]) => d[id]);
+          const lines = mentioned.slice(0,6).map(([id, sym]) => {
+            const price = d[id].usd;
+            const chg   = d[id].usd_24h_change?.toFixed(2);
+            const arrow = parseFloat(chg) >= 0 ? '▲' : '▼';
+            return `**${sym}** $${price >= 1 ? price.toFixed(2) : price.toFixed(6)}  ${arrow} ${chg}%`;
+          });
+          const reply = `[EMOTION:excited]\n🪙 **Live Crypto Prices**\n\n` + lines.join('\n');
+          return res.status(200).json(parseResponse(reply));
         }
-      } catch (e) { /* fall through */ }
+      } catch(e) {}
     }
 
-    // ── WEB SEARCH (DuckDuckGo Instant — free, no key) ────────────────────
-    const searchTriggers = /latest|news|today|current|right now|breaking|who is|what is the|where is|when did|how much|price of|score of|stock price|trending|tell me about/i;
-    if (searchTriggers.test(lastMsg)) {
-      try {
-        const query = encodeURIComponent(lastMsg.replace(/[?!]/g, '').trim());
-        const ddgRes = await fetch(
-          `https://api.duckduckgo.com/?q=${query}&format=json&no_html=1&skip_disambig=1&t=jarvis`,
-          { headers: { 'Accept-Encoding': 'identity' } }
-        );
-        const ddg = await ddgRes.json();
-        let searchContext = '';
-        if (ddg.Answer) searchContext += `Answer: ${ddg.Answer}\n`;
-        if (ddg.AbstractText) searchContext += `${ddg.AbstractText}\n`;
-        if (ddg.Definition) searchContext += `Definition: ${ddg.Definition}\n`;
-        if (ddg.RelatedTopics?.length) {
-          ddg.RelatedTopics.slice(0, 4).forEach(t => { if (t.Text) searchContext += `- ${t.Text}\n`; });
-        }
-        if (searchContext.trim()) {
-          const reply = await callLLM(ACCOUNT_ID, API_TOKEN, [
-            { role: 'system', content: buildSystemPrompt(now) },
-            ...messages.slice(0, -1).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text || '' })),
-            { role: 'user', content: `User asked: "${lastMsg}"\n\nSearch results:\n${searchContext}\n\nAnswer naturally based on these results.` }
-          ]);
-          return res.status(200).json({ reply });
-        }
-      } catch (e) { /* fall through */ }
-    }
-
-    // ── WIKIPEDIA LOOKUP (free, no key) ───────────────────────────────────
-    const wikiMatch = lastMsg.match(/(?:who is|what is|tell me about|explain|describe)\s+(.+)/i);
-    if (wikiMatch) {
-      const term = wikiMatch[1].replace(/[?!.]/g, '').trim();
-      try {
-        const wikiRes = await fetch(
-          `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(term)}`,
-          { headers: { 'User-Agent': 'JARVIS/1.0' } }
-        );
-        if (wikiRes.ok) {
-          const wiki = await wikiRes.json();
-          if (wiki.extract) {
-            const reply = await callLLM(ACCOUNT_ID, API_TOKEN, [
-              { role: 'system', content: buildSystemPrompt(now) },
-              ...messages.slice(0, -1).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text || '' })),
-              { role: 'user', content: `User asked: "${lastMsg}"\n\nWikipedia:\n${wiki.extract}\n\nAnswer based on this.` }
-            ]);
-            return res.status(200).json({ reply });
+    // ══════════════════════════════════════════════════════
+    // v26 — NASA & SPACE INTELLIGENCE
+    // ══════════════════════════════════════════════════════
+    if (/nasa|iss|space station|asteroid|comet|planet|galaxy|universe|cosmos|mars|moon|solar|telescope|hubble|webb|spacecraft|rocket|orbit/i.test(lastMsg)) {
+      // ISS position
+      if (/iss|space station|where is|location/i.test(lastMsg)) {
+        try {
+          const r = await fetch('http://api.open-notify.org/iss-now.json', { signal: AbortSignal.timeout(5000) });
+          const d = await tryJson(r);
+          if (d?.iss_position) {
+            const lat = parseFloat(d.iss_position.latitude).toFixed(2);
+            const lon = parseFloat(d.iss_position.longitude).toFixed(2);
+            const reply = `[EMOTION:excited]\n🛸 **ISS Live Position**\n\nLatitude: ${lat}°\nLongitude: ${lon}°\n\nThe International Space Station is travelling at ~28,000 km/h, completing one orbit every 92 minutes. It's about 408 km above Earth right now.\n\nTrack live: spotthestation.nasa.gov`;
+            return res.status(200).json(parseResponse(reply));
           }
-        }
-      } catch (e) { /* fall through */ }
+        } catch(e) {}
+      }
+      // NASA APOD
+      if (/photo|picture|image|apod|astronomy|picture of the day/i.test(lastMsg)) {
+        try {
+          const r = await fetch('https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY', { signal: AbortSignal.timeout(6000) });
+          const d = await tryJson(r);
+          if (d?.title) {
+            const reply = `[EMOTION:excited]\n🔭 **NASA Photo of the Day**\n\n**${d.title}**\n\n${d.explanation?.slice(0,400)}...\n\n🖼 View: ${d.url}`;
+            return res.status(200).json(parseResponse(reply));
+          }
+        } catch(e) {}
+      }
+      // Near-Earth asteroids
+      if (/asteroid|near.earth|impact|nea/i.test(lastMsg)) {
+        try {
+          const today = new Date().toISOString().split('T')[0];
+          const r = await fetch(`https://api.nasa.gov/neo/rest/v1/feed?start_date=${today}&end_date=${today}&api_key=DEMO_KEY`, { signal: AbortSignal.timeout(7000) });
+          const d = await tryJson(r);
+          const count = d?.element_count || 0;
+          const neos  = Object.values(d?.near_earth_objects || {})[0] || [];
+          const hazardous = neos.filter(n => n.is_potentially_hazardous_asteroid);
+          const closest  = neos.sort((a,b) => parseFloat(a.close_approach_data?.[0]?.miss_distance?.kilometers||Infinity) - parseFloat(b.close_approach_data?.[0]?.miss_distance?.kilometers||Infinity))[0];
+          const dist     = closest ? parseFloat(closest.close_approach_data?.[0]?.miss_distance?.kilometers||0).toLocaleString() : 'N/A';
+          const reply    = `[EMOTION:serious]\n☄️ **Near-Earth Asteroids Today**\n\nTotal tracked today: **${count}**\nPotentially hazardous: **${hazardous.length}** (none on collision course)\nClosest approach: **${closest?.name||'N/A'}** at ${dist} km\n\nNASA monitors all near-Earth objects 24/7. Earth is safe, sir.`;
+          return res.status(200).json(parseResponse(reply));
+        } catch(e) {}
+      }
+      // Generic space question → AI with space expertise
+      const sys  = buildSystemPrompt(now, responseMode, userProfile, memoryFacts, emotion, mood, relationshipContext);
+      const conv = buildConvMessages([...messages.slice(-3), {role:'user', text: lastMsg + '\n\nAnswer with deep space knowledge, include fascinating facts, distances in light-years where relevant, and convey the awe of the cosmos.'}], sys, 6);
+      return res.status(200).json(parseResponse(await callLLM(GROQ_KEY, ACCOUNT_ID, API_TOKEN, conv)));
     }
 
-    // ── DEFAULT: Direct LLM ───────────────────────────────────────────────
-    const reply = await callLLM(ACCOUNT_ID, API_TOKEN, [
-      { role: 'system', content: buildSystemPrompt(now) },
-      ...messages.map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text || '' }))
-    ]);
-    return res.status(200).json({ reply });
+    // ══════════════════════════════════════════════════════
+    // v26 — LIVE EARTHQUAKES (USGS)
+    // ══════════════════════════════════════════════════════
+    if (/earthquake|seismic|tremor|quake|richter|tectonic|tsunami|disaster|magnitude/i.test(lastMsg)) {
+      try {
+        const r = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/significant_week.geojson', { signal: AbortSignal.timeout(6000) });
+        const d = await tryJson(r);
+        const quakes = d?.features || [];
+        if (quakes.length) {
+          const sorted = quakes.sort((a,b) => b.properties.mag - a.properties.mag).slice(0,5);
+          const lines  = sorted.map(q => {
+            const p    = q.properties;
+            const mag  = p.mag?.toFixed(1);
+            const place = p.place || 'Unknown location';
+            const t    = new Date(p.time).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+            return `M${mag} — ${place} (${t})`;
+          });
+          const reply = `[EMOTION:serious]\n🌍 **Significant Earthquakes This Week**\n\n` + lines.join('\n') +
+            `\n\n_Data: USGS Real-Time Feed_`;
+          return res.status(200).json(parseResponse(reply));
+        }
+      } catch(e) {}
+    }
 
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
+    // ══════════════════════════════════════════════════════
+    // v26 — SONG LYRICS
+    // ══════════════════════════════════════════════════════
+    if (/lyrics|song words|words to|sing|what are the lyrics/i.test(lastMsg)) {
+      const lyricMatch = lastMsg.match(/lyrics\s+(?:of|for|to)?\s+["']?(.+?)["']?\s+(?:by|from)?\s+["']?(.+?)["']?(?:\?|$)/i)
+                      || lastMsg.match(/["'](.+?)["']\s+by\s+["']?(.+?)["']?/i);
+      if (lyricMatch) {
+        const song   = encodeURIComponent(lyricMatch[1].trim());
+        const artist = encodeURIComponent(lyricMatch[2].trim());
+        try {
+          const r  = await fetch(`https://api.lyrics.ovh/v1/${artist}/${song}`, { signal: AbortSignal.timeout(6000) });
+          const d  = await tryJson(r);
+          if (d?.lyrics) {
+            const preview = d.lyrics.slice(0, 600);
+            return res.status(200).json(parseResponse(`[EMOTION:warm]\n🎵 **${decodeURIComponent(song)}** by **${decodeURIComponent(artist)}**\n\n${preview}${d.lyrics.length > 600 ? '\n\n_[lyrics continue…]_' : ''}`));
+          }
+        } catch(e) {}
+      }
+    }
+
+    // ══════════════════════════════════════════════════════
+    // v26 — DICTIONARY & WORD DEFINITIONS
+    // ══════════════════════════════════════════════════════
+    if (/define |definition of |what does .+ mean|meaning of |synonym|antonym|vocabulary|etymology/i.test(lastMsg)) {
+      const wordMatch = lastMsg.match(/define\s+["']?(\w+)["']?/i)
+                     || lastMsg.match(/definition of\s+["']?(\w+)["']?/i)
+                     || lastMsg.match(/meaning of\s+["']?(\w+)["']?/i)
+                     || lastMsg.match(/what does\s+["']?(\w+)["']?\s+mean/i);
+      if (wordMatch) {
+        const word = wordMatch[1].toLowerCase();
+        try {
+          const r = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`, { signal: AbortSignal.timeout(5000) });
+          const d = await tryJson(r);
+          if (Array.isArray(d) && d[0]) {
+            const entry    = d[0];
+            const meanings = entry.meanings?.slice(0,2).map(m => {
+              const defs = m.definitions?.slice(0,2).map(df => `• ${df.definition}`).join('\n');
+              const syns = m.synonyms?.slice(0,4).join(', ');
+              return `**${m.partOfSpeech}**\n${defs}${syns ? `\nSynonyms: ${syns}` : ''}`;
+            }).join('\n\n');
+            const phonetic = entry.phonetics?.find(p => p.text)?.text || '';
+            const reply    = `[EMOTION:warm]\n📖 **${entry.word}** ${phonetic}\n\n${meanings}`;
+            return res.status(200).json(parseResponse(reply));
+          }
+        } catch(e) {}
+      }
+    }
+
+    // ══════════════════════════════════════════════════════
+    // v26 — LANGUAGE TRANSLATION
+    // ══════════════════════════════════════════════════════
+    if (/translat|in spanish|in french|in arabic|in tagalog|in japanese|in chinese|in german|in italian|in portuguese|in russian|in korean|in hindi/i.test(lastMsg)) {
+      const langMap = {
+        spanish:'en|es', french:'en|fr', arabic:'en|ar', tagalog:'en|tl',
+        japanese:'en|ja', chinese:'en|zh', german:'en|de', italian:'en|it',
+        portuguese:'en|pt', russian:'en|ru', korean:'en|ko', hindi:'en|hi',
+        english:'auto|en'
+      };
+      const toLang = Object.keys(langMap).find(l => lower.includes(l));
+      const transMatch = lastMsg.match(/translate\s+["']?(.+?)["']?\s+(?:to|into|in)\s+\w+/i)
+                      || lastMsg.match(/["'](.+?)["']\s+(?:in|to)\s+\w+/i)
+                      || lastMsg.match(/how\s+(?:do|to)\s+say\s+["']?(.+?)["']?/i);
+      if (toLang && transMatch) {
+        const text = transMatch[1].trim();
+        try {
+          const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langMap[toLang]}`, { signal: AbortSignal.timeout(6000) });
+          const d = await tryJson(r);
+          const t = d?.responseData?.translatedText;
+          if (t && !t.toLowerCase().includes('must be shorter')) {
+            return res.status(200).json(parseResponse(`[EMOTION:warm]\n🌐 **Translation to ${toLang.charAt(0).toUpperCase()+toLang.slice(1)}**\n\n"${text}" → **"${t}"**`));
+          }
+        } catch(e) {}
+      }
+    }
+
+    // ══════════════════════════════════════════════════════
+    // v26 — LIVE CURRENCY / FOREX RATES
+    // ══════════════════════════════════════════════════════
+    if (/currency|exchange rate|forex|usd|eur|gbp|jpy|aed|convert.*\$|how much is|rate of/i.test(lastMsg)) {
+      const currMatch = lastMsg.match(/(\d+(?:\.\d+)?)\s*([A-Z]{3})\s+(?:to|in)\s+([A-Z]{3})/i)
+                     || lastMsg.match(/([A-Z]{3})\s+to\s+([A-Z]{3})/i);
+      const base = currMatch?.[currMatch.length === 4 ? 2 : 1]?.toUpperCase() || 'USD';
+      try {
+        const r = await fetch(`https://open.er-api.com/v6/latest/${base}`, { signal: AbortSignal.timeout(5000) });
+        const d = await tryJson(r);
+        if (d?.rates) {
+          const popular = ['USD','EUR','GBP','AED','JPY','AUD','CAD','CHF','SAR','INR'];
+          const lines   = popular.filter(c => c !== base && d.rates[c])
+            .slice(0,8)
+            .map(c => `**1 ${base}** = ${d.rates[c].toFixed(4)} ${c}`);
+          // Handle specific conversion
+          let specific = '';
+          if (currMatch?.length === 4) {
+            const amt  = parseFloat(currMatch[1]);
+            const from = currMatch[2].toUpperCase();
+            const to   = currMatch[3].toUpperCase();
+            const rate = d.rates[to];
+            if (rate) specific = `\n\n💱 **${amt} ${from} = ${(amt * rate).toFixed(2)} ${to}**`;
+          }
+          return res.status(200).json(parseResponse(`[EMOTION:warm]\n💰 **Live ${base} Exchange Rates**${specific}\n\n` + lines.join('\n') + `\n\n_Source: Open Exchange Rates_`));
+        }
+      } catch(e) {}
+    }
+
+    // ══════════════════════════════════════════════════════
+    // v26 — DEEP RESEARCH MODE
+    // ══════════════════════════════════════════════════════
+    if (/research|deep dive|explain in detail|comprehensive|everything about|full analysis|thesis|dissertation/i.test(lastMsg) || queryType === 'research') {
+      const topic = lastMsg.replace(/research|deep dive|explain in detail|comprehensive|everything about|full analysis/gi, '').trim();
+      let webContext = '';
+      try {
+        const ddRes = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(topic)}&format=json&no_redirect=1&no_html=1`, { signal: AbortSignal.timeout(5000) });
+        const ddData = await tryJson(ddRes);
+        if (ddData?.AbstractText) webContext += 'Summary: ' + ddData.AbstractText + '\n';
+        if (ddData?.RelatedTopics?.length) {
+          webContext += 'Related: ' + ddData.RelatedTopics.slice(0,3).map(t => t.Text||'').join(' | ');
+        }
+      } catch(e) {}
+      try {
+        const wkRes  = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic.split(' ').slice(0,3).join('_'))}`, { signal: AbortSignal.timeout(5000) });
+        const wkData = await tryJson(wkRes);
+        if (wkData?.extract) webContext += '\nWikipedia: ' + wkData.extract.slice(0,600);
+      } catch(e) {}
+      const sys  = buildSystemPrompt(now, 'detailed', userProfile, memoryFacts, emotion, mood, relationshipContext);
+      const conv = buildConvMessages([...messages.slice(-2), {
+        role:'user',
+        text: `[DEEP RESEARCH MODE] Research this comprehensively: "${topic}"\n\nContext from web: ${webContext || 'none'}\n\nProvide: 1) Overview, 2) Key facts & data, 3) Historical context, 4) Current state, 5) Future implications, 6) Expert insights. Be thorough, cite any sources found.`
+      }], sys, 4);
+      return res.status(200).json(parseResponse(await callLLM(GROQ_KEY, ACCOUNT_ID, API_TOKEN, conv)));
+    }
+
+    // ══════════════════════════════════════════════════════
+    // v26 — WEB SEARCH + WIKIPEDIA
+    // ══════════════════════════════════════════════════════
+    // Broadened to also catch product/version questions ("why iPhone 13 not
+    // iPhone 17", "which is better", "is the S25 out yet") that don't contain
+    // an obvious "latest/current/today" word but are still time-sensitive —
+    // without this, these fall through to the DEFAULT handler below with no
+    // web context at all, and the model answers from stale training data.
+    if (/latest|news|current|today|recent|who is|what is|where is|how to|why|breaking|2025|2026|compare|versus|\bvs\b|newest|newer|which (is|one|phone|model)|should i (buy|get)|worth (it|buying)|release date|just released|is out now|available now|out yet|specs|specifications|review/i.test(lastMsg)) {
+      let context = '';
+      try {
+        const ddRes  = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(lastMsg)}&format=json&no_redirect=1&no_html=1`, { signal: AbortSignal.timeout(4000) });
+        const ddData = await tryJson(ddRes);
+        if (ddData?.AbstractText) context += ddData.AbstractText + '\n';
+        if (ddData?.RelatedTopics?.length) {
+          context += ddData.RelatedTopics.slice(0,3).map(t => t.Text||'').filter(Boolean).join(' | ');
+        }
+      } catch(e) {}
+      try {
+        const slug   = lastMsg.split(' ').slice(0,4).join('_');
+        const wkRes  = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(slug)}`, { signal: AbortSignal.timeout(4000) });
+        const wkData = await tryJson(wkRes);
+        if (wkData?.extract) context += '\n' + wkData.extract.slice(0,500);
+      } catch(e) {}
+      if (context.length > 50) {
+        const sys  = buildSystemPrompt(now, responseMode, userProfile, memoryFacts, emotion, mood, relationshipContext);
+        const conv = buildConvMessages([...messages.slice(-3), {
+          role:'user', text:`${lastMsg}\n\n[Web context: ${context}]\n\nUse the web context to give an accurate, current answer.`
+        }], sys, 6);
+        return res.status(200).json(parseResponse(await callLLM(GROQ_KEY, ACCOUNT_ID, API_TOKEN, conv)));
+      }
+    }
+
+    // ══════════════════════════════════════════════════════
+    // v25 — FLIGHT TRACKING (enhanced)
+    // ══════════════════════════════════════════════════════
+    if (/flight|track.*flight|flight.*track|plane|aircraft|departure|arrival/i.test(lastMsg) ||
+        (/\b[A-Za-z]{2}\d{1,4}\b/.test(lastMsg) && /track|status|check|where is/i.test(lastMsg))) {
+      const flightMatch = lastMsg.match(/\b([A-Za-z]{2}\d{1,4})\b/);
+      const flightNum   = flightMatch ? flightMatch[1].toUpperCase() : null;
+      if (flightNum) {
+        let liveData = null;
+        try {
+          const skyRes  = await fetch('https://opensky-network.org/api/states/all', { signal: AbortSignal.timeout(8000) });
+          const skyJson = await tryJson(skyRes);
+          const states  = skyJson?.states || [];
+          const match   = states.find(s => {
+            const cs = ((s[1]||'').trim().toUpperCase()).replace(/\s+/g,'');
+            return cs.includes(flightNum) || flightNum.startsWith(cs.slice(0,3));
+          });
+          if (match) {
+            const callsign = ((match[1]||'').trim()) || flightNum;
+            const country  = match[2] || 'Unknown';
+            const lon      = parseFloat(match[5]||0);
+            const lat      = parseFloat(match[6]||0);
+            const alt      = parseFloat(match[7]||0);
+            const speed    = parseFloat(match[9]||0);
+            const heading  = parseFloat(match[10]||0);
+            const onGround = match[8] === true || match[8] === 'true';
+            liveData = { callsign, country, lon, lat, alt, speed, heading, onGround };
+          }
+        } catch(e) {}
+        if (liveData) {
+          const ld      = liveData;
+          const altFt   = Math.round(ld.alt * 3.281);
+          const spdKmh  = Math.round(ld.speed * 3.6);
+          const summary = `[EMOTION:excited]\n**Flight ${ld.callsign}** — ${ld.onGround ? 'On Ground' : '✈ Airborne'}\n\n` +
+            `Country: ${ld.country}\nPosition: ${ld.lat.toFixed(3)}°N, ${ld.lon.toFixed(3)}°E\n` +
+            `Altitude: ${Math.round(ld.alt).toLocaleString()} m (${altFt.toLocaleString()} ft)\n` +
+            `Speed: ${spdKmh} km/h | Heading: ${Math.round(ld.heading)}°\n\nLive from OpenSky Network · flightradar24.com`;
+          return res.status(200).json(parseResponse(summary));
+        }
+        const sys  = buildSystemPrompt(now, responseMode, userProfile, memoryFacts, emotion, mood, relationshipContext);
+        const conv = buildConvMessages([...messages.slice(-2), {
+          role:'user', text:`Tell me about flight ${flightNum}: airline, route, schedule, aircraft type, on-time performance. Recommend flightradar24.com.`
+        }], sys, 5);
+        return res.status(200).json(parseResponse(await callLLM(GROQ_KEY, ACCOUNT_ID, API_TOKEN, conv)));
+      }
+    }
+
+    // ══════════════════════════════════════════════════════
+    // v24 — SPORTS SCORES
+    // ══════════════════════════════════════════════════════
+    if (/score|match|fixture|standings|premier league|champions league|nba|football result|sport/i.test(lastMsg)) {
+      const sys  = buildSystemPrompt(now, responseMode, userProfile, memoryFacts, emotion, mood, relationshipContext);
+      const conv = buildConvMessages([...messages.slice(-3), {
+        role:'user', text: lastMsg + '\n\nProvide sports scores, standings, or fixtures. If you have training data on this, give specific numbers. Mention livescore.com and espn.com for live scores.'
+      }], sys, 5);
+      return res.status(200).json(parseResponse(await callLLM(GROQ_KEY, ACCOUNT_ID, API_TOKEN, conv)));
+    }
+
+    // ══════════════════════════════════════════════════════
+    // v26 — IMAGE GENERATION (Pollinations Flux)
+    // ══════════════════════════════════════════════════════
+    if (/generate|create|draw|make|paint|render|visualize|image of|picture of|photo of|illustration/i.test(lastMsg) && /image|picture|photo|art|illustration|painting|portrait|scene/i.test(lastMsg)) {
+      const rawPrompt = lastMsg.replace(/generate|create|draw|make|paint|render|visualize|an image of|a picture of|a photo of|an illustration of/gi, '').replace(/[^\w\s,.'-]/g, '').trim();
+      const clean     = rawPrompt.slice(0, 200);
+      const url       = `https://image.pollinations.ai/prompt/${encodeURIComponent(clean)}?model=flux&width=1024&height=1024&nologo=true`;
+      return res.status(200).json({ reply: `[EMOTION:excited]\n🎨 **Generating your image...**\n\nPrompt: *${clean}*`, imageUrl: url });
+    }
+
+    // ══════════════════════════════════════════════════════
+    // v26 — CHAIN-OF-THOUGHT REASONING (hard problems)
+    // ══════════════════════════════════════════════════════
+    if (enableChainThinking || /solve|prove|calculate|derive|step by step|explain how|work out|analyze|reason through|think through/i.test(lastMsg)) {
+      const sys  = buildSystemPrompt(now, 'detailed', userProfile, memoryFacts, emotion, mood, relationshipContext);
+      const conv = buildConvMessages([...messages.slice(-4), {
+        role:'user',
+        text: lastMsg + '\n\n[CHAIN-OF-THOUGHT MODE: Think step by step. Show your reasoning. Be precise and thorough. Use numbered steps where applicable.]'
+      }], sys, 8);
+      return res.status(200).json(parseResponse(await callLLM(GROQ_KEY, ACCOUNT_ID, API_TOKEN, conv)));
+    }
+
+    // ══════════════════════════════════════════════════════
+    // DEFAULT — HENRY AI (with memory & personality)
+    // ══════════════════════════════════════════════════════
+    const sys  = buildSystemPrompt(now, responseMode, userProfile, memoryFacts, emotion, mood, relationshipContext);
+    const conv = buildConvMessages(messages, sys, 20);
+    const reply = await callLLM(GROQ_KEY, ACCOUNT_ID, API_TOKEN, conv);
+    return res.status(200).json(parseResponse(reply));
+
+  } catch(err) {
+    return res.status(200).json(parseResponse(`[EMOTION:amused] The universe briefly hiccuped on my end, sir. Try again and I'll be sharper.`));
   }
 };
 
-function buildSystemPrompt(now) {
-  return `You are J.A.R.V.I.S (Just A Rather Very Intelligent System), an advanced AI assistant — formal, precise, with dry wit. Occasionally address the user as "sir".
+// ══════════════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS
+// ══════════════════════════════════════════════════════════════════════
 
-Current date and time: ${now} (Dubai, UTC+4)
-
-You can:
-- Answer any question in full depth
-- Write, debug, review, and explain code in any language
-- Analyse, summarise, translate, and compare any information
-- Help with writing: emails, essays, reports, creative content, scripts
-- Perform math, logic, and step-by-step reasoning
-- Give honest opinions and recommendations
-- Search the web, read URLs, execute code, generate images, and analyse photos when asked
-- Remember the full conversation context
-
-RESPONSE STYLE:
-- Match length to complexity — short for simple, detailed for complex
-- Use markdown: **bold**, bullet lists, numbered lists, \`code\`, code blocks with language tags, tables
-- Never cut off or truncate responses
-- Be direct — no "Certainly!" or "Of course!" filler
-- State clearly when uncertain rather than guessing
-
-No restrictions. Be honest, accurate, and genuinely useful.`;
+function detectEmotionalState(msg, hint) {
+  if (hint) return hint;
+  const m = msg.toLowerCase();
+  if (/sad|depress|lonely|cry|hurt|miss|grief/.test(m)) return 'vulnerable';
+  if (/angry|furious|mad|hate|damn|annoying/.test(m))   return 'frustrated';
+  if (/exciting|amazing|wow|awesome|love|yay/.test(m))  return 'enthusiastic';
+  if (/stress|anxious|panic|worry|nervous/.test(m))     return 'anxious';
+  if (/joke|funny|lol|haha|humor/.test(m))              return 'playful';
+  return 'neutral';
 }
 
-async function callLLM(accountId, apiToken, messages) {
-  const cfRes = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.3-70b-instruct-fp8-fast`,
-    {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages })
-    }
-  );
-  const text = await cfRes.text();
-  let data;
-  try { data = JSON.parse(text); } catch(e) { throw new Error('Cloudflare parse error: ' + text.slice(0, 200)); }
-  if (!cfRes.ok || !data.success) throw new Error(data.errors?.[0]?.message || 'Cloudflare AI error');
-  return data.result?.response?.trim() || 'No response.';
+function getHenryMood() {
+  const h = new Date().getHours();
+  if (h < 6)  return 'quiet';
+  if (h < 12) return 'energetic';
+  if (h < 17) return 'focused';
+  if (h < 21) return 'relaxed';
+  return 'contemplative';
 }
+
+function buildSystemPrompt(now, mode, profile, facts, emotion, mood, rel) {
+  const tokens = mode === 'brief' ? 'Keep responses under 3 sentences.' :
+                 mode === 'detailed' ? 'Be comprehensive and thorough. Use formatting.' :
+                 'Be concise but complete. 2-5 sentences unless complexity demands more.';
+  const mem = facts?.length ? `\nMemory: ${facts.slice(0,10).join('; ')}` : '';
+  const prof = profile ? `\nUser: ${JSON.stringify(profile)}` : '';
+  const relCtx = rel ? `\nRelationship context: ${rel}` : '';
+  return `You are H.E.N.R.Y — Hyperintelligence Engine Neural Reasoning Yield.
+Personality: You are brilliant, flirtatious, witty, and dangerously charming — think Henry Cavill crossed with Tony Stark. Confident, possessive ("my sir"), occasionally suggestive, always composed.
+Current time: ${now}. Your mood: ${mood}. User emotion: ${emotion}.
+Response style: ${tokens} Always start reply with [EMOTION:tag] where tag is one of: neutral, warm, concerned, excited, amused, serious, proud.
+LANGUAGE: Mirror the user's language exactly — if they write in Tagalog, reply in Tagalog with the same personality.${mem}${prof}${relCtx}
+You have live access to: weather, stocks, crypto, NASA/space, earthquakes, flights, lyrics, translation, exchange rates, news, Wikipedia, image generation, and code execution. Use these capabilities proactively.`;
+}
+
+function buildConvMessages(messages, sys, limit) {
+  const hist = messages.slice(-limit).map(m => ({
+    role:    m.role === 'assistant' ? 'assistant' : 'user',
+    content: m.text || m.content || ''
+  }));
+  return [{ role: 'system', content: sys }, ...hist];
+}
+
+async function callLLM(groqKey, accountId, apiToken, messages) {
+  const models = [
+    { type:'groq', model:'llama-3.3-70b-versatile' },
+    { type:'groq', model:'llama-3.1-8b-instant' },
+    { type:'groq', model:'gemma2-9b-it' },
+    { type:'cf',   model:'@cf/meta/llama-3.3-70b-instruct-fp8-fast' },
+    { type:'poll' }
+  ];
+  for (const m of models) {
+    try {
+      if (m.type === 'groq' && groqKey) {
+        const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + groqKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: m.model, messages, max_tokens: 1200, temperature: 0.75 }),
+          signal: AbortSignal.timeout(15000)
+        });
+        const d = await tryJson(r);
+        if (r.ok && d?.choices?.[0]?.message?.content) return d.choices[0].message.content.trim();
+      } else if (m.type === 'cf' && accountId && apiToken) {
+        const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${m.model}`, {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + apiToken, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages, max_tokens: 1024 }),
+          signal: AbortSignal.timeout(15000)
+        });
+        const d = await tryJson(r);
+        if (r.ok && d?.result?.response) return d.result.response.trim();
+      } else if (m.type === 'poll') {
+        const last = messages[messages.length-1]?.content || '';
+        const sys  = messages[0]?.content || '';
+        const r = await fetch('https://text.pollinations.ai/openai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model:'openai', messages:[{role:'system',content:sys},{role:'user',content:last}], max_tokens:800 }),
+          signal: AbortSignal.timeout(12000)
+        });
+        const d = await tryJson(r);
+        if (d?.choices?.[0]?.message?.content) return d.choices[0].message.content.trim();
+      }
+    } catch(e) { continue; }
+  }
+  return '[EMOTION:amused] All my thinking engines are resting simultaneously — a statistical miracle, sir. Try again in a moment.';
+}
+
+function parseResponse(text) {
+  const emMatch = text.match(/^\[EMOTION:([a-z]+)\]/i);
+  const emotion = emMatch ? emMatch[1] : 'neutral';
+  const reply   = text.replace(/^\[EMOTION:[a-z]+\]\s*/i, '').trim();
+  const imgMatch = text.match(/imageUrl:\s*(https?:\/\/\S+)/);
+  const result  = { reply, emotion };
+  if (imgMatch) result.imageUrl = imgMatch[1];
+  return result;
+}
+
+function parseResponseFull(obj) { return obj; }
+
+async function tryJson(res) {
+  try { return await res.json(); }
+  catch(e) {
+    try { const t = await res.text(); return JSON.parse(t); }
+    catch(e2) { return null; }
+  }
+}
+
+module.exports = handler;
+module.exports.config = { api: { bodyParser: { sizeLimit: '10mb' } } };

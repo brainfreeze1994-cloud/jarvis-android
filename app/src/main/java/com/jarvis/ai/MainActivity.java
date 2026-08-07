@@ -419,16 +419,6 @@ public class MainActivity extends AppCompatActivity {
             }
         }, 4500);
 
-        // Word of the Day — show once per day after greeting
-        if (WordOfTheDay.shouldShowToday(this)) {
-            mainHandler.postDelayed(() ->
-                WordOfTheDay.fetch(this, result -> mainHandler.post(() -> {
-                    String clean = stripEmotionTag(result);
-                    addJarvisMsg(clean);
-                    // Don't speak it automatically — just show in chat
-                })), 3000);
-        }
-
         // If launched from widget mic button
         if (getIntent() != null && getIntent().getBooleanExtra("start_listening", false)) {
             mainHandler.postDelayed(this::startListening, 800);

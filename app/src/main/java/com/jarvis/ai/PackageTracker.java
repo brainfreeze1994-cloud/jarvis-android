@@ -20,6 +20,11 @@ public class PackageTracker {
 
     public static boolean isPackageQuery(String input) {
         String t = input.toLowerCase();
+        // "track" alone collides with unrelated features — "track storm",
+        // "track flight" — so bail out early if this looks like one of those
+        // instead of a package/parcel query.
+        if (t.contains("storm") || t.contains("typhoon") || t.contains("hurricane") ||
+            t.contains("cyclone") || t.contains("flight")) return false;
         return t.contains("package") || t.contains("parcel") || t.contains("shipment")
             || t.contains("tracking") || t.contains("track") || t.contains("delivery")
             || t.contains("dhl") || t.contains("fedex") || t.contains("ups")

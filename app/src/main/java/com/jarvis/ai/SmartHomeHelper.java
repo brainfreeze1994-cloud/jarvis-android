@@ -23,15 +23,28 @@ public class SmartHomeHelper {
 
     private static final Handler H = new Handler(Looper.getMainLooper());
 
+    // Plain contains() lets short keywords like "ac" match inside unrelated
+    // words ("active", "back", "attack") — this checks for the keyword as a
+    // standalone word only. Same fix as applied to LivePrices.java earlier.
+    private static boolean containsWord(String haystack, String word) {
+        return java.util.regex.Pattern.compile(
+            "\\b" + java.util.regex.Pattern.quote(word) + "\\b")
+            .matcher(haystack).find();
+    }
+
     public static boolean isSmartHomeQuery(String input) {
         String t = input.toLowerCase();
-        return t.contains("light") || t.contains("lamp") || t.contains("ac") || t.contains("air con")
+        // "ac" bare-matched "active" ("active storms"), sending storm queries
+        // here instead of the storm tracker. Bail out on storm/weather words.
+        if (t.contains("storm") || t.contains("typhoon") || t.contains("hurricane") ||
+            t.contains("cyclone")) return false;
+        return t.contains("light") || t.contains("lamp") || containsWord(t, "ac") || t.contains("air con")
             || t.contains("thermostat") || t.contains("temperature") || t.contains("smart home")
             || t.contains("alexa") || t.contains("google home") || t.contains("hue")
-            || t.contains("turn on") || t.contains("turn off") || t.contains("dim")
+            || t.contains("turn on") || t.contains("turn off") || containsWord(t, "dim")
             || t.contains("brightness") && (t.contains("room") || t.contains("light"))
             || t.contains("lock") && t.contains("door") || t.contains("unlock")
-            || t.contains("fan") || t.contains("curtain") || t.contains("blinds")
+            || containsWord(t, "fan") || t.contains("curtain") || t.contains("blinds")
             || t.contains("plug") || t.contains("socket") || t.contains("switch");
     }
 

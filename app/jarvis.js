@@ -373,26 +373,15 @@ const handler = async function(req, res) {
     // ══════════════════════════════════════════════════════
     if (/research|deep dive|explain in detail|comprehensive|everything about|full analysis|thesis|dissertation/i.test(lastMsg) || queryType === 'research') {
       const topic = lastMsg.replace(/research|deep dive|explain in detail|comprehensive|everything about|full analysis/gi, '').trim();
-      let webContext = '';
-      try {
-        const ddRes = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(topic)}&format=json&no_redirect=1&no_html=1`, { signal: AbortSignal.timeout(5000) });
-        const ddData = await tryJson(ddRes);
-        if (ddData?.AbstractText) webContext += 'Summary: ' + ddData.AbstractText + '\n';
-        if (ddData?.RelatedTopics?.length) {
-          webContext += 'Related: ' + ddData.RelatedTopics.slice(0,3).map(t => t.Text||'').join(' | ');
-        }
-      } catch(e) {}
-      try {
-        const wkRes  = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic.split(' ').slice(0,3).join('_'))}`, { signal: AbortSignal.timeout(5000) });
-        const wkData = await tryJson(wkRes);
-        if (wkData?.extract) webContext += '\nWikipedia: ' + wkData.extract.slice(0,600);
-      } catch(e) {}
       const sys  = buildSystemPrompt(now, 'detailed', userProfile, memoryFacts, emotion, mood, relationshipContext);
-      const conv = buildConvMessages([...messages.slice(-2), {
-        role:'user',
-        text: `[DEEP RESEARCH MODE] Research this comprehensively: "${topic}"\n\nContext from web: ${webContext || 'none'}\n\nProvide: 1) Overview, 2) Key facts & data, 3) Historical context, 4) Current state, 5) Future implications, 6) Expert insights. Be thorough, cite any sources found.`
-      }], sys, 4);
-      return res.status(200).json(parseResponse(await callLLM(GROQ_KEY, ACCOUNT_ID, API_TOKEN, conv)));
+      const prompt = `[DEEP RESEARCH MODE] Research this comprehensively: "${topic}"\n\nSearch the web as needed for current, accurate information. Provide: 1) Overview, 2) Key facts & data, 3) Historical context, 4) Current state, 5) Future implications, 6) Expert insights. Be thorough, cite any sources found.`;
+      const conv = buildConvMessages([...messages.slice(-2), { role:'user', text: prompt }], sys, 4);
+      try {
+        return res.status(200).json(parseResponse(await callCompound(GROQ_KEY, conv)));
+      } catch (e) {
+        // Compound unavailable — still answer, just without live search
+        return res.status(200).json(parseResponse(await callLLM(GROQ_KEY, ACCOUNT_ID, API_TOKEN, conv)));
+      }
     }
 
     // ══════════════════════════════════════════════════════
@@ -404,27 +393,12 @@ const handler = async function(req, res) {
     // without this, these fall through to the DEFAULT handler below with no
     // web context at all, and the model answers from stale training data.
     if (/latest|news|current|today|recent|who is|what is|where is|how to|why|breaking|2025|2026|compare|versus|\bvs\b|newest|newer|which (is|one|phone|model)|should i (buy|get)|worth (it|buying)|release date|just released|is out now|available now|out yet|specs|specifications|review/i.test(lastMsg)) {
-      let context = '';
+      const sys  = buildSystemPrompt(now, responseMode, userProfile, memoryFacts, emotion, mood, relationshipContext);
+      const conv = buildConvMessages(messages.slice(-3), sys, 4);
       try {
-        const ddRes  = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(lastMsg)}&format=json&no_redirect=1&no_html=1`, { signal: AbortSignal.timeout(4000) });
-        const ddData = await tryJson(ddRes);
-        if (ddData?.AbstractText) context += ddData.AbstractText + '\n';
-        if (ddData?.RelatedTopics?.length) {
-          context += ddData.RelatedTopics.slice(0,3).map(t => t.Text||'').filter(Boolean).join(' | ');
-        }
-      } catch(e) {}
-      try {
-        const slug   = lastMsg.split(' ').slice(0,4).join('_');
-        const wkRes  = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(slug)}`, { signal: AbortSignal.timeout(4000) });
-        const wkData = await tryJson(wkRes);
-        if (wkData?.extract) context += '\n' + wkData.extract.slice(0,500);
-      } catch(e) {}
-      if (context.length > 50) {
-        const sys  = buildSystemPrompt(now, responseMode, userProfile, memoryFacts, emotion, mood, relationshipContext);
-        const conv = buildConvMessages([...messages.slice(-3), {
-          role:'user', text:`${lastMsg}\n\n[Web context: ${context}]\n\nUse the web context to give an accurate, current answer.`
-        }], sys, 6);
-        return res.status(200).json(parseResponse(await callLLM(GROQ_KEY, ACCOUNT_ID, API_TOKEN, conv)));
+        return res.status(200).json(parseResponse(await callCompound(GROQ_KEY, conv)));
+      } catch (e) {
+        // Compound unavailable — fall through to later handlers / DEFAULT
       }
     }
 
@@ -513,8 +487,12 @@ const handler = async function(req, res) {
     // ══════════════════════════════════════════════════════
     const sys  = buildSystemPrompt(now, responseMode, userProfile, memoryFacts, emotion, mood, relationshipContext);
     const conv = buildConvMessages(messages, sys, 20);
-    const reply = await callLLM(GROQ_KEY, ACCOUNT_ID, API_TOKEN, conv);
-    return res.status(200).json(parseResponse(reply));
+    try {
+      return res.status(200).json(parseResponse(await callCompound(GROQ_KEY, conv)));
+    } catch (e) {
+      const reply = await callLLM(GROQ_KEY, ACCOUNT_ID, API_TOKEN, conv);
+      return res.status(200).json(parseResponse(reply));
+    }
 
   } catch(err) {
     return res.status(200).json(parseResponse(`[EMOTION:amused] The universe briefly hiccuped on my end, sir. Try again and I'll be sharper.`));
@@ -568,11 +546,24 @@ function buildConvMessages(messages, sys, limit) {
   return [{ role: 'system', content: sys }, ...hist];
 }
 
+async function callCompound(groqKey, conv) {
+  if (!groqKey) throw new Error('no groq key');
+  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + groqKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'groq/compound', messages: conv, max_tokens: 1200, temperature: 0.75 }),
+    signal: AbortSignal.timeout(20000)
+  });
+  const d = await tryJson(r);
+  if (r.ok && d?.choices?.[0]?.message?.content) return d.choices[0].message.content.trim();
+  throw new Error('compound failed: ' + (d?.error?.message || r.status));
+}
+
 async function callLLM(groqKey, accountId, apiToken, messages) {
   const models = [
-    { type:'groq', model:'llama-3.3-70b-versatile' },
-    { type:'groq', model:'llama-3.1-8b-instant' },
-    { type:'groq', model:'gemma2-9b-it' },
+    { type:'groq', model:'openai/gpt-oss-120b' },   // was llama-3.3-70b-versatile (deprecated Jun 2026)
+    { type:'groq', model:'qwen/qwen3.6-27b' },       // Groq's current highest-intelligence model
+    { type:'groq', model:'openai/gpt-oss-20b' },     // was llama-3.1-8b-instant (deprecated Jun 2026)
     { type:'cf',   model:'@cf/meta/llama-3.3-70b-instruct-fp8-fast' },
     { type:'poll' }
   ];

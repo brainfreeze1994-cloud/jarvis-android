@@ -2696,11 +2696,11 @@ public class MainActivity extends AppCompatActivity {
 
         // ── Storm Tracker ────────────────────────────────────────────────────
         String stormLower = userText.toLowerCase(Locale.US);
-        if (stormLower.contains("storm tracker") || stormLower.contains("track storms") ||
+        if (stormLower.contains("storm tracker") || stormLower.contains("track storm") ||
             stormLower.contains("typhoon tracker") || stormLower.contains("hurricane tracker") ||
             stormLower.contains("cyclone tracker") || stormLower.contains("storm activity") ||
             stormLower.contains("active storms") || stormLower.contains("active typhoons") ||
-            stormLower.contains("active hurricanes")) {
+            stormLower.contains("active hurricanes") || stormLower.contains("active cyclones")) {
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
             String reply = "[EMOTION:excited] Pulling up the storm tracker, sir.";
             addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "excited");

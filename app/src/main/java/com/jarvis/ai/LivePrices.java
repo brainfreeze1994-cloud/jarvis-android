@@ -50,16 +50,35 @@ public class LivePrices {
         {"usd to aud", "USD", "AUD"}, {"usd to sgd", "USD", "SGD"},
     };
 
+    // ── Word-boundary helper ─────────────────────────────────────────────────
+    // Plain String.contains() matches keywords buried inside unrelated words
+    // ("something" contains "eth", "metadata" contains "meta", "absolutely"
+    // contains "sol") — this checks for the keyword as a standalone word only.
+    private static boolean containsWord(String haystack, String word) {
+        return java.util.regex.Pattern.compile(
+            "\\b" + java.util.regex.Pattern.quote(word) + "\\b")
+            .matcher(haystack).find();
+    }
+
     // ── Detection ─────────────────────────────────────────────────────────────
     public static boolean isPriceQuery(String text) {
         String lower = text.toLowerCase(Locale.US);
-        return lower.contains("price") || lower.contains("stock") || lower.contains("crypto") ||
-               lower.contains("bitcoin") || lower.contains("ethereum") || lower.contains("btc") ||
-               lower.contains("eth") || lower.contains("doge") || lower.contains("solana") ||
-               lower.contains(" to aed") || lower.contains(" to usd") || lower.contains(" to eur") ||
-               lower.contains("exchange rate") || lower.contains("currency") ||
-               lower.contains("how much is") || lower.contains("what's the rate") ||
-               lower.contains("market") || lower.contains("shares") || lower.contains("ticker");
+        String[] words = {
+            "price", "stock", "crypto", "bitcoin", "ethereum", "btc", "eth",
+            "doge", "solana", "currency", "shares", "ticker"
+        };
+        for (String w : words) if (containsWord(lower, w)) return true;
+
+        // "market" alone is too ambiguous ("best phone on the market") —
+        // only count it paired with an actual finance word.
+        if ((containsWord(lower, "market")) &&
+            (lower.contains("stock market") || lower.contains("crypto market") ||
+             lower.contains("forex market") || lower.contains("market price") ||
+             lower.contains("market cap"))) return true;
+
+        return lower.contains(" to aed") || lower.contains(" to usd") || lower.contains(" to eur") ||
+               lower.contains("exchange rate") || lower.contains("how much is") ||
+               lower.contains("what's the rate");
     }
 
     public interface Callback {
@@ -88,13 +107,13 @@ public class LivePrices {
     // ── Crypto ────────────────────────────────────────────────────────────────
     private static String detectCrypto(String lower) {
         for (Map.Entry<String, String> e : CRYPTO_IDS.entrySet())
-            if (lower.contains(e.getKey())) return e.getValue();
+            if (containsWord(lower, e.getKey())) return e.getValue();
         return null;
     }
 
     private static String detectCoinName(String lower) {
         for (Map.Entry<String, String> e : CRYPTO_IDS.entrySet())
-            if (lower.contains(e.getKey())) return e.getKey().substring(0,1).toUpperCase() + e.getKey().substring(1);
+            if (containsWord(lower, e.getKey())) return e.getKey().substring(0,1).toUpperCase() + e.getKey().substring(1);
         return "Crypto";
     }
 
@@ -165,7 +184,7 @@ public class LivePrices {
 
     private static String detectStock(String lower, String original) {
         for (Map.Entry<String, String> e : KNOWN_TICKERS.entrySet())
-            if (lower.contains(e.getKey())) return e.getValue();
+            if (containsWord(lower, e.getKey())) return e.getValue();
         // Look for uppercase ticker like "AAPL stock" or "stock TSLA"
         java.util.regex.Matcher m = java.util.regex.Pattern.compile(
             "\\b([A-Z]{2,5})\\b").matcher(original);

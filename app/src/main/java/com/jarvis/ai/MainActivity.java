@@ -2694,6 +2694,21 @@ public class MainActivity extends AppCompatActivity {
             saveHistory(); return;
         }
 
+        // ── Storm Tracker ────────────────────────────────────────────────────
+        String stormLower = userText.toLowerCase(Locale.US);
+        if (stormLower.contains("storm tracker") || stormLower.contains("track storms") ||
+            stormLower.contains("typhoon tracker") || stormLower.contains("hurricane tracker") ||
+            stormLower.contains("cyclone tracker") || stormLower.contains("storm activity") ||
+            stormLower.contains("active storms") || stormLower.contains("active typhoons") ||
+            stormLower.contains("active hurricanes")) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply = "[EMOTION:excited] Pulling up the storm tracker, sir.";
+            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "excited");
+            saveHistory();
+            startActivity(new Intent(this, StormActivity.class));
+            return;
+        }
+
         // ── [v13] Place Details ───────────────────────────────────────────────
         if (PlaceDetails.isPlaceQuery(userText)) {
             String placeQ = PlaceDetails.parseQuery(userText);

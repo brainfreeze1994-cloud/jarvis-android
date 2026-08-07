@@ -23,13 +23,35 @@ public class PlaceDetails {
 
     public static boolean isPlaceQuery(String text) {
         String lower = text.toLowerCase(Locale.US);
-        return (lower.startsWith("tell me about") || lower.startsWith("what is") ||
-                lower.startsWith("info on") || lower.startsWith("info about") ||
-                lower.startsWith("details about") || lower.startsWith("where is") ||
-                lower.startsWith("show me") || lower.contains("landmark") ||
-                lower.contains("famous place") || lower.contains("tourist")) &&
-               !lower.contains("weather") && !lower.contains("price") &&
-               !lower.contains("time") && !lower.contains("how");
+
+        // "what is" / "show me" alone are too generic — they open all sorts of
+        // non-place questions ("what is the best smartphone"). Only count them
+        // as place queries when an actual place-signal word is also present.
+        boolean placeSignal = lower.contains("landmark") || lower.contains("monument") ||
+            lower.contains("tower") || lower.contains("museum") || lower.contains("palace") ||
+            lower.contains("mosque") || lower.contains("temple") || lower.contains("mall") ||
+            lower.contains("beach") || lower.contains("bridge") || lower.contains("located") ||
+            lower.contains("capital of") || lower.contains("famous place") || lower.contains("tourist");
+
+        boolean startsRight =
+            lower.startsWith("tell me about") || lower.startsWith("where is") ||
+            lower.startsWith("info on") || lower.startsWith("info about") ||
+            lower.startsWith("details about") ||
+            ((lower.startsWith("what is") || lower.startsWith("show me")) && placeSignal);
+
+        if (!startsRight && !placeSignal) return false;
+
+        // Exclude general-knowledge / product / opinion questions that happen
+        // to open the same way as a place query.
+        String[] exclude = {
+            "weather", "price", "time", "how", "best", "worst", "cheapest",
+            "most expensive", "smartphone", "phone", "laptop", "computer",
+            "software", "app", "compare", " vs ", "versus", "difference between",
+            "should i", "why", "quantum"
+        };
+        for (String w : exclude) if (lower.contains(w)) return false;
+
+        return true;
     }
 
     public static String parseQuery(String text) {

@@ -96,6 +96,10 @@
         <activity android:name=".EarthRadarActivity" android:exported="false"
             android:screenOrientation="portrait" android:theme="@style/Theme.Jarvis"/>
 
+        <!-- 🌀 Storm Tracker Activity -->
+        <activity android:name=".StormActivity" android:exported="false"
+            android:screenOrientation="portrait" android:theme="@style/Theme.Jarvis"/>
+
         <!-- ✈ Flight Tracker Activity -->
         <activity
             android:name=".FlightActivity"

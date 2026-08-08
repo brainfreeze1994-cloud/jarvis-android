@@ -387,6 +387,10 @@ public class MainActivity extends AppCompatActivity {
         // 🌿 Plant Scanner button
         android.widget.TextView btnPlantScan = findViewById(R.id.btn_plant_scan);
         if (btnPlantScan != null) btnPlantScan.setOnClickListener(v -> openPlantScanner());
+
+        // 🌀 Storm Tracker button
+        android.widget.TextView btnStorm = findViewById(R.id.btn_storm);
+        if (btnStorm != null) btnStorm.setOnClickListener(v -> startActivity(new Intent(this, StormActivity.class)));
         if (ivAttachPreview != null) ivAttachPreview.setOnClickListener(v -> clearAttachment());
         if (etInput != null) {
             etInput.setOnEditorActionListener((v, id, e) -> {

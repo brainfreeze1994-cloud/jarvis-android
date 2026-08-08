@@ -3764,19 +3764,40 @@ public class MainActivity extends AppCompatActivity {
             addJarvisMsg("Creating your " + typeName + " titled **\"" + docTitle + "\"**…");
             speak("Creating your " + typeName + " now, sir.", "excited");
             setState(OrbView.OrbState.THINKING);
-            GoogleWorkspaceHelper.create(docTitle, docType, null, new GoogleWorkspaceHelper.Callback() {
+            // Was always passed null here — nothing ever built real content from
+            // the chat, so every doc/slide came out empty no matter what was asked.
+            String docContent = GoogleWorkspaceHelper.buildContentFromHistory(history, docType);
+            GoogleWorkspaceHelper.create(docTitle, docType, docContent, new GoogleWorkspaceHelper.Callback() {
                 @Override public void onSuccess(String url, String title, GoogleWorkspaceHelper.DocType type) {
                     mainHandler.post(() -> {
                         setState(OrbView.OrbState.IDLE);
-                        String msg = "[EMOTION:proud]\n**" + typeName + " created!**\n\nTitle: " + title + "\n\n[Open →](" + url + ")";
+                        // No Google service account configured server-side means the
+                        // backend can only hand back a blank docs.new/sheets.new/
+                        // slides.new link — it has no way to pre-fill a brand new
+                        // Google doc's content via URL. Bridge that gap by copying
+                        // the content to the clipboard so it's one paste away.
+                        boolean isBlankShortcut = url.equals("https://docs.new")
+                            || url.equals("https://sheets.new") || url.equals("https://slides.new");
+                        if (isBlankShortcut && docContent != null && !docContent.isEmpty()) {
+                            android.content.ClipboardManager cm =
+                                (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                            cm.setPrimaryClip(android.content.ClipData.newPlainText(typeName + " content", docContent));
+                        }
+                        String msg = isBlankShortcut
+                            ? "[EMOTION:proud]\n**" + typeName + " opened!**\n\nI don't have Google credentials configured yet, so I couldn't create and fill it automatically — but your content is copied to the clipboard. Just paste it in (long-press → Paste)."
+                            : "[EMOTION:proud]\n**" + typeName + " created!**\n\nTitle: " + title + "\n\n[Open →](" + url + ")";
                         String clean = stripEmotionTag(msg);
                         history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
-                        speak("Your " + typeName + " is ready, sir. Opening now.", "proud");
+                        speak(isBlankShortcut
+                            ? "Opened it, sir — your content's on the clipboard, just paste it in."
+                            : "Your " + typeName + " is ready, sir. Opening now.", "proud");
                         saveHistory();
                         // Show dialog to open in browser
                         new android.app.AlertDialog.Builder(MainActivity.this)
-                            .setTitle(typeName + " Ready")
-                            .setMessage("\"" + title + "\" has been created.\n\n" + url)
+                            .setTitle(typeName + (isBlankShortcut ? " Opened — Content Copied" : " Ready"))
+                            .setMessage(isBlankShortcut
+                                ? "Paste (long-press → Paste) into the new " + typeName + " to add your content."
+                                : "\"" + title + "\" has been created.\n\n" + url)
                             .setPositiveButton("Open", (d, w) -> GoogleWorkspaceHelper.openInBrowser(MainActivity.this, url))
                             .setNegativeButton("Later", null)
                             .show();
@@ -3791,7 +3812,12 @@ public class MainActivity extends AppCompatActivity {
                             : docType == GoogleWorkspaceHelper.DocType.SLIDES
                             ? "https://slides.new"
                             : "https://docs.new";
-                        String reply = "I'll open " + typeName + " for you directly, sir.";
+                        if (docContent != null && !docContent.isEmpty()) {
+                            android.content.ClipboardManager cm =
+                                (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                            cm.setPrimaryClip(android.content.ClipData.newPlainText(typeName + " content", docContent));
+                        }
+                        String reply = "I'll open " + typeName + " for you directly, sir — your content's copied to the clipboard, just paste it in.";
                         history.add(new HistoryItem("model", reply)); addJarvisMsg(reply);
                         speak(reply, "neutral"); saveHistory();
                         GoogleWorkspaceHelper.openInBrowser(MainActivity.this, fallbackUrl);

@@ -67,6 +67,61 @@ public class GoogleWorkspaceHelper {
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
+    // ── Build real content from the current chat, per doc type ─────────────────
+    // This is the piece that was always missing: create() was being called with
+    // content=null, so every doc/sheet/slide came out empty regardless of what
+    // was asked for.
+    public static String buildContentFromHistory(java.util.List<HistoryItem> history, DocType type) {
+        if (history == null || history.isEmpty()) return "";
+        switch (type) {
+            case SHEETS: return buildSheetContent(history);
+            case SLIDES: return buildSlideContent(history);
+            default:     return buildDocContent(history);
+        }
+    }
+
+    private static String buildDocContent(java.util.List<HistoryItem> history) {
+        StringBuilder sb = new StringBuilder();
+        for (HistoryItem h : history) {
+            String speaker = "user".equals(h.role) ? "You" : "HENRY";
+            sb.append(speaker).append(":\n").append(h.text == null ? "" : h.text).append("\n\n");
+        }
+        return sb.toString().trim();
+    }
+
+    // Sheets content is parsed as CSV rows by the backend — one exchange per row.
+    private static String buildSheetContent(java.util.List<HistoryItem> history) {
+        StringBuilder sb = new StringBuilder("Speaker,Message\n");
+        for (HistoryItem h : history) {
+            String speaker = "user".equals(h.role) ? "You" : "HENRY";
+            String msg = (h.text == null ? "" : h.text).replace("\"", "'").replace("\n", " ");
+            sb.append(speaker).append(",\"").append(msg).append("\"\n");
+        }
+        return sb.toString().trim();
+    }
+
+    // Slides content uses a "SLIDE: <title>" marker per slide, body lines after
+    // it until the next marker — the backend splits on this to build real slides
+    // instead of one empty presentation. Groups the conversation into chunks of
+    // a few exchanges per slide so a long chat doesn't become one giant slide.
+    private static String buildSlideContent(java.util.List<HistoryItem> history) {
+        StringBuilder sb = new StringBuilder();
+        int chunkSize = 4; // messages per slide
+        for (int i = 0; i < history.size(); i += chunkSize) {
+            int end = Math.min(i + chunkSize, history.size());
+            sb.append("SLIDE: Part ").append((i / chunkSize) + 1).append("\n");
+            for (int j = i; j < end; j++) {
+                HistoryItem h = history.get(j);
+                String speaker = "user".equals(h.role) ? "You" : "HENRY";
+                String msg = h.text == null ? "" : h.text;
+                if (msg.length() > 200) msg = msg.substring(0, 200) + "…";
+                sb.append(speaker).append(": ").append(msg).append("\n");
+            }
+            sb.append("\n");
+        }
+        return sb.toString().trim();
+    }
+
     // ── Network call ──────────────────────────────────────────────────────────
 
     public static void create(String title, DocType type, String initialContent, Callback cb) {

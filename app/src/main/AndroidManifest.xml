@@ -221,6 +221,15 @@
             </intent-filter>
         </receiver>
 
+        <!-- Daily Briefing receiver -->
+        <receiver
+            android:name=".BriefingReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
         <!-- Car Mode -->
         <activity
             android:name=".CarModeActivity"

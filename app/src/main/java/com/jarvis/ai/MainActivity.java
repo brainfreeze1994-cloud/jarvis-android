@@ -2767,6 +2767,20 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        // ── Periodic Table / Element Mixer ──────────────────────────────────
+        String periodicLower = userText.toLowerCase(Locale.US);
+        if (periodicLower.contains("periodic table") || periodicLower.contains("element mixer") ||
+            periodicLower.contains("chemistry lab") || periodicLower.contains("mix elements")) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply = "[EMOTION:excited] Opening the periodic table, sir. Drag one element onto another to see what they form.";
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, "excited");
+            saveHistory();
+            startActivity(new Intent(this, PeriodicTableActivity.class));
+            return;
+        }
+
         // ── Storm Tracker ────────────────────────────────────────────────────
         String stormLower = userText.toLowerCase(Locale.US);
         if (stormLower.contains("storm tracker") || stormLower.contains("track storm") ||

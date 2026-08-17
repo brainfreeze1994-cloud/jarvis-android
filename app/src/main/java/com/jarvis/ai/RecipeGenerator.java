@@ -26,6 +26,12 @@ public class RecipeGenerator {
     }
 
     public static boolean isRecipeCommand(String text) {
+        // "recipe" is a bare substring, and "create a document about the
+        // adobo recipe" contains it — that was silently hijacking every
+        // recipe-related doc creation request before it ever reached
+        // GoogleWorkspaceHelper. Reusing its own check here keeps both
+        // features in sync instead of maintaining two divergent regexes.
+        if (GoogleWorkspaceHelper.isDocCommand(text)) return false;
         String lower = text.toLowerCase(Locale.US);
         return lower.contains("recipe") ||
                lower.contains("what can i make") || lower.contains("what can i cook") ||

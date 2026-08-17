@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#121212">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=" H·E·N·R·Y™ Chemistry Lab"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:gravity="center"
+            android:padding="16dp" />
+
+        <!-- Periodic Table -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Periodic Table"
+            android:textSize="18sp"
+            android:textColor="#2196F3"
+            android:layout_marginTop="16dp" />
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <GridLayout
+                android:id="@+id/periodic_grid"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:columnCount="18"
+                android:useDefaultMargins="true" />
+        </HorizontalScrollView>
+
+        <!-- Molecular Structures -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Molecular Structures"
+            android:textSize="18sp"
+            android:textColor="#2196F3"
+            android:layout_marginTop="24dp" />
+
+        <LinearLayout
+            android:id="@+id/molecule_buttons"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="8dp" />
+
+        <com.jarvis.android.chemistry.MolecularStructureView
+            android:id="@+id/structure_view"
+            android:layout_width="300dp"
+            android:layout_height="300dp"
+            android:layout_gravity="center"
+            android:background="#1E1E1E"
+            android:layout_marginTop="16dp" />
+
+        <TextView
+            android:id="@+id/info_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Select a molecule"
+            android:textColor="#FFFFFF"
+            android:gravity="center"
+            android:padding="16dp" />
+
+        <!-- Export Button -->
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="📊 Export to Excel"
+            android:onClick="exportToExcel"
+            android:layout_marginTop="24dp"
+            android:backgroundTint="#4CAF50" />
+
+    </LinearLayout>
+</ScrollView>

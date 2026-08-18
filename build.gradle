@@ -1,30 +1,4 @@
-android {
-    compileSdk 34
-
-    defaultConfig {
-        applicationId "com.jarvis.android"   // keep your existing ID
-        minSdk 26                            // ← CHANGED: 24 → 26 (POI requires it)
-        targetSdk 34
-        versionCode 23
-        versionName "23.0.0"
-    }
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
-
-    // ← ADD THIS BLOCK (prevents duplicate-file build errors from POI)
-    packagingOptions {
-        exclude 'META-INF/DEPENDENCIES'
-        exclude 'META-INF/LICENSE'
-        exclude 'META-INF/LICENSE.txt'
-        exclude 'META-INF/NOTICE'
-        exclude 'META-INF/NOTICE.txt'
-        exclude 'META-INF/INDEX.LIST'
-        exclude 'META-INF/io.netty.versions.properties'
-    }
-
+// ═══ ROOT build.gradle — DO NOT put "android { }" here ═══
 buildscript {
     repositories {
         google()
@@ -39,10 +13,10 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        maven { url 'https://jitpack.io' }  // ← ADD THIS
+        maven { url 'https://jitpack.io' }
     }
 }
 
-task clean(type: Delete) {
+tasks.register('clean', Delete) {
     delete rootProject.buildDir
 }

@@ -355,46 +355,10 @@ public class MainActivity extends AppCompatActivity {
         if (btnVoice  != null) btnVoice.setOnClickListener(v -> showVoicePicker());
         if (btnAttach != null) btnAttach.setOnClickListener(v -> showAttachDialog());
 
-        // 🌍 Earth Map button
-        // 🚀 Space Command button
-        android.widget.TextView btnSpace = findViewById(R.id.btn_space);
-        if (btnSpace != null) btnSpace.setOnClickListener(v ->
-            startActivity(new android.content.Intent(this, SpaceActivity.class)));
-
-        // 📈 Live Markets button
-        android.widget.TextView btnMarkets = findViewById(R.id.btn_markets);
-        if (btnMarkets != null) btnMarkets.setOnClickListener(v ->
-            startActivity(new android.content.Intent(this, MarketsActivity.class)));
-
-        // 🌐 Earth Radar button
-        android.widget.TextView btnEarthRadar = findViewById(R.id.btn_earth_radar);
-        if (btnEarthRadar != null) btnEarthRadar.setOnClickListener(v ->
-            startActivity(new android.content.Intent(this, EarthRadarActivity.class)));
-
-        // ✈ Flight Tracker button
-        android.widget.TextView btnFlight = findViewById(R.id.btn_flight);
-        if (btnFlight != null) btnFlight.setOnClickListener(v -> openFlightTracker(null));
-
-        // 🧠 Brain button
-        android.widget.TextView btnBrain = findViewById(R.id.btn_brain);
-        if (btnBrain != null) btnBrain.setOnClickListener(v ->
-            startActivity(new android.content.Intent(this, BrainActivity.class)));
-
-        // 🌍 Earth Map button
-        android.widget.TextView btnEarthMap = findViewById(R.id.btn_earth_map);
-        if (btnEarthMap != null) btnEarthMap.setOnClickListener(v -> openEarthMap(null));
-
-        // 🐾 Animal Scanner button
-        android.widget.TextView btnAnimalScan = findViewById(R.id.btn_animal_scan);
-        if (btnAnimalScan != null) btnAnimalScan.setOnClickListener(v -> openAnimalScanner());
-
-        // 🌿 Plant Scanner button
-        android.widget.TextView btnPlantScan = findViewById(R.id.btn_plant_scan);
-        if (btnPlantScan != null) btnPlantScan.setOnClickListener(v -> openPlantScanner());
-
-        // 🌀 Storm Tracker button
-        android.widget.TextView btnStorm = findViewById(R.id.btn_storm);
-        if (btnStorm != null) btnStorm.setOnClickListener(v -> startActivity(new Intent(this, StormActivity.class)));
+        // Header icon row removed — all these features remain fully reachable
+        // via voice/text command (e.g. "storm tracker", "periodic table",
+        // "open space command", "flight tracker", "animal scanner", etc.),
+        // which is why removing the buttons doesn't remove functionality.
         if (ivAttachPreview != null) ivAttachPreview.setOnClickListener(v -> clearAttachment());
         if (etInput != null) {
             etInput.setOnEditorActionListener((v, id, e) -> {

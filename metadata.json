@@ -1,7 +1,10 @@
 {
   "name": "HENRY",
-  "description": "Hyperintelligence Engine Neural Reasoning Yield Android AI Assistant",
-  "requestFramePermissions": [],
+  "description": "Hyperintelligence Engine Neural Reasoning Yield AI Assistant with Voice, Vision, Brain Training, Space, and Real-Time Knowledge",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]

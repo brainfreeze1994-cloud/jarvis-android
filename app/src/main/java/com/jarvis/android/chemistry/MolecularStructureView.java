@@ -59,7 +59,7 @@ public class MolecularStructureView extends View {
         atomPaint.setStyle(Paint.Style.FILL);
         
         bondPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        bondPaint.setStyle(Paint.STROKE);
+        bondPaint.setStyle(Paint.Style.STROKE);
         bondPaint.setStrokeWidth(6);
         bondPaint.setColor(Color.GRAY);
         

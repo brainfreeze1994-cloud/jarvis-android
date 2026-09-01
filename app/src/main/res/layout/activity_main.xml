@@ -475,4 +475,186 @@
 
     </LinearLayout>
 
+    <!-- ── Screen Recording Floating Action Button (FAB) ── -->
+    <FrameLayout
+        android:id="@+id/fab_screen_record"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_fab_record"
+        android:elevation="8dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:contentDescription="Screen Recording Controls"
+        app:layout_constraintBottom_toTopOf="@id/input_container"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ImageView
+            android:id="@+id/iv_fab_record_icon"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_videocam"
+            app:tint="#00FFCC"
+            android:contentDescription="Record Screen" />
+
+        <View
+            android:id="@+id/dot_fab_recording"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="6dp"
+            android:layout_marginEnd="6dp"
+            android:background="#FF2255"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <!-- ── Screen Recording Overlay Control Panel ── -->
+    <FrameLayout
+        android:id="@+id/panel_screen_record_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/bg_record_panel"
+        android:elevation="12dp"
+        android:padding="14dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/fab_screen_record"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Header Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/tv_overlay_status_dot"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🎥"
+                    android:textSize="14sp"
+                    android:layout_marginEnd="6dp" />
+
+                <TextView
+                    android:id="@+id/tv_overlay_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="SCREEN RECORDING CONTROLLER"
+                    android:textColor="#00FFCC"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_overlay_timer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="00:00"
+                    android:textColor="#00D4FF"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:background="#15263F"
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="2dp"
+                    android:layout_marginEnd="8dp" />
+
+                <ImageButton
+                    android:id="@+id/btn_close_record_overlay"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_delete"
+                    app:tint="#7A92B4"
+                    android:contentDescription="Close Panel" />
+            </LinearLayout>
+
+            <!-- Quick Setting Toggles -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/chip_overlay_mic"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:gravity="center"
+                    android:background="#1E3250"
+                    android:paddingHorizontal="10dp"
+                    android:text="🎙️ Mic: ON"
+                    android:textColor="#00FFCC"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:layout_marginEnd="6dp" />
+
+                <TextView
+                    android:id="@+id/chip_overlay_quality"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:gravity="center"
+                    android:background="#0F1A2A"
+                    android:paddingHorizontal="10dp"
+                    android:text="⚙️ 1080p 60fps"
+                    android:textColor="#88A8D0"
+                    android:textSize="11sp"
+                    android:layout_marginEnd="6dp" />
+
+                <TextView
+                    android:id="@+id/btn_overlay_studio"
+                    android:layout_width="0dp"
+                    android:layout_height="32dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:background="#0F1A2A"
+                    android:paddingHorizontal="8dp"
+                    android:text="🎬 Studio / Posts"
+                    android:textColor="#00D4FF"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- Main Action Buttons -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="12dp">
+
+                <Button
+                    android:id="@+id/btn_overlay_start_stop"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#00FFCC"
+                    android:text="🔴 START RECORDING"
+                    android:textColor="#000000"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:layout_marginEnd="6dp" />
+
+                <Button
+                    android:id="@+id/btn_overlay_pause_resume"
+                    android:layout_width="wrap_content"
+                    android:layout_height="44dp"
+                    android:backgroundTint="#162A45"
+                    android:text="⏸ Pause"
+                    android:textColor="#00D4FF"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </FrameLayout>
+
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginVertical="6dp"
+    android:background="#142036"
+    android:padding="14dp">
+
+    <!-- Top Row: Name + Hazardous Badge -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <!-- Hexagon icon -->
+        <TextView
+            android:id="@+id/item_ast_icon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⬡"
+            android:textColor="#00FF99"
+            android:textSize="20sp"
+            android:layout_marginEnd="8dp"/>
+
+        <!-- Asteroid Name -->
+        <TextView
+            android:id="@+id/item_ast_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="2025 QV5"
+            android:textColor="#FFFFFF"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.04"
+            android:fontFamily="sans-serif-medium"/>
+
+        <!-- Hazard Tag -->
+        <TextView
+            android:id="@+id/item_ast_hazard"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SAFE"
+            android:textColor="#00FF99"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.1"
+            android:background="#1500FF99"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"/>
+    </LinearLayout>
+
+    <!-- Divider -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#1C2E4A"
+        android:layout_marginVertical="10dp"/>
+
+    <!-- Details Grid: Date & Estimated Size -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <!-- Left: Approach Date & Time -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CLOSE APPROACH DATE"
+                android:textColor="#668899"
+                android:textSize="10sp"
+                android:letterSpacing="0.12"/>
+
+            <TextView
+                android:id="@+id/item_ast_date"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Sep 02, 2026 • 03:46 PM"
+                android:textColor="#DDEEFF"
+                android:textSize="13sp"
+                android:fontFamily="monospace"
+                android:layout_marginTop="2dp"/>
+        </LinearLayout>
+
+        <!-- Right: Estimated Size -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="end">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ESTIMATED SIZE"
+                android:textColor="#668899"
+                android:textSize="10sp"
+                android:letterSpacing="0.12"/>
+
+            <TextView
+                android:id="@+id/item_ast_size"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="11.5 m (37.7 ft)"
+                android:textColor="#00D4FF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace"
+                android:layout_marginTop="2dp"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Bottom Row: Distance & Velocity -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="8dp"
+        android:background="#0A1424"
+        android:paddingVertical="6dp"
+        android:paddingHorizontal="10dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Miss Distance: "
+            android:textColor="#7799AA"
+            android:textSize="11sp"/>
+
+        <TextView
+            android:id="@+id/item_ast_distance"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="5,433,910 km"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:fontFamily="monospace"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Velocity: "
+            android:textColor="#7799AA"
+            android:textSize="11sp"/>
+
+        <TextView
+            android:id="@+id/item_ast_velocity"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="72,340 km/h"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:fontFamily="monospace"/>
+    </LinearLayout>
+
+</LinearLayout>

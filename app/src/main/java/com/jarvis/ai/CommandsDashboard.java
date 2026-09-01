@@ -49,6 +49,11 @@ public class CommandsDashboard {
         list.add(new Command("Weather & Maps", "Share my location with Mom", "Location share"));
         list.add(new Command("Weather & Maps", "Tell me about the Eiffel Tower", "Place details + Wikipedia"));
 
+        // Space & Astronomy
+        list.add(new Command("Space & Asteroids", "Asteroid watch", "NASA Eyes on Asteroids & close approaches"));
+        list.add(new Command("Space & Asteroids", "Where is ISS?", "Live Space Station telemetry & orbit"));
+        list.add(new Command("Space & Asteroids", "NASA photo of the day", "NASA APOD deep space discovery"));
+
         // Finance
         list.add(new Command("Finance", "Bitcoin price", "Live crypto (CoinGecko)"));
         list.add(new Command("Finance", "USD to AED", "Live forex rates"));
@@ -96,6 +101,8 @@ public class CommandsDashboard {
         list.add(new Command("Device", "Alert me when battery drops below 20%", "Battery guardian"));
         list.add(new Command("Device", "Play Spotify / Next song", "Music control"));
         list.add(new Command("Device", "Volume up / down", "Volume control"));
+        list.add(new Command("Device", "Record screen / Stop recording", "HD Screen Recorder + Floating HUD"));
+        list.add(new Command("Device", "Screen record studio", "AI TikTok & YouTube caption + video publisher"));
         list.add(new Command("Device", "Test my internet speed", "Speed test"));
         list.add(new Command("Device", "What's on screen?", "Screen reader (Accessibility)"));
 

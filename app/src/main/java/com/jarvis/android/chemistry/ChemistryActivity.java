@@ -10,10 +10,12 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
-import com.jarvis.android.R;
-import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import com.jarvis.ai.R;
+import java.io.File;
 import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -144,36 +146,19 @@ public class ChemistryActivity extends AppCompatActivity {
     
     public void exportToExcel(View v) {
         try {
-            Workbook workbook = new XSSFWorkbook();
-            Sheet sheet = workbook.createSheet("Periodic Table");
-            
-            Row header = sheet.createRow(0);
-            String[] headers = {"Number", "Symbol", "Name", "Category", "Mass", "Config"};
-            for (int i = 0; i < headers.length; i++) {
-                Cell cell = header.createCell(i);
-                cell.setCellValue(headers[i]);
+            String fileName = "HENRY_PeriodicTable_" + System.currentTimeMillis() + ".csv";
+            File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+            if (dir == null) dir = getFilesDir();
+            File file = new File(dir, fileName);
+
+            try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8))) {
+                writer.println("Number,Symbol,Name,Category,Mass,Config");
+                for (Element el : elements) {
+                    writer.println(el.atomicNumber + "," + el.symbol + "," + el.name + "," + el.category + "," + el.mass + "," + el.config);
+                }
             }
-            
-            int rowNum = 1;
-            for (Element el : elements) {
-                Row row = sheet.createRow(rowNum++);
-                row.createCell(0).setCellValue(el.atomicNumber);
-                row.createCell(1).setCellValue(el.symbol);
-                row.createCell(2).setCellValue(el.name);
-                row.createCell(3).setCellValue(el.category);
-                row.createCell(4).setCellValue(el.mass);
-                row.createCell(5).setCellValue(el.config);
-            }
-            
-            String fileName = "HENRY_PeriodicTable_" + System.currentTimeMillis() + ".xlsx";
-            String path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + fileName;
-            
-            FileOutputStream fos = new FileOutputStream(path);
-            workbook.write(fos);
-            fos.close();
-            workbook.close();
-            
-            Toast.makeText(this, "Saved: " + fileName, Toast.LENGTH_LONG).show();
+
+            Toast.makeText(this, "Saved: " + file.getName(), Toast.LENGTH_LONG).show();
         } catch (Exception e) {
             Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }

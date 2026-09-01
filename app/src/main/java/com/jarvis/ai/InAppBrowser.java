@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -167,6 +168,17 @@ public class InAppBrowser extends AppCompatActivity {
                 etUrl.setText(url);
                 progressBar.setVisibility(View.GONE);
             }
+            @Override
+            public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+                if (view != null) {
+                    ViewGroup parent = (ViewGroup) view.getParent();
+                    if (parent != null) {
+                        parent.removeView(view);
+                    }
+                    view.destroy();
+                }
+                return true;
+            }
         });
         webView.setWebChromeClient(new WebChromeClient() {
             @Override public void onProgressChanged(WebView view, int progress) {
@@ -182,7 +194,35 @@ public class InAppBrowser extends AppCompatActivity {
         setContentView(root);
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (webView != null) {
+            webView.onPause();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (webView != null) {
+            webView.onResume();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (webView != null) {
+            webView.loadUrl("about:blank");
+            webView.clearHistory();
+            webView.removeAllViews();
+            webView.destroy();
+            webView = null;
+        }
+        super.onDestroy();
+    }
+
     @Override public void onBackPressed() {
-        if (webView.canGoBack()) webView.goBack(); else super.onBackPressed();
+        if (webView != null && webView.canGoBack()) webView.goBack(); else super.onBackPressed();
     }
 }

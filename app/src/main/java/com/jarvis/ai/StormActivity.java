@@ -115,7 +115,19 @@ public class StormActivity extends AppCompatActivity {
         WebSettings ws = mapView.getSettings();
         ws.setJavaScriptEnabled(true);
         ws.setDomStorageEnabled(true);
-        mapView.setWebViewClient(new WebViewClient());
+        mapView.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+                if (view != null) {
+                    ViewGroup parent = (ViewGroup) view.getParent();
+                    if (parent != null) {
+                        parent.removeView(view);
+                    }
+                    view.destroy();
+                }
+                return true;
+            }
+        });
         root.addView(mapView);
 
         // Header row (storm count)
@@ -346,5 +358,33 @@ public class StormActivity extends AppCompatActivity {
             "</script></body></html>";
 
         mapView.loadDataWithBaseURL("https://henry.ai", html, "text/html", "UTF-8", null);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (mapView != null) {
+            mapView.onPause();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mapView != null) {
+            mapView.onResume();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (mapView != null) {
+            mapView.loadUrl("about:blank");
+            mapView.clearHistory();
+            mapView.removeAllViews();
+            mapView.destroy();
+            mapView = null;
+        }
+        super.onDestroy();
     }
 }

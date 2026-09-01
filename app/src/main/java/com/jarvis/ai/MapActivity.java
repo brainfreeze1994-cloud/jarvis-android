@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -91,7 +92,19 @@ public class MapActivity extends AppCompatActivity {
                 callback.invoke(origin, true, false);
             }
         });
-        webView.setWebViewClient(new WebViewClient());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+                if (view != null) {
+                    ViewGroup parent = (ViewGroup) view.getParent();
+                    if (parent != null) {
+                        parent.removeView(view);
+                    }
+                    view.destroy();
+                }
+                return true;
+            }
+        });
         webView.addJavascriptInterface(new MapBridge(), "Android");
         root.addView(webView);
 
@@ -194,7 +207,35 @@ public class MapActivity extends AppCompatActivity {
         if (code == PERM_LOC) webView.reload();
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (webView != null) {
+            webView.onPause();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (webView != null) {
+            webView.onResume();
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (webView != null) {
+            webView.loadUrl("about:blank");
+            webView.clearHistory();
+            webView.removeAllViews();
+            webView.destroy();
+            webView = null;
+        }
+        super.onDestroy();
+    }
+
     @Override public void onBackPressed() {
-        if (webView.canGoBack()) webView.goBack(); else super.onBackPressed();
+        if (webView != null && webView.canGoBack()) webView.goBack(); else super.onBackPressed();
     }
 }

@@ -31,7 +31,9 @@ import android.util.Base64;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
+import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -84,13 +86,13 @@ public class MainActivity extends AppCompatActivity {
     private static final int    REQUEST_LOCATION = 204;
     private static final int    REQUEST_LIVE_CAM = 205;
     private static final int    REQUEST_DOC_SCAN = 206;
+    private static final int    REQUEST_SCREEN_RECORD = 207;
     private static final String PREFS            = "jarvis_prefs";
     private static final String KEY_HIS          = "history_v2";
     private static final String KEY_VOICE        = "voice_choice";
     private static final String KEY_WAKE         = "wake_enabled";
     private static final String KEY_MUTE         = "tts_muted";
     private static final String KEY_SPEED        = "tts_speed";
-    private static final String KEY_PERSONA      = "persona_mode";
     private static final String KEY_RESP_MODE    = "response_mode";
     private static final String KEY_SCREEN_ON    = "screen_always_on";
     private static final String CRASH_FILE       = "henry_crash.txt";
@@ -113,13 +115,6 @@ public class MainActivity extends AppCompatActivity {
     private static final String VOICE_FRENCH_MALE     = "french_male";
     private static final String VOICE_FRENCH_FEMALE   = "french_female";
     private String currentVoice   = VOICE_AMERICAN_MALE;
-
-    // Persona modes
-    private static final String PERSONA_FLIRTY       = "flirty";
-    private static final String PERSONA_PROFESSIONAL = "professional";
-    private static final String PERSONA_CASUAL       = "casual";
-    private static final String PERSONA_TACTICAL     = "tactical";
-    private String currentPersona = PERSONA_FLIRTY;
 
     // TTS speed (0=slow, 1=normal, 2=fast)
     private int     ttsSpeed    = 1;
@@ -188,6 +183,26 @@ public class MainActivity extends AppCompatActivity {
     // Sleep tracker
     private SleepTracker  sleepTracker;
     private FitnessCoach  fitnessCoach;
+
+    // Screen recording FAB & Overlay Control Panel
+    private FrameLayout fabScreenRecord;
+    private ImageView ivFabRecordIcon;
+    private View dotFabRecording;
+    private FrameLayout panelScreenRecordOverlay;
+    private TextView tvOverlayStatusDot;
+    private TextView tvOverlayTitle;
+    private TextView tvOverlayTimer;
+    private TextView chipOverlayMic;
+    private TextView chipOverlayQuality;
+    private TextView btnOverlayStudio;
+    private Button btnOverlayStartStop;
+    private Button btnOverlayPauseResume;
+    private ImageButton btnCloseRecordOverlay;
+    private boolean recordMicEnabled = true;
+    private boolean isQuality1080p = true;
+    private final Handler recordTimerHandler = new Handler(Looper.getMainLooper());
+    private Runnable recordTimerRunnable;
+    private BroadcastReceiver screenRecordReceiver;
 
     // ── onCreate ──────────────────────────────────────────────────────────────
     @Override
@@ -301,7 +316,6 @@ public class MainActivity extends AppCompatActivity {
 
         // Load prefs
         currentVoice   = getPrefs().getString(KEY_VOICE,      VOICE_AMERICAN_MALE);
-        currentPersona = getPrefs().getString(KEY_PERSONA,    PERSONA_FLIRTY);
         responseMode   = getPrefs().getString(KEY_RESP_MODE,  MODE_BALANCED);
         wakeEnabled    = getPrefs().getBoolean(KEY_WAKE,      false);
         ttsMuted       = getPrefs().getBoolean(KEY_MUTE,      false);
@@ -373,6 +387,8 @@ public class MainActivity extends AppCompatActivity {
         setupChip(R.id.chip4, 3);
         setupChip(R.id.chip5, 4);
         setupChip(R.id.chip6, 5);
+
+        initScreenRecordFabAndOverlay();
 
         if (history.isEmpty()) {
             addJarvisMsg("Good day, sir. H.E.N.R.Y online. All systems nominal.");
@@ -494,6 +510,17 @@ public class MainActivity extends AppCompatActivity {
             registerReceiver(notifReceiver, nf, Context.RECEIVER_NOT_EXPORTED);
         else
             registerReceiver(notifReceiver, nf);
+
+        screenRecordReceiver = new BroadcastReceiver() {
+            @Override public void onReceive(Context ctx, Intent intent) {
+                updateScreenRecordUi();
+            }
+        };
+        IntentFilter srf = new IntentFilter(ScreenRecorderService.ACTION_STATE_CHANGED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            registerReceiver(screenRecordReceiver, srf, Context.RECEIVER_NOT_EXPORTED);
+        else
+            registerReceiver(screenRecordReceiver, srf);
     }
 
     // ── Native TTS ────────────────────────────────────────────────────────────
@@ -537,10 +564,11 @@ public class MainActivity extends AppCompatActivity {
             wakeEnabled    ? "🟢 Wake Word: ON  (tap to disable)"  : "⚫ Wake Word: OFF  (tap to enable)",
             ttsMuted       ? "🔇 Voice Muted  (tap to unmute)"    : "🔊 Voice Enabled  (tap to mute)",
             "⚡ Voice Speed: " + new String[]{"Slow","Normal","Fast"}[ttsSpeed],
-            "🧠 Persona: " + capitalize(currentPersona),
             "💬 Response Mode: " + modeLbl,
             screenAlwaysOn ? "💡 Screen Always-On: ON  (tap off)" : "💡 Screen Always-On: OFF  (tap on)",
             bubbleEnabled  ? "🫧 Floating Bubble: ON  (tap off)"  : "🫧 Floating Bubble: OFF  (tap on)",
+            ScreenRecorderService.isRecording ? "🔴 Stop Screen Recording" : "🎥 Start Screen Recording (1080p HUD)",
+            "🎬 Screen Recording & Social Studio (TikTok/YouTube)",
             "☀️ Daily Digest — Full Morning Briefing",
             "📰 Headlines Only",
             "📋 My Reminders",
@@ -560,20 +588,21 @@ public class MainActivity extends AppCompatActivity {
                     case 1:  toggleWakeWord(); break;
                     case 2:  toggleMute(); break;
                     case 3:  showSpeedPicker(); break;
-                    case 4:  showPersonaPicker(); break;
-                    case 5:  showResponseModePicker(); break;
-                    case 6:  toggleScreenAlwaysOn(); break;
-                    case 7:  toggleBubble(); break;
-                    case 8:  showDailyDigest(); break;
-                    case 9:  readNewsBriefing(); break;
-                    case 10: showReminders(); break;
-                    case 11: showNotes(); break;
-                    case 12: showShoppingList(); break;
-                    case 13: showShortcuts(); break;
-                    case 14: showChatSearch(); break;
-                    case 15: showProfileEditor(); break;
-                    case 16: exportChat(); break;
-                    case 17: translateLastReply(); break;
+                    case 4:  showResponseModePicker(); break;
+                    case 5:  toggleScreenAlwaysOn(); break;
+                    case 6:  toggleBubble(); break;
+                    case 7:  if (ScreenRecorderService.isRecording) stopScreenRecording(); else startScreenRecording(); break;
+                    case 8:  startActivity(new Intent(this, ScreenRecordResultActivity.class)); break;
+                    case 9:  showDailyDigest(); break;
+                    case 10: readNewsBriefing(); break;
+                    case 11: showReminders(); break;
+                    case 12: showNotes(); break;
+                    case 13: showShoppingList(); break;
+                    case 14: showShortcuts(); break;
+                    case 15: showChatSearch(); break;
+                    case 16: showProfileEditor(); break;
+                    case 17: exportChat(); break;
+                    case 18: translateLastReply(); break;
                 }
             }).show();
     }
@@ -645,27 +674,6 @@ public class MainActivity extends AppCompatActivity {
                 getPrefs().edit().putInt(KEY_SPEED, ttsSpeed).apply();
                 applyNativeVoice(currentVoice);
                 Toast.makeText(this, "Speed: " + speeds[ttsSpeed], Toast.LENGTH_SHORT).show();
-            })
-            .setNegativeButton("Cancel", null).show();
-    }
-
-    private void showPersonaPicker() {
-        final String[] labels = { "😏 Flirty (default)", "👔 Professional", "😊 Casual", "🎯 Tactical" };
-        final String[] personas = { PERSONA_FLIRTY, PERSONA_PROFESSIONAL, PERSONA_CASUAL, PERSONA_TACTICAL };
-        int cur = 0;
-        for (int i = 0; i < personas.length; i++) if (personas[i].equals(currentPersona)) { cur = i; break; }
-        final int[] sel = { cur };
-        new AlertDialog.Builder(this)
-            .setTitle("◆ Persona Mode")
-            .setSingleChoiceItems(labels, cur, (d, w) -> sel[0] = w)
-            .setPositiveButton("Apply", (d, w) -> {
-                currentPersona = personas[sel[0]];
-                getPrefs().edit().putString(KEY_PERSONA, currentPersona).apply();
-                history.add(new HistoryItem("user",
-                    "[SYSTEM] Persona mode changed to: " + currentPersona +
-                    ". Adjust your personality accordingly."));
-                Toast.makeText(this, "Persona: " + capitalize(currentPersona), Toast.LENGTH_SHORT).show();
-                speak("Persona set to " + currentPersona + " mode, sir.", "neutral");
             })
             .setNegativeButton("Cancel", null).show();
     }
@@ -830,6 +838,197 @@ public class MainActivity extends AppCompatActivity {
         Intent i = new Intent(this, FloatingBubbleService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(i);
         else startService(i);
+    }
+
+    // ── Screen Recording FAB & Overlay Controller ────────────────────────────
+    private void initScreenRecordFabAndOverlay() {
+        fabScreenRecord          = findViewById(R.id.fab_screen_record);
+        ivFabRecordIcon          = findViewById(R.id.iv_fab_record_icon);
+        dotFabRecording          = findViewById(R.id.dot_fab_recording);
+        panelScreenRecordOverlay = findViewById(R.id.panel_screen_record_overlay);
+        tvOverlayStatusDot       = findViewById(R.id.tv_overlay_status_dot);
+        tvOverlayTitle           = findViewById(R.id.tv_overlay_title);
+        tvOverlayTimer           = findViewById(R.id.tv_overlay_timer);
+        chipOverlayMic           = findViewById(R.id.chip_overlay_mic);
+        chipOverlayQuality       = findViewById(R.id.chip_overlay_quality);
+        btnOverlayStudio         = findViewById(R.id.btn_overlay_studio);
+        btnOverlayStartStop      = findViewById(R.id.btn_overlay_start_stop);
+        btnOverlayPauseResume    = findViewById(R.id.btn_overlay_pause_resume);
+        btnCloseRecordOverlay    = findViewById(R.id.btn_close_record_overlay);
+
+        if (fabScreenRecord != null) {
+            fabScreenRecord.setOnClickListener(v -> {
+                if (panelScreenRecordOverlay != null) {
+                    int vis = panelScreenRecordOverlay.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE;
+                    panelScreenRecordOverlay.setVisibility(vis);
+                    if (vis == View.VISIBLE) updateScreenRecordUi();
+                }
+            });
+        }
+
+        if (btnCloseRecordOverlay != null) {
+            btnCloseRecordOverlay.setOnClickListener(v -> {
+                if (panelScreenRecordOverlay != null) panelScreenRecordOverlay.setVisibility(View.GONE);
+            });
+        }
+
+        if (btnOverlayStartStop != null) {
+            btnOverlayStartStop.setOnClickListener(v -> {
+                if (ScreenRecorderService.isRecording) {
+                    stopScreenRecording();
+                } else {
+                    startScreenRecording();
+                }
+            });
+        }
+
+        if (btnOverlayPauseResume != null) {
+            btnOverlayPauseResume.setOnClickListener(v -> {
+                if (ScreenRecorderService.isRecording) {
+                    Intent pauseIntent = new Intent(this, ScreenRecorderService.class);
+                    pauseIntent.setAction(ScreenRecorderService.isPaused ? ScreenRecorderService.ACTION_RESUME : ScreenRecorderService.ACTION_PAUSE);
+                    startService(pauseIntent);
+                }
+            });
+        }
+
+        if (chipOverlayMic != null) {
+            chipOverlayMic.setOnClickListener(v -> {
+                recordMicEnabled = !recordMicEnabled;
+                chipOverlayMic.setText(recordMicEnabled ? "🎙️ Mic: ON" : "🔇 Mic: OFF");
+                chipOverlayMic.setTextColor(recordMicEnabled ? 0xFF00FFCC : 0xFF88A8D0);
+                Toast.makeText(this, recordMicEnabled ? "Microphone commentary enabled" : "Microphone muted for recording", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        if (chipOverlayQuality != null) {
+            chipOverlayQuality.setOnClickListener(v -> {
+                isQuality1080p = !isQuality1080p;
+                chipOverlayQuality.setText(isQuality1080p ? "⚙️ 1080p 60fps" : "⚙️ 720p 30fps");
+                Toast.makeText(this, "Capture quality set to " + (isQuality1080p ? "1080p (FHD 60fps)" : "720p (HD 30fps)"), Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        if (btnOverlayStudio != null) {
+            btnOverlayStudio.setOnClickListener(v -> {
+                startActivity(new Intent(this, ScreenRecordResultActivity.class));
+            });
+        }
+
+        recordTimerRunnable = new Runnable() {
+            @Override public void run() {
+                if (ScreenRecorderService.isRecording) {
+                    long elapsed = System.currentTimeMillis() - ScreenRecorderService.currentStartTimeMs;
+                    if (elapsed < 0) elapsed = 0;
+                    int seconds = (int) (elapsed / 1000) % 60;
+                    int minutes = (int) ((elapsed / (1000 * 60)) % 60);
+                    String timeStr = String.format(Locale.US, "%02d:%02d", minutes, seconds);
+                    if (tvOverlayTimer != null) tvOverlayTimer.setText(timeStr);
+                    if (dotFabRecording != null) {
+                        dotFabRecording.setVisibility((seconds % 2 == 0) ? View.VISIBLE : View.INVISIBLE);
+                    }
+                    recordTimerHandler.postDelayed(this, 1000);
+                }
+            }
+        };
+
+        updateScreenRecordUi();
+    }
+
+    private void updateScreenRecordUi() {
+        boolean rec = ScreenRecorderService.isRecording;
+        boolean paused = ScreenRecorderService.isPaused;
+
+        if (ivFabRecordIcon != null) {
+            ivFabRecordIcon.setImageResource(rec ? R.drawable.ic_stop : R.drawable.ic_videocam);
+            ivFabRecordIcon.setImageTintList(android.content.res.ColorStateList.valueOf(rec ? 0xFFFF3366 : 0xFF00FFCC));
+        }
+
+        if (dotFabRecording != null) {
+            dotFabRecording.setVisibility(rec ? View.VISIBLE : View.GONE);
+        }
+
+        if (btnOverlayStartStop != null) {
+            btnOverlayStartStop.setText(rec ? "⏹ STOP & OPEN STUDIO" : "🔴 START RECORDING");
+            btnOverlayStartStop.setBackgroundTintList(android.content.res.ColorStateList.valueOf(rec ? 0xFFFF2255 : 0xFF00FFCC));
+            btnOverlayStartStop.setTextColor(rec ? 0xFFFFFFFF : 0xFF000000);
+        }
+
+        if (btnOverlayPauseResume != null) {
+            btnOverlayPauseResume.setVisibility(rec ? View.VISIBLE : View.GONE);
+            btnOverlayPauseResume.setText(paused ? "▶ Resume" : "⏸ Pause");
+        }
+
+        if (tvOverlayStatusDot != null) {
+            tvOverlayStatusDot.setText(rec ? "🔴" : "🎥");
+        }
+
+        if (tvOverlayTitle != null) {
+            tvOverlayTitle.setText(rec ? (paused ? "RECORDING PAUSED" : "RECORDING ACTIVE (1080p)") : "SCREEN RECORDING CONTROLLER");
+            tvOverlayTitle.setTextColor(rec ? (paused ? 0xFFFFBB00 : 0xFFFF3366) : 0xFF00FFCC);
+        }
+
+        recordTimerHandler.removeCallbacks(recordTimerRunnable);
+        if (rec) {
+            recordTimerHandler.post(recordTimerRunnable);
+        } else {
+            if (tvOverlayTimer != null) tvOverlayTimer.setText("00:00");
+        }
+    }
+
+    // ── Screen Recording ───────────────────────────────────────────────────────
+    public void startScreenRecording() {
+        if (ScreenRecorderService.isRecording) {
+            String reply = "Screen recording is currently active, sir. Tap ⏹ on the floating widget or say 'stop recording' when you are done.";
+            addJarvisMsg(reply);
+            speak(reply, "neutral");
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!android.provider.Settings.canDrawOverlays(this)) {
+                Toast.makeText(this, "Enable 'Display over other apps' to view the floating recording HUD", Toast.LENGTH_LONG).show();
+                try {
+                    Intent overlayIntent = new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        android.net.Uri.parse("package:" + getPackageName()));
+                    startActivity(overlayIntent);
+                } catch (Exception ignored) {}
+            }
+        }
+
+        if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            androidx.core.app.ActivityCompat.requestPermissions(this,
+                new String[]{android.Manifest.permission.RECORD_AUDIO}, PERM_CODE);
+        }
+
+        try {
+            android.media.projection.MediaProjectionManager projectionManager =
+                (android.media.projection.MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
+            if (projectionManager != null) {
+                startActivityForResult(projectionManager.createScreenCaptureIntent(), REQUEST_SCREEN_RECORD);
+            }
+        } catch (Exception e) {
+            String errorMsg = "Could not initialize screen capture: " + e.getMessage();
+            addJarvisMsg(errorMsg);
+            speak(errorMsg, "concerned");
+        }
+    }
+
+    public void stopScreenRecording() {
+        if (ScreenRecorderService.isRecording) {
+            Intent stopIntent = new Intent(this, ScreenRecorderService.class);
+            stopIntent.setAction(ScreenRecorderService.ACTION_STOP);
+            startService(stopIntent);
+            String reply = "⏹ Finalizing screen recording and launching Social Studio, sir.";
+            addJarvisMsg(reply);
+            speak(reply, "excited");
+        } else {
+            String reply = "No screen recording is currently active, sir. Opening Screen Recording & Social Studio.";
+            addJarvisMsg(reply);
+            speak(reply, "neutral");
+            startActivity(new Intent(this, ScreenRecordResultActivity.class));
+        }
     }
 
     // ── Daily Digest ──────────────────────────────────────────────────────────
@@ -1279,6 +1478,34 @@ public class MainActivity extends AppCompatActivity {
                 speak(analysisResult, "neutral");
                 history.add(new HistoryItem("model", analysisResult));
                 saveHistory();
+            }
+            return;
+        }
+
+        // 🎥 Screen Recorder Permission Result
+        if (req == REQUEST_SCREEN_RECORD) {
+            if (res == RESULT_OK && data != null) {
+                Intent serviceIntent = new Intent(this, ScreenRecorderService.class);
+                serviceIntent.setAction(ScreenRecorderService.ACTION_START);
+                serviceIntent.putExtra(ScreenRecorderService.EXTRA_RESULT_CODE, res);
+                serviceIntent.putExtra(ScreenRecorderService.EXTRA_RESULT_DATA, data);
+                serviceIntent.putExtra(ScreenRecorderService.EXTRA_ENABLE_MIC, recordMicEnabled);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(serviceIntent);
+                } else {
+                    startService(serviceIntent);
+                }
+                String reply = "🔴 Screen recording initiated, sir. A floating Stark HUD widget with a live timer is now active on your display.";
+                addJarvisMsg(reply);
+                speak(reply, "excited");
+                history.add(new HistoryItem("model", reply));
+                saveHistory();
+                updateScreenRecordUi();
+            } else {
+                String reply = "Screen recording permission was cancelled or not granted, sir.";
+                addJarvisMsg(reply);
+                speak(reply, "neutral");
+                updateScreenRecordUi();
             }
             return;
         }
@@ -2731,12 +2958,49 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        // ── Screen Recording & Social Video Studio ───────────────────────────
+        String srLower = userText.toLowerCase(Locale.US);
+        if (srLower.contains("record screen") || srLower.contains("screen record") ||
+            srLower.contains("screen recording") || srLower.contains("capture screen") ||
+            srLower.contains("record my screen") || srLower.contains("start recording") ||
+            srLower.contains("start screen record") || srLower.contains("video record screen") ||
+            srLower.contains("record video of screen")) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            startScreenRecording();
+            return;
+        }
+
+        if (srLower.contains("stop recording") || srLower.contains("stop screen record") ||
+            srLower.contains("finish recording") || srLower.contains("end screen record") ||
+            srLower.contains("stop record screen")) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            stopScreenRecording();
+            return;
+        }
+
+        if (srLower.contains("screen record studio") || srLower.contains("screen studio") ||
+            srLower.contains("social studio") || srLower.contains("video studio") ||
+            srLower.contains("my screen recordings") || srLower.contains("post video to tiktok") ||
+            srLower.contains("post video to youtube") || srLower.contains("post screen record")) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply = "[EMOTION:excited] Opening Screen Recording & Social Studio, sir.";
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, "excited");
+            saveHistory();
+            startActivity(new Intent(this, ScreenRecordResultActivity.class));
+            return;
+        }
+
         // ── Periodic Table / Element Mixer ──────────────────────────────────
         String periodicLower = userText.toLowerCase(Locale.US);
         if (periodicLower.contains("periodic table") || periodicLower.contains("element mixer") ||
-            periodicLower.contains("chemistry lab") || periodicLower.contains("mix elements")) {
+            periodicLower.contains("chemistry lab") || periodicLower.contains("mix elements") ||
+            periodicLower.contains("chemistry periodic") || periodicLower.contains("elements table") ||
+            periodicLower.contains("periodic matrix") || periodicLower.contains("arc synthesizer") ||
+            periodicLower.contains("bohr model") || (periodicLower.contains("chemistry") && periodicLower.contains("table"))) {
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            String reply = "[EMOTION:excited] Opening the periodic table, sir. Drag one element onto another to see what they form.";
+            String reply = "[EMOTION:excited] Accessing the Stark Periodic Matrix and Chemical Synthesizer, sir.";
             String clean = stripEmotionTag(reply);
             history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
             speak(clean, "excited");
@@ -4040,8 +4304,8 @@ public class MainActivity extends AppCompatActivity {
         if (lowerInput.matches(".*(what plant|plant scanner|identify plant|scan plant|what flower|what tree|what herb).*")) {
             openPlantScanner();
         }
-        // 🚀 Space Command voice trigger
-        if (lowerInput.matches(".*(space station|iss|nasa|asteroid|open space|space command).*")) {
+        // 🚀 Space Command / Asteroid Watch voice trigger
+        if (lowerInput.matches(".*(space station|iss|nasa|asteroid|asteroid watch|eyes on asteroids|open space|space command|track iss|where is iss).*")) {
             startActivity(new android.content.Intent(this, SpaceActivity.class));
         }
         // 📈 Markets voice trigger
@@ -4636,6 +4900,11 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        updateScreenRecordUi();
+    }
+
     @Override protected void onPause() {
         super.onPause();
         stopSpeaking();
@@ -4649,8 +4918,11 @@ public class MainActivity extends AppCompatActivity {
         if (batteryHandler != null && batteryChecker != null)
             batteryHandler.removeCallbacks(batteryChecker);
         if (fitnessTracker != null) fitnessTracker.stop();
+        if (recordTimerHandler != null && recordTimerRunnable != null)
+            recordTimerHandler.removeCallbacks(recordTimerRunnable);
         try { unregisterReceiver(wakeReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(notifReceiver); } catch (Exception ignored) {}
+        try { unregisterReceiver(screenRecordReceiver); } catch (Exception ignored) {}
         super.onDestroy();
     }
 }

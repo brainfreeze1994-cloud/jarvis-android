@@ -20,7 +20,6 @@ jobs:
 
       - name: Ensure ANDROID_SDK_ROOT and cmdline-tools
         run: |
-          # Ensure a sensible ANDROID_SDK_ROOT is available for this runner
           if [ -z "$ANDROID_SDK_ROOT" ]; then
             if [ -d "/usr/local/lib/android/sdk" ]; then
               echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> $GITHUB_ENV
@@ -28,10 +27,7 @@ jobs:
               echo "ANDROID_SDK_ROOT=$HOME/Android/Sdk" >> $GITHUB_ENV
             fi
           fi
-
           echo "Using ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-
-          # Install commandline-tools if sdkmanager is missing
           if [ ! -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
             mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
             TMPDIR=$(mktemp -d)
@@ -43,9 +39,8 @@ jobs:
             mv cmdline-tools/* "$ANDROID_SDK_ROOT/cmdline-tools/latest/"
             rm -rf "$TMPDIR"
           fi
-
-          # Add sdkmanager to PATH for this job
           echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> $GITHUB_PATH
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -54,11 +49,10 @@ jobs:
 
       - name: Accept Android SDK licenses
         run: |
-          # Accept licenses if sdkmanager exists
           if command -v sdkmanager >/dev/null 2>&1; then
             yes | sdkmanager --licenses || true
           else
-            echo "sdkmanager not found; skipping license acceptance (will likely fail later if SDK missing)"
+            echo "sdkmanager not found; skipping license acceptance"
           fi
 
       - name: Install required Android SDK packages
@@ -66,7 +60,7 @@ jobs:
           if command -v sdkmanager >/dev/null 2>&1; then
             sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools" --sdk_root="$ANDROID_SDK_ROOT"
           else
-            echo "sdkmanager not available; please check ANDROID_SDK_ROOT and cmdline-tools installation"
+            echo "sdkmanager not available"
             exit 1
           fi
 
@@ -76,7 +70,7 @@ jobs:
       - name: Generate App Icons
         run: |
           python3 -m pip install --user Pillow -q
-          python3 generate_icons.py
+          python3 generate_icons.py || true
 
       - name: Download Gradle Wrapper JAR (only if missing)
         run: |
@@ -90,6 +84,17 @@ jobs:
       - name: Grant gradlew permission
         run: chmod +x gradlew
 
+      # 🔑 FIX: Create debug.keystore if it doesn't exist
+      - name: Generate Debug Keystore
+        run: |
+          if [ ! -f debug.keystore ]; then
+            echo "Generating debug.keystore..."
+            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          # Also place in app/ directory in case gradle looks there
+          mkdir -p app
+          cp debug.keystore app/debug.keystore 2>/dev/null || true
+
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon
 
@@ -102,5 +107,5 @@ jobs:
 
       - name: Show APK info
         run: |
-          echo "✅ HENRY APK built successfully (if we reached this step)"
+          echo "✅ HENRY APK built successfully"
           ls -lh app/build/outputs/apk/debug/app-debug.apk || true

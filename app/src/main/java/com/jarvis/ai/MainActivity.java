@@ -185,6 +185,11 @@ public class MainActivity extends AppCompatActivity {
     private FitnessCoach  fitnessCoach;
 
     // Screen recording FAB & Overlay Control Panel
+    private View layoutFabRecordContainer;
+    private FrameLayout btnFabRecordPause;
+    private ImageView ivFabPauseIcon;
+    private FrameLayout btnFabRecordExit;
+    private ImageButton btnTopScreenRecord;
     private FrameLayout fabScreenRecord;
     private ImageView ivFabRecordIcon;
     private View dotFabRecording;
@@ -194,12 +199,14 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvOverlayTimer;
     private TextView chipOverlayMic;
     private TextView chipOverlayQuality;
+    private TextView chipOverlayCleanRecord;
     private TextView btnOverlayStudio;
     private Button btnOverlayStartStop;
     private Button btnOverlayPauseResume;
     private ImageButton btnCloseRecordOverlay;
     private boolean recordMicEnabled = true;
     private boolean isQuality1080p = true;
+    private boolean cleanRecordEnabled = false;
     private final Handler recordTimerHandler = new Handler(Looper.getMainLooper());
     private Runnable recordTimerRunnable;
     private BroadcastReceiver screenRecordReceiver;
@@ -842,6 +849,11 @@ public class MainActivity extends AppCompatActivity {
 
     // ── Screen Recording FAB & Overlay Controller ────────────────────────────
     private void initScreenRecordFabAndOverlay() {
+        layoutFabRecordContainer = findViewById(R.id.layout_fab_record_container);
+        btnFabRecordPause        = findViewById(R.id.btn_fab_record_pause);
+        ivFabPauseIcon           = findViewById(R.id.iv_fab_pause_icon);
+        btnFabRecordExit         = findViewById(R.id.btn_fab_record_exit);
+        btnTopScreenRecord       = findViewById(R.id.btn_top_screen_record);
         fabScreenRecord          = findViewById(R.id.fab_screen_record);
         ivFabRecordIcon          = findViewById(R.id.iv_fab_record_icon);
         dotFabRecording          = findViewById(R.id.dot_fab_recording);
@@ -851,6 +863,7 @@ public class MainActivity extends AppCompatActivity {
         tvOverlayTimer           = findViewById(R.id.tv_overlay_timer);
         chipOverlayMic           = findViewById(R.id.chip_overlay_mic);
         chipOverlayQuality       = findViewById(R.id.chip_overlay_quality);
+        chipOverlayCleanRecord   = findViewById(R.id.chip_overlay_clean_record);
         btnOverlayStudio         = findViewById(R.id.btn_overlay_studio);
         btnOverlayStartStop      = findViewById(R.id.btn_overlay_start_stop);
         btnOverlayPauseResume    = findViewById(R.id.btn_overlay_pause_resume);
@@ -862,6 +875,49 @@ public class MainActivity extends AppCompatActivity {
                     int vis = panelScreenRecordOverlay.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE;
                     panelScreenRecordOverlay.setVisibility(vis);
                     if (vis == View.VISIBLE) updateScreenRecordUi();
+                }
+            });
+        }
+
+        // ⏸ Pause / Resume directly on the floating video camera controls
+        if (btnFabRecordPause != null) {
+            btnFabRecordPause.setOnClickListener(v -> {
+                if (ScreenRecorderService.isRecording) {
+                    Intent pauseIntent = new Intent(this, ScreenRecorderService.class);
+                    pauseIntent.setAction(ScreenRecorderService.isPaused ? ScreenRecorderService.ACTION_RESUME : ScreenRecorderService.ACTION_PAUSE);
+                    startService(pauseIntent);
+                }
+            });
+        }
+
+        // ✕ Exit / Dismiss button on the floating video camera controls
+        // Hides the floating controls completely so user can record cleanly without it
+        if (btnFabRecordExit != null) {
+            btnFabRecordExit.setOnClickListener(v -> {
+                if (layoutFabRecordContainer != null) {
+                    layoutFabRecordContainer.setVisibility(View.GONE);
+                }
+                if (panelScreenRecordOverlay != null) {
+                    panelScreenRecordOverlay.setVisibility(View.GONE);
+                }
+                Toast.makeText(this, "Screen recorder icon dismissed. Recording cleanly without it. Re-open anytime via top-bar camera button.", Toast.LENGTH_LONG).show();
+            });
+        }
+
+        // 🎥 Top bar toggle button to re-open or toggle the screen recorder controls
+        if (btnTopScreenRecord != null) {
+            btnTopScreenRecord.setOnClickListener(v -> {
+                if (layoutFabRecordContainer != null) {
+                    if (layoutFabRecordContainer.getVisibility() != View.VISIBLE) {
+                        layoutFabRecordContainer.setVisibility(View.VISIBLE);
+                        Toast.makeText(this, "Screen recorder controls restored", Toast.LENGTH_SHORT).show();
+                    } else {
+                        if (panelScreenRecordOverlay != null) {
+                            int vis = panelScreenRecordOverlay.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE;
+                            panelScreenRecordOverlay.setVisibility(vis);
+                        }
+                    }
+                    updateScreenRecordUi();
                 }
             });
         }
@@ -909,6 +965,15 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
+        if (chipOverlayCleanRecord != null) {
+            chipOverlayCleanRecord.setOnClickListener(v -> {
+                cleanRecordEnabled = !cleanRecordEnabled;
+                chipOverlayCleanRecord.setText(cleanRecordEnabled ? "👻 Clean: ON" : "👻 Clean: OFF");
+                chipOverlayCleanRecord.setTextColor(cleanRecordEnabled ? 0xFF00FFCC : 0xFF88A8D0);
+                Toast.makeText(this, cleanRecordEnabled ? "Clean recording ON: icon will auto-hide during recording" : "Clean recording OFF: icon will remain visible", Toast.LENGTH_SHORT).show();
+            });
+        }
+
         if (btnOverlayStudio != null) {
             btnOverlayStudio.setOnClickListener(v -> {
                 startActivity(new Intent(this, ScreenRecordResultActivity.class));
@@ -946,6 +1011,20 @@ public class MainActivity extends AppCompatActivity {
 
         if (dotFabRecording != null) {
             dotFabRecording.setVisibility(rec ? View.VISIBLE : View.GONE);
+        }
+
+        if (btnFabRecordPause != null) {
+            btnFabRecordPause.setVisibility(rec ? View.VISIBLE : View.GONE);
+        }
+
+        if (ivFabPauseIcon != null) {
+            ivFabPauseIcon.setImageResource(paused ? R.drawable.ic_play : R.drawable.ic_pause);
+            ivFabPauseIcon.setImageTintList(android.content.res.ColorStateList.valueOf(paused ? 0xFF00FFCC : 0xFF00D4FF));
+        }
+
+        // Restore floating container visibility when recording ends
+        if (!rec && layoutFabRecordContainer != null && layoutFabRecordContainer.getVisibility() != View.VISIBLE && cleanRecordEnabled) {
+            layoutFabRecordContainer.setVisibility(View.VISIBLE);
         }
 
         if (btnOverlayStartStop != null) {
@@ -1500,6 +1579,14 @@ public class MainActivity extends AppCompatActivity {
                 speak(reply, "excited");
                 history.add(new HistoryItem("model", reply));
                 saveHistory();
+
+                if (panelScreenRecordOverlay != null) {
+                    panelScreenRecordOverlay.setVisibility(View.GONE);
+                }
+                if (cleanRecordEnabled && layoutFabRecordContainer != null) {
+                    layoutFabRecordContainer.setVisibility(View.GONE);
+                    Toast.makeText(this, "Screen recorder icon dismissed for clean recording. Reopen anytime via top bar camera button.", Toast.LENGTH_LONG).show();
+                }
                 updateScreenRecordUi();
             } else {
                 String reply = "Screen recording permission was cancelled or not granted, sir.";

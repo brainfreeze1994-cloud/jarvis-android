@@ -68,6 +68,7 @@ public class ScreenRecorderService extends Service {
 
     private MediaProjectionManager projectionManager;
     private MediaProjection mediaProjection;
+    private MediaProjection.Callback mediaProjectionCallback;
     private VirtualDisplay virtualDisplay;
     private MediaRecorder mediaRecorder;
 
@@ -78,6 +79,7 @@ public class ScreenRecorderService extends Service {
     private TextView tvTimer;
     private TextView tvRecDot;
     private TextView tvExpandedTimer;
+    private TextView btnQuickPauseFloating;
     private TextView btnPauseFloating;
     private TextView btnStopFloating;
     private TextView btnMicToggle;
@@ -261,6 +263,19 @@ public class ScreenRecorderService extends Service {
                 return;
             }
 
+            // Android 14 (API 34) MANDATORY: Must register a callback before starting capture
+            mediaProjectionCallback = new MediaProjection.Callback() {
+                @Override
+                public void onStop() {
+                    super.onStop();
+                    Log.d(TAG, "MediaProjection capture stopped by system");
+                    if (isRecording) {
+                        stopRecording();
+                    }
+                }
+            };
+            mediaProjection.registerCallback(mediaProjectionCallback, new Handler(Looper.getMainLooper()));
+
             virtualDisplay = mediaProjection.createVirtualDisplay(
                 "HENRY_ScreenDisplay",
                 screenWidth,
@@ -359,6 +374,9 @@ public class ScreenRecorderService extends Service {
         if (btnPauseFloating != null) {
             btnPauseFloating.setText(isPaused ? "▶ Resume" : "⏸ Pause");
         }
+        if (btnQuickPauseFloating != null) {
+            btnQuickPauseFloating.setText(isPaused ? "▶" : "⏸");
+        }
     }
 
     private void stopRecording() {
@@ -395,6 +413,12 @@ public class ScreenRecorderService extends Service {
             }
 
             if (mediaProjection != null) {
+                if (mediaProjectionCallback != null) {
+                    try {
+                        mediaProjection.unregisterCallback(mediaProjectionCallback);
+                    } catch (Exception ignored) {}
+                    mediaProjectionCallback = null;
+                }
                 mediaProjection.stop();
                 mediaProjection = null;
             }
@@ -463,6 +487,18 @@ public class ScreenRecorderService extends Service {
             tvTimer.setPadding(0, 0, dp(8), 0);
             layoutCollapsed.addView(tvTimer);
 
+            // Quick Pause / Resume Button in Collapsed Mode
+            btnQuickPauseFloating = new TextView(this);
+            btnQuickPauseFloating.setText(isPaused ? "▶" : "⏸");
+            btnQuickPauseFloating.setTextColor(0xFF00D4FF);
+            btnQuickPauseFloating.setTextSize(14f);
+            btnQuickPauseFloating.setPadding(dp(6), dp(2), dp(6), dp(2));
+            btnQuickPauseFloating.setOnClickListener(v -> {
+                if (isPaused) resumeRecording();
+                else pauseRecording();
+            });
+            layoutCollapsed.addView(btnQuickPauseFloating);
+
             // Quick Stop Button in Collapsed Mode
             TextView btnQuickStop = new TextView(this);
             btnQuickStop.setText("⏹");
@@ -471,6 +507,18 @@ public class ScreenRecorderService extends Service {
             btnQuickStop.setPadding(dp(4), dp(2), dp(6), dp(2));
             btnQuickStop.setOnClickListener(v -> stopRecording());
             layoutCollapsed.addView(btnQuickStop);
+
+            // Exit / Dismiss Floating HUD Button (Allows recording cleanly without HUD)
+            TextView btnQuickExit = new TextView(this);
+            btnQuickExit.setText("✕");
+            btnQuickExit.setTextColor(0xFF88A8D0);
+            btnQuickExit.setTextSize(13f);
+            btnQuickExit.setPadding(dp(6), dp(2), dp(4), dp(2));
+            btnQuickExit.setOnClickListener(v -> {
+                removeFloatingControls();
+                Toast.makeText(this, "HUD hidden. Recording cleanly without floating icon. Manage via notification drawer.", Toast.LENGTH_SHORT).show();
+            });
+            layoutCollapsed.addView(btnQuickExit);
 
             // Expand Arrow
             TextView tvExpand = new TextView(this);

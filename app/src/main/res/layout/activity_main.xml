@@ -87,6 +87,17 @@
             android:contentDescription="Voice settings"/>
 
 
+        <!-- Screen Recorder Toggle Button (re-open floating controls if exited) -->
+        <ImageButton
+            android:id="@+id/btn_top_screen_record"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:layout_marginStart="4dp"
+            android:background="@android:color/transparent"
+            android:src="@drawable/ic_videocam"
+            android:contentDescription="Screen Recording Controls"
+            app:tint="#00D4FF"/>
+
         <!-- Clear button — kept OUTSIDE the scroll area so it's always visible/reachable -->
         <ImageButton
             android:id="@+id/btn_clear"
@@ -475,40 +486,93 @@
 
     </LinearLayout>
 
-    <!-- ── Screen Recording Floating Action Button (FAB) ── -->
-    <FrameLayout
-        android:id="@+id/fab_screen_record"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
+    <!-- ── Screen Recording Floating Action Controller (Video Camera + Pause + Exit) ── -->
+    <LinearLayout
+        android:id="@+id/layout_fab_record_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="16dp"
-        android:background="@drawable/bg_fab_record"
-        android:elevation="8dp"
-        android:clickable="true"
-        android:focusable="true"
-        android:contentDescription="Screen Recording Controls"
+        android:elevation="10dp"
         app:layout_constraintBottom_toTopOf="@id/input_container"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <ImageView
-            android:id="@+id/iv_fab_record_icon"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:layout_gravity="center"
-            android:src="@drawable/ic_videocam"
-            app:tint="#00FFCC"
-            android:contentDescription="Record Screen" />
+        <!-- Pause / Resume Button -->
+        <FrameLayout
+            android:id="@+id/btn_fab_record_pause"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/bg_fab_pause"
+            android:clickable="true"
+            android:focusable="true"
+            android:elevation="6dp"
+            android:visibility="gone"
+            android:contentDescription="Pause or Resume Recording">
 
-        <View
-            android:id="@+id/dot_fab_recording"
-            android:layout_width="10dp"
-            android:layout_height="10dp"
-            android:layout_gravity="top|end"
-            android:layout_marginTop="6dp"
-            android:layout_marginEnd="6dp"
-            android:background="#FF2255"
-            android:visibility="gone" />
-    </FrameLayout>
+            <ImageView
+                android:id="@+id/iv_fab_pause_icon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_pause"
+                app:tint="#00D4FF" />
+        </FrameLayout>
+
+        <!-- Main Video Camera FAB (Tap to toggle control panel / start record) -->
+        <FrameLayout
+            android:id="@+id/fab_screen_record"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="@drawable/bg_fab_record"
+            android:elevation="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Screen Recording Controls">
+
+            <ImageView
+                android:id="@+id/iv_fab_record_icon"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_videocam"
+                app:tint="#00FFCC"
+                android:contentDescription="Record Screen" />
+
+            <View
+                android:id="@+id/dot_fab_recording"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="6dp"
+                android:layout_marginEnd="6dp"
+                android:background="#FF2255"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <!-- Exit / Dismiss Button (Allows user to hide camera icon and record cleanly without it) -->
+        <FrameLayout
+            android:id="@+id/btn_fab_record_exit"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_fab_exit"
+            android:clickable="true"
+            android:focusable="true"
+            android:elevation="6dp"
+            android:contentDescription="Exit / Hide Recording Icon">
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_close"
+                app:tint="#88A8D0" />
+        </FrameLayout>
+
+    </LinearLayout>
 
     <!-- ── Screen Recording Overlay Control Panel ── -->
     <FrameLayout
@@ -521,7 +585,7 @@
         android:elevation="12dp"
         android:padding="14dp"
         android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@id/fab_screen_record"
+        app:layout_constraintBottom_toTopOf="@id/layout_fab_record_container"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
@@ -607,6 +671,18 @@
                     android:background="#0F1A2A"
                     android:paddingHorizontal="10dp"
                     android:text="⚙️ 1080p 60fps"
+                    android:textColor="#88A8D0"
+                    android:textSize="11sp"
+                    android:layout_marginEnd="6dp" />
+
+                <TextView
+                    android:id="@+id/chip_overlay_clean_record"
+                    android:layout_width="wrap_content"
+                    android:layout_height="32dp"
+                    android:gravity="center"
+                    android:background="#0F1A2A"
+                    android:paddingHorizontal="10dp"
+                    android:text="👻 Clean: OFF"
                     android:textColor="#88A8D0"
                     android:textSize="11sp"
                     android:layout_marginEnd="6dp" />

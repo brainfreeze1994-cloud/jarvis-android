@@ -1,0 +1,6 @@
+{
+  "name": "HENRY",
+  "description": "Hyperintelligence Engine Neural Reasoning Yield - AI Assistant with voice, vision, brain training, and tools.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,8 @@
+<resources>
+    <style name="Theme.HENRY" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#06B6D4</item>
+        <item name="colorPrimaryVariant">#0891B2</item>
+        <item name="colorOnPrimary">#070B14</item>
+        <item name="android:statusBarColor">#070B14</item>
+    </style>
+</resources>

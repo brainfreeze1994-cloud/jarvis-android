@@ -4558,7 +4558,9 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onError(String error) {
                 mainHandler.post(() -> {
                     hideTyping();
-                    String offlineReply = HenryOfflineBrain.generateOfflineResponse(effectiveUserText, intentType, MainActivity.this);
+                    final String userTextForLambda = effectiveUserText;
+                    final var intentTypeForLambda = intentType;
+                    String offlineReply = HenryOfflineBrain.generateOfflineResponse(effectiveUserForLambda, intentTypeForLambda, MainActivity.this);
                     String emotion = extractEmotion(offlineReply);
                     String cleanReply = stripEmotionTag(offlineReply);
                     history.add(new HistoryItem("model", cleanReply));

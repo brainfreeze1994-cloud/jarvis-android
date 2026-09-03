@@ -34,8 +34,10 @@ import androidx.appcompat.app.AppCompatActivity;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Stark Chemical Synthesizer & Holographic Periodic Matrix.
@@ -55,8 +57,8 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
     private static final int TAP_THRESHOLD_DP = 8;
 
     private TextView tvLabTitle, tvLabSubtitle, btnBack, btnVoiceInspect, tvMatrixStatus, tvElementCounter;
-    private TextView tabMatrix, tabSynthesizer, tabMixer, tabBohr;
-    private View panelMatrix, panelSynthesizer, panelMixer, panelBohr;
+    private TextView tabMatrix, tabMixer, tabBohr;
+    private View panelMatrix, panelMixer, panelBohr;
     private View searchFilterBar, cardMiniInspect;
     private EditText etSearch;
     private TextView btnClearSearch;
@@ -67,17 +69,21 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
     private TextView miniZNum, miniSymbol, miniName, miniEconfig, btnInspectFull;
     private LinearLayout miniTilePreview;
 
-    // Synthesizer views
-    private ArcReactorSynthesizerView arcSynthCanvas;
-    private TextView tvSynthFocus, tvSynthOutput, tvSynthToxicity, btnIgniteLaser;
-    private LinearLayout recipesContainer;
-
     // Mixer views
-    private LinearLayout slotElementA, slotElementB;
-    private TextView tvSlotAZ, tvSlotASymbol, tvSlotAName;
-    private TextView tvSlotBZ, tvSlotBSymbol, tvSlotBName;
-    private TextView tvCompoundFormula, tvCompoundCommon, tvCompoundBond, tvCompoundFact;
+    private LinearLayout selectedElementsContainer;
+    private TextView btnAddElement, btnClearElements;
+    private LinearLayout cardMultipleCompounds, multipleCompoundsChips;
+    private TextView tvMultipleCompoundsTitle;
+    private LinearLayout cardMixerResult;
+    private TextView tvCompoundFormula, tvCompoundCommon, tvCompoundStructure, tvCompoundBond, tvCompoundSynthesis, tvCompoundUses;
     private LinearLayout commonCompoundsContainer;
+    private TextView btnNovelChemical;
+    private LinearLayout novelChemicalOutput;
+    private TextView tvNovelName, tvNovelFormula, tvNovelStructure, tvNovelSynthesis, tvNovelUses;
+
+    private final List<Elem> selectedReactantElements = new ArrayList<>();
+    private final List<Compound> matchingCompounds = new ArrayList<>();
+    private Compound selectedCompound = null;
 
     // Bohr views
     private BohrAtomView bohrAtomCanvas;
@@ -89,12 +95,9 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
     private boolean ttsReady = false;
 
     private Elem selectedElement;
-    private Elem mixerElementA;
-    private Elem mixerElementB;
     private String selectedCategory = "ALL";
-    private int selectedRecipeIndex = 0;
 
-    private enum Mode { MATRIX, SYNTHESIZER, MIXER, BOHR }
+    private enum Mode { MATRIX, MIXER, BOHR }
     private Mode currentMode = Mode.MATRIX;
 
     // ── Data Models ──────────────────────────────────────────────────────────
@@ -111,30 +114,23 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
     }
 
     static class Compound {
-        String a, b, formula, name, common, fact, structure, bond;
-        Compound(String a, String b, String f, String n, String c, String fact, String structure, String bond) {
-            this.a = a; this.b = b; this.formula = f; this.name = n; this.common = c; this.fact = fact;
-            this.structure = structure; this.bond = bond;
+        String[] requiredElements;
+        String formula, name, common, structure, bond, synthesis, uses, category;
+
+        Compound(String[] req, String f, String n, String c, String st, String b, String syn, String u, String cat) {
+            this.requiredElements = req; this.formula = f; this.name = n; this.common = c;
+            this.structure = st; this.bond = b; this.synthesis = syn; this.uses = u; this.category = cat;
         }
-        boolean matches(String x, String y) {
-            return (a.equalsIgnoreCase(x) && b.equalsIgnoreCase(y)) || (a.equalsIgnoreCase(y) && b.equalsIgnoreCase(x));
+
+        boolean canFormFrom(List<Elem> elements) {
+            Set<String> pool = new HashSet<>();
+            for (Elem e : elements) pool.add(e.symbol.toUpperCase(Locale.US));
+            for (String req : requiredElements) {
+                if (!pool.contains(req.toUpperCase(Locale.US))) return false;
+            }
+            return true;
         }
     }
-
-    static class SynthRecipe {
-        String title, targetFormula, elementsUsed, outputPower, description;
-        SynthRecipe(String t, String tf, String eu, String op, String d) {
-            this.title = t; this.targetFormula = tf; this.elementsUsed = eu; this.outputPower = op; this.description = d;
-        }
-    }
-
-    private static final SynthRecipe[] SYNTH_RECIPES = {
-            new SynthRecipe("BADASSIUM / NEW ELEMENT #118+", "Stark-Core X-1", "Heavy Particle Fusion • Isotope α-99", "4.2 GJ / sec", "Discovered via Howard Stark's 1974 Expo model. High-density clean energy core capable of replacing toxic Palladium without self-poisoning."),
-            new SynthRecipe("TITANIUM-GOLD ALLOY (MARK III)", "Ti₃Au (95.5% Ti / 4.5% Au)", "Ti + Au (Refined Sputtering)", "Thermal Dissipation +450%", "High strength-to-weight aerodynamic alloy with anti-icing characteristics and golden-crimson luster."),
-            new SynthRecipe("NITINOL SHAPE-MEMORY ACTUATOR", "NiTi (Nickel-Titanium)", "Ni + Ti (Superelastic Phase)", "Elastic Recovery 8.5%", "Shape-memory alloy used in nano-repulsor servos and flight control surfaces with instant thermal response."),
-            new SynthRecipe("GRAPHENE SUPER-LATTICE", "C-2D Hexagonal Monolayer", "Carbon Arc Vaporization", "Conductivity 10⁶ S/m", "Single-atom thickness ballistic electron transport matrix with 200x tensile strength of structural steel."),
-            new SynthRecipe("VIBRANIUM SYNTHETIC ISOTOPE", "Vb-Synthetic Phase IV", "Deep Laser Ion Sputtering", "Kinetic Absorption 99.8%", "Synthetic hyper-dense lattice that absorbs and redirects kinetic shockwaves.")
-    };
 
     private static final Elem[] ELEMENTS = {
             new Elem("H","Hydrogen",1,"#69DB7C",1,1,"1s1","Hydrogen is the lightest and most abundant chemical element in the universe, powering stellar fusion.","https://upload.wikimedia.org/wikipedia/commons/d/d9/Hydrogenglow.jpg","Rocket fuel, ammonia production, clean fuel cells","Reactive Nonmetal","1.008 u"),
@@ -258,20 +254,143 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
     };
 
     private static final Compound[] COMPOUNDS = {
-            new Compound("Na","Cl","NaCl","Sodium Chloride","Table Salt","The salt on your food — a violently reactive alkali metal and toxic gas combine into an essential biological nutrient.","Ionic crystal lattice","Ionic"),
-            new Compound("H","O","H₂O","Water","Universal Solvent / Water","Two flammable gases combine into the universal solvent supporting all known carbon-based life.","Bent molecular geometry (104.5°)","Covalent (Polar)"),
-            new Compound("H","Cl","HCl","Hydrogen Chloride","Hydrochloric Acid","Concentrated acid produced biologically in the human stomach for digestion.","Linear diatomic molecule","Covalent (Polar)"),
-            new Compound("C","O","CO₂","Carbon Dioxide","Carbon Dioxide Gas","What photosynthetic flora breathe in and aerobic fauna exhale; greenhouse regulator.","Linear molecular structure","Covalent"),
-            new Compound("Fe","O","Fe₂O₃","Iron(III) Oxide","Rust / Hematite","Oxidation byproduct of iron exposed to moisture; primary ore for industrial iron smelting.","Ionic crystal lattice","Ionic"),
-            new Compound("Ti","O","TiO₂","Titanium Dioxide","White Pigment / Photocatalyst","High-refractive oxide that gives white paint opacity and destroys organic pollutants via UV catalysis.","Rutile crystal lattice","Ionic"),
-            new Compound("C","H","CH₄","Methane","Natural Gas","Hydrocarbon molecule fueling electrical turbines, stoves, and rocket propulsion engines.","Tetrahedral (109.5°)","Covalent"),
-            new Compound("N","H","NH₃","Ammonia","Ammonia Gas","Precursor for nitrogen fertilizers feeding billions globally, synthesized via Haber-Bosch.","Trigonal pyramidal (107°)","Covalent (Polar)"),
-            new Compound("Al","O","Al₂O₃","Aluminum Oxide","Corundum / Sapphire & Ruby","Pure crystals colored by trace chromium yield rubies; colored by titanium yield blue sapphires.","Corundum hexagonal lattice","Ionic"),
-            new Compound("Si","O","SiO₂","Silicon Dioxide","Quartz / Beach Sand","Constitutes quartz crystals, glass lenses, and silicon microchip feedstock.","3D Covalent network lattice","Covalent"),
-            new Compound("Ca","O","CaO","Calcium Oxide","Quicklime","Exothermic compound reacting vigorously with water to create structural mortar.","Rock-salt crystal lattice","Ionic"),
-            new Compound("Mg","O","MgO","Magnesium Oxide","Refractory Ceramic","Withstands temperatures up to 2,800°C as furnace lining for steel making.","Cubic crystal lattice","Ionic"),
-            new Compound("Ni","Ti","NiTi","Nickel-Titanium","Nitinol Shape-Memory Alloy","Superelastic alloy that remembers and recovers its forged shape when heated.","Austenite / Martensite cubic","Metallic Superalloy"),
-            new Compound("Ti","Au","Ti₃Au","Titanium-Gold Matrix","Mark III Armor Hardener","Four times harder than pure titanium with high biocompatibility and anti-icing attributes.","Intermetallic beta-phase lattice","Metallic Intermetallic")
+            new Compound(new String[]{"H","O"}, "H₂O", "Dihydrogen Monoxide", "Water / Universal Solvent",
+                    "Bent Molecular Geometry • 104.5° H-O-H Bond Angle • sp³ Hybridized Oxygen • Dipole Moment 1.85 D • Intermolecular Hydrogen Bonding Network.",
+                    "Polar Covalent O-H Bonds (ΔEN = 1.24) • Strong Liquid Cohesion",
+                    "2 H₂ (g) + O₂ (g) → 2 H₂O (l) + 572 kJ\nRapid highly exothermic combustion initiated by electric spark or platinum catalyst.",
+                    "• Universal biological cellular solvent for all metabolic life.\n• Industrial steam turbine power generation working fluid.\n• Agricultural crop irrigation & hydroponics.\n• Precursor for green electrolytic hydrogen energy storage.", "Polar Covalent Molecule"),
+
+            new Compound(new String[]{"H","O"}, "H₂O₂", "Hydrogen Peroxide", "Peroxide / Bleaching Agent",
+                    "Non-planar Open-Book (Skewed) Geometry • Dihedral Angle 111.5° • Reactive O-O Peroxo Single Bond.",
+                    "Covalent Single O-O Peroxy Linkage (Weak 146 kJ/mol) • Strong Oxidizing Potential",
+                    "Anthraquinone autoxidation process: H₂ + O₂ catalyzed over alkylanthrahydroquinone in organic solution.",
+                    "• Medical antiseptic disinfectant (3% topical solution).\n• Monopropellant rocket fuel & satellite attitude thrusters (high-test 90%+).\n• Environmental wastewater oxidation of sulfur and cyanides.\n• Pulp and paper industrial bleaching agent.", "Oxidizing Peroxide"),
+
+            new Compound(new String[]{"Na","Cl"}, "NaCl", "Sodium Chloride", "Table Salt / Halite",
+                    "Face-Centered Cubic (FCC) Ionic Lattice • Coordination Number 6:6 [Na⁺ surrounded by 6 Cl⁻ octahedra] • Lattice Constant 564.02 pm.",
+                    "Strong Electrostatic Ionic Bond (ΔEN = 2.23) • Lattice Energy: 786 kJ/mol",
+                    "2 Na (s) + Cl₂ (g) → 2 NaCl (s) + 822 kJ\nSodium metal burns vigorously with bright yellow luminescence in toxic chlorine gas.",
+                    "• Essential biological dietary electrolyte for neuromuscular transmission.\n• Highway de-icing via freezing-point depression.\n• Chloralkali chemical manufacturing for Chlorine, NaOH, and PVC plastics.\n• Medical isotonic saline (0.9%) IV fluid resuscitation.", "Ionic Salt"),
+
+            new Compound(new String[]{"C","O"}, "CO₂", "Carbon Dioxide", "Carbonic Gas / Dry Ice",
+                    "Linear Molecular Geometry • 180° O=C=O Bond Angle • sp Hybridized Carbon • Zero Net Molecular Dipole Moment (Symmetric).",
+                    "Double Covalent C=O Bonds (Bond Energy 799 kJ/mol)",
+                    "C (s) + O₂ (g) → CO₂ (g) + 393.5 kJ\nComplete combustion of carbonaceous fuels or limestone calcination (CaCO₃ → CaO + CO₂).",
+                    "• Plant photosynthesis reactant supporting planetary biomass.\n• Supercritical CO₂ decaffeination and aerogel extraction solvent.\n• Fire extinguishers & beverage carbonation.\n• Cryogenic cooling as Dry Ice (-78.5°C sublimation).", "Covalent Gas"),
+
+            new Compound(new String[]{"C","O"}, "CO", "Carbon Monoxide", "Coal Gas / Syngas Precursor",
+                    "Linear Diatomic • Triple Bond (one coordinate dative bond from Oxygen to Carbon) • Bond Length 112.8 pm.",
+                    "Strongest chemical bond in neutral molecules (1072 kJ/mol)",
+                    "2 C (s) + O₂ (g) [limited] → 2 CO (g) or Steam reforming: CH₄ + H₂O → CO + 3 H₂.",
+                    "• Industrial blast-furnace reduction of iron ore (Fe₂O₃ + 3 CO → 2 Fe + 3 CO₂).\n• Fischer-Tropsch synthetic hydrocarbon fuel production.\n• Acetic acid synthesis via methanol carbonylation (Monsanto process).", "Reducing Gas"),
+
+            new Compound(new String[]{"C","H"}, "CH₄", "Methane", "Natural Gas / Firedamp",
+                    "Tetrahedral Molecular Geometry • 109.5° H-C-H Bond Angle • sp³ Hybridized Carbon • 4 Equivalent C-H σ Bonds.",
+                    "Non-polar Covalent C-H Bonds (439 kJ/mol)",
+                    "Sabatier reaction: CO₂ + 4 H₂ → CH₄ + 2 H₂O (Nickel catalyst, 300°C-400°C).",
+                    "• Clean-burning electrical power generation in gas turbines.\n• Methalox rocket propellant (SpaceX Raptor & Starship engines).\n• Primary steam-reforming feedstock for commercial Hydrogen production.\n• Domestic residential heating and cooking.", "Hydrocarbon Gas"),
+
+            new Compound(new String[]{"C","H","O"}, "C₂H₅OH", "Ethanol", "Grain Alcohol / Biofuel",
+                    "Tetrahedral around Carbon atoms • Bent around Oxygen atom (108.5°) • Polar Hydroxyl (-OH) Functional Group.",
+                    "Covalent C-C, C-H, C-O, and O-H Bonds • Capable of Hydrogen Bonding",
+                    "C₂H₄ + H₂O (Steam hydration over H₃PO₄ catalyst at 300°C) or microbial sugar fermentation: C₆H₁₂O₆ → 2 C₂H₅OH + 2 CO₂.",
+                    "• Renewable E85 motor vehicle biofuel.\n• Antiseptic hand sanitizers and medical disinfectants (70% solution).\n• Organic chemical solvent for perfumes, paints, and pharmaceuticals.\n• Precursor for ethyl esters, acetic acid, and acetaldehyde.", "Organic Alcohol"),
+
+            new Compound(new String[]{"C","H","O"}, "C₆H₁₂O₆", "D-Glucose", "Blood Sugar / Dextrose",
+                    "Six-membered Pyranose Ring (Haworth Projection) • Chair Conformation • 5 Hydroxyl Groups and 1 Hydroxymethyl Group.",
+                    "Covalent Polyhydroxy Aldehyde Backbone",
+                    "Biological Photosynthesis: 6 CO₂ + 6 H₂O + Photons → C₆H₁₂O₆ + 6 O₂.",
+                    "• Primary universal energetic cellular fuel in aerobic glycolysis (produces 30-32 ATP).\n• Medical IV dextrose infusions for hypoglycemia and dehydration.\n• Feedstock for bioplastics (PLA - Polylactic Acid) synthesis.\n• Essential food nutrient and cellular metabolism driver.", "Monosaccharide Carbohydrate"),
+
+            new Compound(new String[]{"C","H","O"}, "CH₃COOH", "Ethanoic Acid", "Acetic Acid / Vinegar",
+                    "Planar Carboxyl Group (-COOH) bonded to Methyl group (-CH₃) • Hydrogen-bonded Dimers in Gas/Liquid Phase.",
+                    "Polar Covalent with Resonantly Stabilized Carboxylate Anion",
+                    "CH₃OH + CO → CH₃COOH (Monsanto/Cativa carbonylation over Iridium/Rhodium catalyst).",
+                    "• Vinyl acetate monomer (VAM) production for paints, glues, and coatings.\n• Food flavoring and biological preservation (Vinegar 5-8%).\n• Cellulose acetate synthesis for photographic film and synthetic fibers.\n• Industrial organic chemistry solvent.", "Carboxylic Acid"),
+
+            new Compound(new String[]{"C","H","O"}, "C₃H₆O", "Propan-2-one", "Acetone / Dimethyl Ketone",
+                    "Trigonal Planar Carbonyl Carbon (120° C-C(=O)-C) • sp² Hybridized Central Carbon.",
+                    "Polar Carbonyl C=O Double Bond with high dipole moment (2.88 D)",
+                    "Cumene process: Benzene + Propylene → Cumene + O₂ → Acetone + Phenol.",
+                    "• Universal laboratory and industrial degreasing solvent.\n• Precursor to Methyl Methacrylate (Plexiglas / Lucite acrylic).\n• Nail polish remover and chemical lacquer solvent.\n• Safe storage solvent for compressed Acetylene gas tanks.", "Ketone Solvent"),
+
+            new Compound(new String[]{"N","H"}, "NH₃", "Ammonia", "Ammonia Gas / Fertilizer Base",
+                    "Trigonal Pyramidal Geometry • 107.8° H-N-H Bond Angle • Lone Pair on Nitrogen • Strong Hydrogen Bonding.",
+                    "Polar Covalent N-H Bonds (391 kJ/mol) • Lewis Base",
+                    "Haber-Bosch process: N₂ (g) + 3 H₂ (g) ⇌ 2 NH₃ (g) (Iron catalyst, 450°C, 200 atm).",
+                    "• Agricultural fertilizer precursor (urea, ammonium nitrate) feeding ~50% of Earth's population.\n• Industrial refrigerant (R-717) in large cold-storage warehouses.\n• Precursor for nitric acid, hydrazine, and nylon polymers.\n• Zero-carbon maritime carrier fuel for hydrogen transport.", "Nitrogen Hydride"),
+
+            new Compound(new String[]{"N","H","O"}, "HNO₃", "Nitric Acid", "Aqua Fortis / Strong Acid",
+                    "Planar Molecule • Resonantly Delocalized Nitrate Group • O-N-O angles ~130° and 115°.",
+                    "Strong Polar Covalent Acid (pKa = -1.4) • Powerful Oxidizing Agent",
+                    "Ostwald process: 4 NH₃ + 5 O₂ → 4 NO + 6 H₂O (Pt-Rh gauze catalyst, 900°C), followed by NO oxidation and absorption in water.",
+                    "• Ammonium nitrate fertilizer synthesis.\n• Semiconductor silicon wafer chemical etching and cleaning.\n• Rocket propellant oxidizer (Red Fuming Nitric Acid).\n• Metallurgical gold and platinum refining (component of Aqua Regia with HCl).", "Mineral Acid"),
+
+            new Compound(new String[]{"Ni","Ti"}, "NiTi", "Nickel-Titanium", "Nitinol Shape-Memory Alloy",
+                    "Reversible Solid-State Phase Transformation • High-temp Austenite (B2 Cubic CsCl-type) to Low-temp Martensite (B19' Monoclinic).",
+                    "Metallic Bonding with Strong d-Orbital Overlap • Superelasticity up to 8% Strain",
+                    "Vacuum Induction Melting (VIM) or Vacuum Arc Remelting (VAR) under argon atmosphere at 1,310°C.",
+                    "• Self-expanding cardiac vascular stents and orthodontic archwires.\n• Aerospace actuators, Mars rover non-pneumatic wire-mesh tires.\n• Surgical laparoscopic tools and robotic micro-manipulators.\n• Temperature-activated safety valves and smart couplings.", "Smart Shape-Memory Superalloy"),
+
+            new Compound(new String[]{"Ti","Au"}, "β-Ti₃Au", "Beta-Phase Titanium-Gold", "Superhard Biocompatible Intermetallic",
+                    "Ordered Cubic L1₂ Lattice • High Cohesive Energy • Dislocation Motion Hindered by Intermetallic Ordering.",
+                    "Metallic-Covalent Hybridized Intermetallic Bonding • 4x Hardness of Pure Titanium",
+                    "High-vacuum arc melting of 3:1 atomic ratio Ti and Au at >1,500°C followed by controlled furnace annealing.",
+                    "• Ultra-durable joint prosthetics (artificial hips and knees) with near-zero wear debris.\n• Dental implants with superior biocompatibility.\n• Deep-well drilling precision bearings.\n• Luxury scratch-proof horology and aerospace instrumentation.", "Intermetallic Superalloy"),
+
+            new Compound(new String[]{"Fe","C","Cr","Ni"}, "Fe-Cr-Ni-C", "Austenitic Stainless Steel (316)", "Marine Grade Stainless Steel",
+                    "Face-Centered Cubic (FCC) Austenite Matrix stabilized by Nickel • Solid Solution of Carbon in Iron Interstices.",
+                    "Metallic Bonding with Spontaneous Chromium Oxide (Cr₂O₃) Passive Nanofilm",
+                    "Electric Arc Furnace (EAF) smelting with Argon Oxygen Decarburization (AOD) refining: 70% Fe, 18% Cr, 10% Ni, 2% Mo, <0.08% C.",
+                    "• Marine, chemical processing, and pharmaceutical equipment.\n• Surgical scalpels, needles, and medical implants.\n• Food and beverage sanitary containment tanks.\n• Architectural structural cladding and aerospace manifolds.", "Structural Superalloy"),
+
+            new Compound(new String[]{"Si","O"}, "SiO₂", "Silicon Dioxide", "Quartz / Beach Sand / Aerogel",
+                    "3D Continuous Covalent Network • Corner-Sharing SiO₄ Tetrahedra (Si-O-Si angle ~144°) • Trigonal α-Quartz or Amorphous Glass.",
+                    "Strong Covalent Network (Bond Energy 460 kJ/mol) • High Melting Point (1,710°C)",
+                    "Si (s) + O₂ (g) → SiO₂ (s) or Hydrolysis of tetraethyl orthosilicate (TEOS) with supercritical drying to yield Aerogel.",
+                    "• Silicon microelectronics semiconductor wafer fabrication & gate oxides.\n• Optical fiber communication cables and precision camera lenses.\n• NASA spacecraft thermal insulation (as 99.8% air Aerogel 'frozen smoke').\n• Glass containers, window panes, and structural concrete aggregates.", "Covalent Network Mineral"),
+
+            new Compound(new String[]{"Si","C"}, "SiC", "Silicon Carbide", "Carborundum / Extreme Semiconductor",
+                    "Tetrahedral sp³ Network • Zincblende (3C) or Wurtzite (4H/6H) Polytypes • Mohs Hardness 9.5.",
+                    "Strong Covalent Si-C Bonds (ΔEN = 0.65) • Wide Bandgap 3.26 eV",
+                    "Acheson process: SiO₂ + 3 C → SiC + 2 CO (Electric resistance furnace, 2,500°C).",
+                    "• EV power inverters, high-voltage fast chargers, and rail power grids.\n• Carbon-ceramic brake discs for hypercars and aircraft.\n• Abrasive grinding wheels, sandpaper, and ballistic armor plates.\n• High-temperature furnace heating elements.", "Wide-Bandgap Semiconductor"),
+
+            new Compound(new String[]{"Ga","N"}, "GaN", "Gallium Nitride", "GaN Power Crystal",
+                    "Wurtzite Hexagonal Crystal Lattice • High Electron Saturation Velocity (2.5 × 10⁷ cm/s).",
+                    "Covalent with Partial Ionic Character • Direct Bandgap 3.4 eV",
+                    "Metal-Organic Chemical Vapor Deposition (MOCVD): Trimethylgallium + Ammonia at 1,050°C.",
+                    "• Ultra-compact high-efficiency GaN smartphone and laptop fast chargers.\n• Blue and violet laser diodes (Blu-ray, surgical lasers, LED lighting).\n• 5G cellular base station RF power amplifiers.\n• Military Active Electronically Scanned Array (AESA) radars.", "Compound Semiconductor"),
+
+            new Compound(new String[]{"Li","Co","O"}, "LiCoO₂", "Lithium Cobalt(III) Oxide", "LCO Battery Cathode",
+                    "Layered α-NaFeO₂ Rock-Salt Lattice (R3m space group) • Alternating layers of Lithium ions and CoO₆ octahedra.",
+                    "Mixed Ionic-Covalent with Reversible Intercalation Channels",
+                    "Solid-state reaction of Lithium Carbonate (Li₂CO₃) and Cobalt Carbonate (CoCO₃) calcined at 900°C in air.",
+                    "• High-energy-density rechargeable battery cathodes in smartphones and laptops.\n• Portable medical equipment power supplies.\n• High-discharge consumer electronics.", "Battery Cathode Material"),
+
+            new Compound(new String[]{"C","H","N","O"}, "C₈H₁₀N₄O₂", "1,3,7-Trimethylxanthine", "Caffeine / Stimulant",
+                    "Fused Bicyclic Purine Ring System (Pyrimidinedione + Imidazole) • Planar sp² Skeleton.",
+                    "Heterocyclic Organic Molecule with Tertiary Amine and Amide Centers",
+                    "Traube synthesis from Dimethylurea and Ethyl Cyanoacetate, or supercritical CO₂ extraction from coffee beans.",
+                    "• Central nervous system psychostimulant (adenosine receptor antagonist).\n• Enhances athletic alertness and cognitive focus.\n• Combined in analgesic formulations to boost pain relief efficacy.", "Purine Alkaloid"),
+
+            new Compound(new String[]{"C","H","N","O"}, "C₉H₈O₄", "Acetylsalicylic Acid", "Aspirin",
+                    "Benzene Ring substituted with Carboxylic Acid (-COOH) and Acetoxy (-OCOCH₃) Groups.",
+                    "Aromatic Ring with Ester and Carboxylic Covalent Linkages",
+                    "Salicylic acid + Acetic anhydride → Acetylsalicylic acid + Acetic acid (Acid-catalyzed esterification).",
+                    "• Analgesic pain relief and antipyretic fever reducer.\n• Anti-inflammatory treatment for arthritis.\n• Low-dose antiplatelet cardiovascular therapy to prevent stroke and heart attacks.", "Pharmaceutical Drug"),
+
+            new Compound(new String[]{"Fe","O"}, "Fe₂O₃", "Iron(III) Oxide", "Rust / Hematite Ore",
+                    "Corundum-type Rhombohedral Lattice • Hexagonal Close-Packed Oxygen anions with Fe³⁺ in 2/3 octahedral sites.",
+                    "Ionic Crystal Lattice (Lattice Energy 14,774 kJ/mol)",
+                    "4 Fe (s) + 3 O₂ (g) + 6 H₂O (l) → 4 Fe(OH)₃ (s) → 2 Fe₂O₃·3H₂O (Corrosion oxidation).",
+                    "• Primary ore for industrial pig iron and steel smelting in blast furnaces.\n• Red ferric pigment in paints, ceramics, and cosmetics (Rouge).\n• Magnetic recording tapes and hard drive storage media.\n• Thermite cutting and welding reactions with Aluminum powder.", "Metal Oxide"),
+
+            new Compound(new String[]{"Cu","Sn"}, "Cu₉Sn", "Phosphor Bronze", "Alpha Bronze / Bell Metal",
+                    "Face-Centered Cubic (FCC) Alpha Solid Solution • Tin atoms distort copper lattice, inhibiting dislocation glide.",
+                    "Metallic Bonding with High Tensile Strength and Ductility",
+                    "Smelting molten copper (1,085°C) with tin ingots (232°C) under charcoal flux cover.",
+                    "• Ship marine propellers and underwater fittings (impervious to saltwater corrosion).\n• Heavy-duty low-friction machine bearings and bushings.\n• Musical acoustic guitar strings, cymbals, and church bells.\n• Historical monument sculpture casting.", "Alloy")
     };
 
     // ── Draggable + Tappable Holographic Element Tile ──────────────────────────
@@ -318,7 +437,9 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
             box.addView(tvWeight);
 
             addView(box, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-            setOnTouchListener((v, event) -> handleTouch(this, event));
+            setClickable(true);
+            setFocusable(true);
+            setOnClickListener(v -> selectElement(elem));
         }
 
         void highlight(boolean active) {
@@ -348,7 +469,6 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
         setupCategoryChips();
         setupSearch();
         buildPeriodicTableGrid();
-        setupSynthesizerPanel();
         setupMixerPanel();
         setupBohrPanel();
 
@@ -384,12 +504,10 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
         tvElementCounter   = findViewById(R.id.tv_element_counter);
 
         tabMatrix          = findViewById(R.id.tab_matrix);
-        tabSynthesizer     = findViewById(R.id.tab_synthesizer);
         tabMixer           = findViewById(R.id.tab_mixer);
         tabBohr            = findViewById(R.id.tab_bohr);
 
         panelMatrix        = findViewById(R.id.panel_matrix);
-        panelSynthesizer   = findViewById(R.id.panel_synthesizer);
         panelMixer         = findViewById(R.id.panel_mixer);
         panelBohr          = findViewById(R.id.panel_bohr);
 
@@ -416,7 +534,6 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
 
     private void setupTabs() {
         tabMatrix.setOnClickListener(v -> switchMode(Mode.MATRIX));
-        tabSynthesizer.setOnClickListener(v -> switchMode(Mode.SYNTHESIZER));
         tabMixer.setOnClickListener(v -> switchMode(Mode.MIXER));
         tabBohr.setOnClickListener(v -> switchMode(Mode.BOHR));
     }
@@ -427,9 +544,6 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
         tabMatrix.setTextColor(mode == Mode.MATRIX ? 0xFF00FFCC : 0xFF88AABB);
         tabMatrix.setBackgroundColor(mode == Mode.MATRIX ? 0x2500FFCC : 0xFF0A1526);
 
-        tabSynthesizer.setTextColor(mode == Mode.SYNTHESIZER ? 0xFF00FFCC : 0xFF88AABB);
-        tabSynthesizer.setBackgroundColor(mode == Mode.SYNTHESIZER ? 0x2500FFCC : 0xFF0A1526);
-
         tabMixer.setTextColor(mode == Mode.MIXER ? 0xFF00FFCC : 0xFF88AABB);
         tabMixer.setBackgroundColor(mode == Mode.MIXER ? 0x2500FFCC : 0xFF0A1526);
 
@@ -437,20 +551,16 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
         tabBohr.setBackgroundColor(mode == Mode.BOHR ? 0x2500FFCC : 0xFF0A1526);
 
         panelMatrix.setVisibility(mode == Mode.MATRIX ? View.VISIBLE : View.GONE);
-        panelSynthesizer.setVisibility(mode == Mode.SYNTHESIZER ? View.VISIBLE : View.GONE);
         panelMixer.setVisibility(mode == Mode.MIXER ? View.VISIBLE : View.GONE);
         panelBohr.setVisibility(mode == Mode.BOHR ? View.VISIBLE : View.GONE);
         searchFilterBar.setVisibility(mode == Mode.MATRIX ? View.VISIBLE : View.GONE);
 
         if (mode == Mode.MATRIX) {
-            tvLabTitle.setText("STARK PERIODIC MATRIX");
+            tvLabTitle.setText("HENRY PERIODIC MATRIX");
             tvLabSubtitle.setText("-- INITIATED -- • [SEGMENTS: 118 ELEMENTS]");
-        } else if (mode == Mode.SYNTHESIZER) {
-            tvLabTitle.setText("ARC REACTOR SYNTHESIZER");
-            tvLabSubtitle.setText("PARTICLE ACCELERATOR LASER LAB");
         } else if (mode == Mode.MIXER) {
-            tvLabTitle.setText("COMPOUND MIXER & REACTION");
-            tvLabSubtitle.setText("MOLECULAR SYNTHESIS VESSEL");
+            tvLabTitle.setText("HENRY MOLECULAR CHEMICAL MIXER");
+            tvLabSubtitle.setText("MULTI-ELEMENT ADVANCED SYNTHESIS & REACTION VESSEL");
         } else if (mode == Mode.BOHR) {
             tvLabTitle.setText("BOHR ATOMIC ORBITALS");
             tvLabSubtitle.setText("ELECTRON QUANTUM SHELL DIAGNOSTICS");
@@ -532,7 +642,7 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
         if (!query.isEmpty()) {
             tvMatrixStatus.setText("Found " + matchedCount + " element(s) matching \"" + query + "\"");
         } else {
-            tvMatrixStatus.setText("💡 Tap element for Bohr atomic telemetry • Drag to combine");
+            tvMatrixStatus.setText("💡 Swipe in any direction to explore 118 elements • Tap to inspect telemetry");
         }
     }
 
@@ -550,66 +660,9 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
             lp.leftMargin = dp((e.col - 1) * CELL);
             lp.topMargin  = dp((e.row - 1) * CELL) + (e.row >= 9 ? dp(CELL / 2) : 0);
             ev.setLayoutParams(lp);
-            ev.setX(lp.leftMargin);
-            ev.setY(lp.topMargin);
             tableLayer.addView(ev);
             elemViews.add(ev);
         }
-    }
-
-    private boolean handleTouch(ElemView view, MotionEvent event) {
-        switch (event.getActionMasked()) {
-            case MotionEvent.ACTION_DOWN:
-                view.downRawX = event.getRawX();
-                view.downRawY = event.getRawY();
-                view.startX = view.getX();
-                view.startY = view.getY();
-                view.totalMove = 0f;
-                view.bringToFront();
-                return true;
-
-            case MotionEvent.ACTION_MOVE:
-                float dx = event.getRawX() - view.downRawX;
-                float dy = event.getRawY() - view.downRawY;
-                view.totalMove = (float) Math.hypot(dx, dy);
-                view.setX(view.startX + dx);
-                view.setY(view.startY + dy);
-                return true;
-
-            case MotionEvent.ACTION_UP:
-            case MotionEvent.ACTION_CANCEL:
-                if (view.totalMove < dp(TAP_THRESHOLD_DP)) {
-                    view.setX(view.startX);
-                    view.setY(view.startY);
-                    selectElement(view.elem);
-                    return true;
-                }
-                ElemView target = findOverlap(view);
-                if (target != null) {
-                    onElementsCombined(view.elem, target.elem);
-                }
-                view.animate().x(view.startX).y(view.startY).setDuration(200).start();
-                return true;
-        }
-        return false;
-    }
-
-    private ElemView findOverlap(ElemView moved) {
-        float mx = moved.getX() + moved.getWidth() / 2f;
-        float my = moved.getY() + moved.getHeight() / 2f;
-        ElemView best = null;
-        float bestDist = Float.MAX_VALUE;
-        for (ElemView other : elemViews) {
-            if (other == moved) continue;
-            float ox = other.getX() + other.getWidth() / 2f;
-            float oy = other.getY() + other.getHeight() / 2f;
-            float dist = (float) Math.hypot(mx - ox, my - oy);
-            if (dist < dp(CELL) * 0.75f && dist < bestDist) {
-                best = other;
-                bestDist = dist;
-            }
-        }
-        return best;
     }
 
     private void selectElement(Elem elem) {
@@ -630,168 +683,344 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
     }
 
     private void onElementsCombined(Elem a, Elem b) {
-        this.mixerElementA = a;
-        this.mixerElementB = b;
-        updateMixerSlots();
+        selectedReactantElements.clear();
+        selectedReactantElements.add(a);
+        if (!b.symbol.equalsIgnoreCase(a.symbol)) {
+            selectedReactantElements.add(b);
+        }
+        updateMixerUI();
         switchMode(Mode.MIXER);
     }
 
-    // ── Mode 2: Arc Reactor Synthesizer Setup ─────────────────────────────────
-    private void setupSynthesizerPanel() {
-        arcSynthCanvas    = findViewById(R.id.arc_synth_canvas);
-        tvSynthFocus      = findViewById(R.id.tv_synth_focus);
-        tvSynthOutput     = findViewById(R.id.tv_synth_output);
-        tvSynthToxicity   = findViewById(R.id.tv_synth_toxicity);
-        btnIgniteLaser    = findViewById(R.id.btn_ignite_laser);
-        recipesContainer  = findViewById(R.id.recipes_container);
-
-        renderSynthRecipes();
-
-        btnIgniteLaser.setOnClickListener(v -> startArcReactorLaserSynthesis());
-    }
-
-    private void renderSynthRecipes() {
-        recipesContainer.removeAllViews();
-        for (int i = 0; i < SYNTH_RECIPES.length; i++) {
-            final int index = i;
-            SynthRecipe r = SYNTH_RECIPES[i];
-            boolean selected = (index == selectedRecipeIndex);
-
-            LinearLayout card = new LinearLayout(this);
-            card.setOrientation(LinearLayout.VERTICAL);
-            card.setPadding(dp(12), dp(10), dp(12), dp(10));
-
-            GradientDrawable gd = new GradientDrawable();
-            gd.setColor(selected ? 0x2500FFCC : 0x120E1E34);
-            gd.setStroke(dp(1), selected ? 0xFF00FFCC : 0x33446688);
-            gd.setCornerRadius(dp(6));
-            card.setBackground(gd);
-
-            TextView title = new TextView(this);
-            title.setText((selected ? "▶ " : "") + r.title);
-            title.setTextColor(selected ? 0xFF00FFCC : 0xFFFFFFFF);
-            title.setTextSize(13f);
-            title.setTypeface(Typeface.DEFAULT_BOLD);
-            card.addView(title);
-
-            TextView formula = new TextView(this);
-            formula.setText("Formula: " + r.targetFormula + "  •  Power: " + r.outputPower);
-            formula.setTextColor(0xFF00D4FF);
-            formula.setTextSize(11f);
-            card.addView(formula);
-
-            TextView desc = new TextView(this);
-            desc.setText(r.description);
-            desc.setTextColor(0xFF88AADD);
-            desc.setTextSize(11f);
-            desc.setPadding(0, dp(4), 0, 0);
-            card.addView(desc);
-
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.bottomMargin = dp(8);
-            card.setLayoutParams(lp);
-
-            card.setOnClickListener(v -> {
-                selectedRecipeIndex = index;
-                renderSynthRecipes();
-                tvSynthOutput.setText(r.outputPower);
-            });
-            recipesContainer.addView(card);
-        }
-    }
-
-    private void startArcReactorLaserSynthesis() {
-        SynthRecipe r = SYNTH_RECIPES[selectedRecipeIndex];
-        btnIgniteLaser.setEnabled(false);
-        btnIgniteLaser.setText("⚡ FOCUSING PARTICLE ACCELERATOR LASER...");
-        tvSynthFocus.setText("ALIGNING PRISMS 100%");
-
-        arcSynthCanvas.startSynthesis(r.title, null);
-
-        ValueAnimator anim = ValueAnimator.ofFloat(0f, 1f);
-        anim.setDuration(3500);
-        anim.addUpdateListener(animation -> {
-            float progress = (float) animation.getAnimatedValue();
-            arcSynthCanvas.setSynthesisProgress(progress);
-            tvSynthOutput.setText((int)(progress * 100) + "% INTENSITY • " + r.outputPower);
-        });
-        anim.start();
-
-        mainHandler.postDelayed(() -> {
-            btnIgniteLaser.setEnabled(true);
-            btnIgniteLaser.setText("⚡ FIRE PARTICLE ACCELERATOR LASER");
-            tvSynthFocus.setText("SYNTHESIS COMPLETE");
-            tvSynthToxicity.setText("0.0% PURE ISOTOPE");
-
-            speakJarvis("Synthesis successful, sir. " + r.title + " has been synthesized with an energy output of " + r.outputPower + ".");
-            Toast.makeText(this, "✨ Synthesized " + r.title + "!", Toast.LENGTH_LONG).show();
-        }, 3600);
-    }
-
-    // ── Mode 3: Compound Mixer Setup ──────────────────────────────────────────
+    // ── Mode 2: Multi-Element Chemical Mixer Setup ────────────────────────────
     private void setupMixerPanel() {
-        slotElementA = findViewById(R.id.slot_element_a);
-        slotElementB = findViewById(R.id.slot_element_b);
-        tvSlotAZ     = findViewById(R.id.tv_slot_a_z);
-        tvSlotASymbol= findViewById(R.id.tv_slot_a_symbol);
-        tvSlotAName  = findViewById(R.id.tv_slot_a_name);
-        tvSlotBZ     = findViewById(R.id.tv_slot_b_z);
-        tvSlotBSymbol= findViewById(R.id.tv_slot_b_symbol);
-        tvSlotBName  = findViewById(R.id.tv_slot_b_name);
+        selectedElementsContainer = findViewById(R.id.selected_elements_container);
+        btnAddElement             = findViewById(R.id.btn_add_element);
+        btnClearElements          = findViewById(R.id.btn_clear_elements);
 
-        tvCompoundFormula = findViewById(R.id.tv_compound_formula);
-        tvCompoundCommon  = findViewById(R.id.tv_compound_common);
-        tvCompoundBond    = findViewById(R.id.tv_compound_bond);
-        tvCompoundFact    = findViewById(R.id.tv_compound_fact);
-        commonCompoundsContainer = findViewById(R.id.common_compounds_container);
+        cardMultipleCompounds     = findViewById(R.id.card_multiple_compounds);
+        tvMultipleCompoundsTitle  = findViewById(R.id.tv_multiple_compounds_title);
+        multipleCompoundsChips    = findViewById(R.id.multiple_compounds_chips);
 
-        // Default combo: Na + Cl
-        mixerElementA = ELEMENTS[10]; // Na
-        mixerElementB = ELEMENTS[16]; // Cl
-        updateMixerSlots();
+        cardMixerResult           = findViewById(R.id.card_mixer_result);
+        tvCompoundFormula         = findViewById(R.id.tv_compound_formula);
+        tvCompoundCommon          = findViewById(R.id.tv_compound_common);
+        tvCompoundStructure       = findViewById(R.id.tv_compound_structure);
+        tvCompoundBond            = findViewById(R.id.tv_compound_bond);
+        tvCompoundSynthesis       = findViewById(R.id.tv_compound_synthesis);
+        tvCompoundUses            = findViewById(R.id.tv_compound_uses);
 
-        slotElementA.setOnClickListener(v -> showElementSelectorDialog(true));
-        slotElementB.setOnClickListener(v -> showElementSelectorDialog(false));
+        commonCompoundsContainer  = findViewById(R.id.common_compounds_container);
+
+        btnNovelChemical          = findViewById(R.id.btn_novel_chemical);
+        novelChemicalOutput       = findViewById(R.id.novel_chemical_output);
+        tvNovelName               = findViewById(R.id.tv_novel_name);
+        tvNovelFormula            = findViewById(R.id.tv_novel_formula);
+        tvNovelStructure          = findViewById(R.id.tv_novel_structure);
+        tvNovelSynthesis          = findViewById(R.id.tv_novel_synthesis);
+        tvNovelUses               = findViewById(R.id.tv_novel_uses);
+
+        // Default combo: Sodium (Na) + Chlorine (Cl)
+        selectedReactantElements.clear();
+        selectedReactantElements.add(ELEMENTS[10]); // Na
+        selectedReactantElements.add(ELEMENTS[16]); // Cl
+
+        btnAddElement.setOnClickListener(v -> showElementSelectorDialog());
+        btnClearElements.setOnClickListener(v -> {
+            selectedReactantElements.clear();
+            updateMixerUI();
+        });
+
+        btnNovelChemical.setOnClickListener(v -> synthesizeNovelChemicalWithHenry());
 
         setupQuickCompounds();
+        updateMixerUI();
     }
 
-    private void updateMixerSlots() {
-        if (mixerElementA != null) {
-            tvSlotAZ.setText(String.valueOf(mixerElementA.number));
-            tvSlotASymbol.setText(mixerElementA.symbol);
-            tvSlotASymbol.setTextColor(Color.parseColor(mixerElementA.color));
-            tvSlotAName.setText(mixerElementA.name);
-        }
-        if (mixerElementB != null) {
-            tvSlotBZ.setText(String.valueOf(mixerElementB.number));
-            tvSlotBSymbol.setText(mixerElementB.symbol);
-            tvSlotBSymbol.setTextColor(Color.parseColor(mixerElementB.color));
-            tvSlotBName.setText(mixerElementB.name);
+    private void showElementSelectorDialog() {
+        String[] names = new String[ELEMENTS.length];
+        for (int i = 0; i < ELEMENTS.length; i++) {
+            names[i] = ELEMENTS[i].number + ". " + ELEMENTS[i].name + " (" + ELEMENTS[i].symbol + ") - " + ELEMENTS[i].category;
         }
 
-        if (mixerElementA != null && mixerElementB != null) {
-            Compound c = findCompound(mixerElementA.symbol, mixerElementB.symbol);
-            if (c != null) {
-                tvCompoundFormula.setText(c.formula + " • " + c.name);
-                tvCompoundCommon.setText("Common Name: " + c.common);
-                tvCompoundBond.setText("Bond: " + c.bond + " • " + c.structure);
-                tvCompoundFact.setText("💡 " + c.fact);
-            } else {
-                tvCompoundFormula.setText(mixerElementA.symbol + " + " + mixerElementB.symbol + " (Uncatalogued)");
-                tvCompoundCommon.setText("No standard everyday binary compound under ambient STP.");
-                tvCompoundBond.setText("High-temperature plasma or exotic lattice required.");
-                tvCompoundFact.setText("💡 Try pairing alkali metals with halogens, or hydrogen with nonmetals.");
+        new AlertDialog.Builder(this)
+                .setTitle("Select Element to Add:")
+                .setItems(names, (dialog, which) -> {
+                    Elem chosen = ELEMENTS[which];
+                    boolean already = false;
+                    for (Elem e : selectedReactantElements) {
+                        if (e.symbol.equalsIgnoreCase(chosen.symbol)) {
+                            already = true;
+                            break;
+                        }
+                    }
+                    if (!already) {
+                        selectedReactantElements.add(chosen);
+                    } else {
+                        Toast.makeText(this, chosen.name + " is already in the reaction vessel.", Toast.LENGTH_SHORT).show();
+                    }
+                    updateMixerUI();
+                })
+                .show();
+    }
+
+    private void renderSelectedReactantChips() {
+        selectedElementsContainer.removeAllViews();
+        if (selectedReactantElements.isEmpty()) {
+            TextView emptyText = new TextView(this);
+            emptyText.setText("No elements in vessel. Tap '+ ADD ELEMENT' above to select reactants.");
+            emptyText.setTextColor(0xFF6B8A9E);
+            emptyText.setTextSize(12f);
+            emptyText.setPadding(dp(8), dp(8), dp(8), dp(8));
+            selectedElementsContainer.addView(emptyText);
+            return;
+        }
+
+        for (int i = 0; i < selectedReactantElements.size(); i++) {
+            final Elem elem = selectedReactantElements[i];
+
+            LinearLayout chip = new LinearLayout(this);
+            chip.setOrientation(LinearLayout.HORIZONTAL);
+            chip.setGravity(Gravity.CENTER_VERTICAL);
+            chip.setPadding(dp(10), dp(6), dp(8), dp(6));
+
+            GradientDrawable gd = new GradientDrawable();
+            gd.setColor(0x220A1E34);
+            gd.setStroke(dp(1), Color.parseColor(elem.color));
+            gd.setCornerRadius(dp(14));
+            chip.setBackground(gd);
+
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(0, 0, dp(8), 0);
+            chip.setLayoutParams(lp);
+
+            TextView zNum = new TextView(this);
+            zNum.setText(String.valueOf(elem.number));
+            zNum.setTextSize(9f);
+            zNum.setTextColor(0xFF88AABB);
+            zNum.setPadding(0, 0, dp(4), 0);
+            chip.addView(zNum);
+
+            TextView sym = new TextView(this);
+            sym.setText(elem.symbol);
+            sym.setTextSize(13f);
+            sym.setTypeface(Typeface.DEFAULT_BOLD);
+            sym.setTextColor(Color.parseColor(elem.color));
+            chip.addView(sym);
+
+            TextView name = new TextView(this);
+            name.setText(" " + elem.name);
+            name.setTextSize(11f);
+            name.setTextColor(0xFFD8E9F8);
+            name.setPadding(0, 0, dp(6), 0);
+            chip.addView(name);
+
+            // [×] remove button
+            TextView btnRemove = new TextView(this);
+            btnRemove.setText("✕");
+            btnRemove.setTextSize(11f);
+            btnRemove.setTextColor(0xFFFF6B6B);
+            btnRemove.setPadding(dp(4), dp(2), dp(4), dp(2));
+            btnRemove.setOnClickListener(v -> {
+                selectedReactantElements.remove(elem);
+                updateMixerUI();
+            });
+            chip.addView(btnRemove);
+
+            selectedElementsContainer.addView(chip);
+        }
+    }
+
+    private void updateMixerUI() {
+        renderSelectedReactantChips();
+
+        matchingCompounds.clear();
+        if (!selectedReactantElements.isEmpty()) {
+            for (Compound c : COMPOUNDS) {
+                if (c.canFormFrom(selectedReactantElements)) {
+                    matchingCompounds.add(c);
+                }
             }
         }
+
+        // Render multiple matching compounds cards
+        if (matchingCompounds.size() > 1) {
+            cardMultipleCompounds.setVisibility(View.VISIBLE);
+            tvMultipleCompoundsTitle.setText("POSSIBLE CHEMICALS FORMED (" + matchingCompounds.size() + " SYNTHESIS PATHS AVAILABLE)");
+            multipleCompoundsChips.removeAllViews();
+
+            for (int i = 0; i < matchingCompounds.size(); i++) {
+                final Compound comp = matchingCompounds[i];
+                boolean isSelected = (selectedCompound == comp || (selectedCompound == null && i == 0));
+                if (isSelected && selectedCompound == null) {
+                    selectedCompound = comp;
+                }
+
+                TextView chip = new TextView(this);
+                chip.setText((isSelected ? "▶ " : "") + comp.formula + " (" + comp.common + ")");
+                chip.setTextSize(11f);
+                chip.setTypeface(Typeface.DEFAULT_BOLD);
+                chip.setTextColor(isSelected ? 0xFF00FFCC : 0xFF88AABB);
+                chip.setPadding(dp(12), dp(6), dp(12), dp(6));
+
+                GradientDrawable gd = new GradientDrawable();
+                gd.setColor(isSelected ? 0x2800FFCC : 0x140B1A2E);
+                gd.setStroke(dp(1), isSelected ? 0xFF00FFCC : 0x33446688);
+                gd.setCornerRadius(dp(14));
+                chip.setBackground(gd);
+
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                lp.setMargins(0, 0, dp(8), 0);
+                chip.setLayoutParams(lp);
+
+                chip.setOnClickListener(v -> {
+                    selectedCompound = comp;
+                    updateMixerUI();
+                });
+                multipleCompoundsChips.addView(chip);
+            }
+        } else {
+            cardMultipleCompounds.setVisibility(View.GONE);
+            if (!matchingCompounds.isEmpty()) {
+                selectedCompound = matchingCompounds.get(0);
+            } else {
+                selectedCompound = null;
+            }
+        }
+
+        // Display current compound details or instructions
+        if (selectedCompound != null && matchingCompounds.contains(selectedCompound)) {
+            cardMixerResult.setVisibility(View.VISIBLE);
+            tvCompoundFormula.setText(selectedCompound.formula + " • " + selectedCompound.name);
+            tvCompoundCommon.setText("Common Name: " + selectedCompound.common + " (" + selectedCompound.category + ")");
+            tvCompoundStructure.setText(selectedCompound.structure);
+            tvCompoundBond.setText(selectedCompound.bond);
+            tvCompoundSynthesis.setText(selectedCompound.synthesis);
+            tvCompoundUses.setText(selectedCompound.uses);
+        } else if (!matchingCompounds.isEmpty()) {
+            selectedCompound = matchingCompounds.get(0);
+            cardMixerResult.setVisibility(View.VISIBLE);
+            tvCompoundFormula.setText(selectedCompound.formula + " • " + selectedCompound.name);
+            tvCompoundCommon.setText("Common Name: " + selectedCompound.common + " (" + selectedCompound.category + ")");
+            tvCompoundStructure.setText(selectedCompound.structure);
+            tvCompoundBond.setText(selectedCompound.bond);
+            tvCompoundSynthesis.setText(selectedCompound.synthesis);
+            tvCompoundUses.setText(selectedCompound.uses);
+        } else if (selectedReactantElements.size() >= 2) {
+            cardMixerResult.setVisibility(View.VISIBLE);
+            StringBuilder sb = new StringBuilder();
+            for (Elem e : selectedReactantElements) {
+                if (sb.length() > 0) sb.append(" + ");
+                sb.append(e.symbol);
+            }
+            tvCompoundFormula.setText(sb.toString() + " (Uncatalogued Binary/Multi-Phase)");
+            tvCompoundCommon.setText("No standard everyday room-temperature compound catalogued.");
+            tvCompoundStructure.setText("Multi-element precursor blend. Requires high-temperature sintering, chemical vapor deposition, or laser induction.");
+            tvCompoundBond.setText("Predicted intermetallic coordination / complex ionic crystal lattice.");
+            tvCompoundSynthesis.setText("High-temperature vacuum furnace melting (>1,200°C) or plasma spark sintering.");
+            tvCompoundUses.setText("• Potential high-entropy alloy or custom catalytic formulation.\n• Tap 'SYNTHESIZE NOVEL CHEMICAL WITH HENRY' below to predict a novel material!");
+        } else {
+            cardMixerResult.setVisibility(View.VISIBLE);
+            tvCompoundFormula.setText("Awaiting Reactants");
+            tvCompoundCommon.setText("Add 2 or more elements to inspect molecular reaction paths.");
+            tvCompoundStructure.setText("--");
+            tvCompoundBond.setText("--");
+            tvCompoundSynthesis.setText("--");
+            tvCompoundUses.setText("--");
+        }
+    }
+
+    private void synthesizeNovelChemicalWithHenry() {
+        if (selectedReactantElements.isEmpty()) {
+            Toast.makeText(this, "Please add at least one element to the vessel.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        novelChemicalOutput.setVisibility(View.VISIBLE);
+
+        Set<String> syms = new HashSet<>();
+        for (Elem e : selectedReactantElements) syms.add(e.symbol.toUpperCase(Locale.US));
+
+        String name;
+        String formula;
+        String structure;
+        String synthesis;
+        String uses;
+
+        if (syms.contains("C") && syms.contains("N")) {
+            name = "Carbon Nitride Super-Diamond Lattice (β-C₃N₄)";
+            formula = "β-C₃N₄";
+            structure = "Hexagonal Network of Corner-Sharing sp³ Carbon and sp² Nitrogen atoms with extreme bond energy and bulk modulus rivaling or exceeding natural diamond.";
+            synthesis = "Laser-heated diamond anvil cell synthesis under ultra-high pressure (70 GPa) and 2,500 K from triazine and dicyandiamide precursors.";
+            uses = "• Ultra-wear-resistant cutting tools for titanium and aerospace superalloys.\n• High-temperature semiconductor heat spreaders.\n• Next-generation bulletproof transparent protective shields.";
+        } else if (syms.contains("TI") && (syms.contains("B") || syms.contains("C"))) {
+            name = "Titanium Diboride Ultra-Refractory Ceramic";
+            formula = "TiB₂";
+            structure = "Hexagonal AlB₂-type crystal structure featuring alternating close-packed titanium sheets and planar hexagonal boron rings.";
+            synthesis = "Carbothermal boronation of TiO₂ and B₂O₃ in vacuum induction furnace at 1,900°C.";
+            uses = "• Hypersonic leading-edge thermal protection shields (stable to 3,000°C).\n• Molten metal evaporation crucibles (impervious to molten aluminum attack).\n• Lightweight ceramic ballistic body armor plates.";
+        } else if (syms.contains("H") && (syms.contains("LA") || syms.contains("Y") || syms.contains("CA"))) {
+            name = "Lanthanide Clathrate Room-Temperature Superconductor Precursor";
+            formula = "LaH₁₀";
+            structure = "Face-centered cubic clathrate cage structure with 32 hydrogen atoms encapsulating central Lanthanum cations; high phonon frequency electron pairing.";
+            synthesis = "Direct laser heating of Lanthanum foil in pure liquid hydrogen medium inside a Diamond Anvil Cell at 170 GPa.";
+            uses = "• Near-room-temperature superconductivity (Tc = 250 K / -23°C).\n• Zero-resistance magnetic levitation transport.\n• Lossless continental electric power grids and compact fusion tokamak magnet coils.";
+        } else if (syms.contains("C")) {
+            name = "Twisted Bilayer Graphene Moiré Super-Lattice";
+            formula = "C₂ (θ = 1.08° 'Magic Angle')";
+            structure = "Two atomically thin graphene monolayers rotated precisely to the 1.08° 'magic angle', inducing flat energy bands and correlated electron superconductivity.";
+            synthesis = "Tear-and-stack dry viscoelastic stamp transfer under ultra-high vacuum with atomic force microscope rotational angle alignment.";
+            uses = "• Quantum computing topological qubits.\n• Superconducting field-effect transistors with ultra-low thermal dissipation.\n• Ballistic quantum sensory arrays.";
+        } else if (syms.contains("SI") && syms.contains("C")) {
+            name = "Silicon Oxycarbide (SiCO) High-Temperature Aerogel Ceramic";
+            formula = "SiC_{x}O_{y}";
+            structure = "Amorphous covalently bonded silicon, carbon, and oxygen network with embedded turbostratic carbon graphene nanodomains.";
+            synthesis = "Polymer-derived ceramic (PDC) route: crosslinking polycarbosilane followed by pyrolysis under argon at 1,100°C.";
+            uses = "• Extreme aerospace insulation up to 1,500°C in oxidizing environments.\n• High-capacity anode material for fast-charging lithium and sodium batteries.\n• Radiation-resistant nuclear cladding.";
+        } else {
+            // General multi-element novel metal-organic framework / hyper-alloy
+            StringBuilder formulaBuilder = new StringBuilder();
+            StringBuilder elemNames = new StringBuilder();
+            for (Elem e : selectedReactantElements) {
+                formulaBuilder.append(e.symbol);
+                if (elemNames.length() > 0) elemNames.append("-");
+                elemNames.append(e.symbol);
+            }
+            formulaBuilder.append("ₙ (HENRY-MOF-").append(selectedReactantElements.size()).append(")");
+
+            name = "HENRY Metallo-Crystalline Framework (" + elemNames.toString() + ")";
+            formula = formulaBuilder.toString();
+            structure = "Engineered sub-nanometer coordination matrix with customizable pore topology, ultra-high surface area (>6,000 m²/g), and coordinated unsaturated metallic sites.";
+            synthesis = "Solvothermal micro-crystallization in autoclaves under microwave-assisted heating at 180°C for 24 hours.";
+            uses = "• Direct air capture of atmospheric carbon dioxide.\n• Solar-driven drinking water extraction from low-humidity desert air.\n• Safe high-density hydrogen fuel storage without cryogenic pressurization.";
+        }
+
+        tvNovelName.setText(name);
+        tvNovelFormula.setText("Formula: " + formula);
+        tvNovelStructure.setText(structure);
+        tvNovelSynthesis.setText(synthesis);
+        tvNovelUses.setText(uses);
+
+        speakHenry("Novel synthesis analysis complete. I have calculated the synthesis parameters for " + name + ".");
     }
 
     private void setupQuickCompounds() {
         commonCompoundsContainer.removeAllViews();
-        String[] quickCombos = {"H₂O (Water)", "NaCl (Salt)", "CO₂ (Gas)", "Fe₂O₃ (Rust)", "CH₄ (Methane)", "TiO₂ (White)", "NiTi (Nitinol)"};
-        String[][] pairs = {
-                {"H", "O"}, {"Na", "Cl"}, {"C", "O"}, {"Fe", "O"}, {"C", "H"}, {"Ti", "O"}, {"Ni", "Ti"}
+        String[] quickCombos = {
+                "Water (H₂O)", "Table Salt (NaCl)", "Carbon Dioxide (CO₂)",
+                "Methane (CH₄)", "Ethanol (C₂H₅OH)", "Glucose (C₆H₁₂O₆)",
+                "Ammonia (NH₃)", "Nitinol (NiTi)", "Titanium-Gold (β-Ti₃Au)",
+                "Stainless Steel (Fe-Cr-Ni-C)", "Silicon Dioxide (SiO₂)",
+                "Silicon Carbide (SiC)", "Gallium Nitride (GaN)"
+        };
+        String[][] combos = {
+                {"H", "O"}, {"Na", "Cl"}, {"C", "O"},
+                {"C", "H"}, {"C", "H", "O"}, {"C", "H", "O"},
+                {"N", "H"}, {"Ni", "Ti"}, {"Ti", "Au"},
+                {"Fe", "C", "Cr", "Ni"}, {"Si", "O"},
+                {"Si", "C"}, {"Ga", "N"}
         };
 
         for (int i = 0; i < quickCombos.length; i++) {
@@ -800,12 +1029,12 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
             pill.setText(quickCombos[i]);
             pill.setTextColor(0xFF00FFCC);
             pill.setTextSize(11f);
-            pill.setPadding(dp(10), dp(5), dp(10), dp(5));
+            pill.setPadding(dp(12), dp(6), dp(12), dp(6));
 
             GradientDrawable gd = new GradientDrawable();
             gd.setColor(0x1800FFCC);
             gd.setStroke(dp(1), 0x5500FFCC);
-            gd.setCornerRadius(dp(12));
+            gd.setCornerRadius(dp(14));
             pill.setBackground(gd);
 
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
@@ -814,28 +1043,14 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
             pill.setLayoutParams(lp);
 
             pill.setOnClickListener(v -> {
-                mixerElementA = findElement(pairs[index][0]);
-                mixerElementB = findElement(pairs[index][1]);
-                updateMixerSlots();
+                selectedReactantElements.clear();
+                for (String sym : combos[index]) {
+                    selectedReactantElements.add(findElement(sym));
+                }
+                updateMixerUI();
             });
             commonCompoundsContainer.addView(pill);
         }
-    }
-
-    private void showElementSelectorDialog(boolean isSlotA) {
-        String[] names = new String[ELEMENTS.length];
-        for (int i = 0; i < ELEMENTS.length; i++) {
-            names[i] = ELEMENTS[i].number + ". " + ELEMENTS[i].name + " (" + ELEMENTS[i].symbol + ")";
-        }
-
-        new AlertDialog.Builder(this)
-                .setTitle("Select Reactant Element:")
-                .setItems(names, (dialog, which) -> {
-                    if (isSlotA) mixerElementA = ELEMENTS[which];
-                    else mixerElementB = ELEMENTS[which];
-                    updateMixerSlots();
-                })
-                .show();
     }
 
     // ── Mode 4: Bohr Model Setup ──────────────────────────────────────────────
@@ -959,17 +1174,22 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
         if (selectedElement == null) return;
         String text = selectedElement.name + ", symbol " + selectedElement.symbol + ", atomic number " +
                 selectedElement.number + ". " + selectedElement.summary;
-        speakJarvis(text);
+        speakHenry(text);
     }
 
-    private void speakJarvis(String text) {
+    private void speakHenry(String text) {
         if (ttsReady && tts != null) {
-            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "JARVIS_CHEM");
+            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "HENRY_CHEM");
         }
     }
 
     private static Compound findCompound(String a, String b) {
-        for (Compound c : COMPOUNDS) if (c.matches(a, b)) return c;
+        List<Elem> list = new ArrayList<>();
+        list.add(findElement(a));
+        list.add(findElement(b));
+        for (Compound c : COMPOUNDS) {
+            if (c.canFormFrom(list)) return c;
+        }
         return null;
     }
 

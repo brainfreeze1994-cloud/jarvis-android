@@ -58,7 +58,7 @@
             android:clipToOutline="true"
             android:visibility="invisible"/>
 
-        <!-- Hint -->
+        <!-- Hint (visible only after image loads) -->
         <TextView
             android:id="@+id/tv_hint"
             android:layout_width="wrap_content"
@@ -66,7 +66,8 @@
             android:text="Tap image to open full size"
             android:textColor="#3a7aa0"
             android:textSize="10sp"
-            android:padding="4dp"/>
+            android:padding="4dp"
+            android:visibility="gone"/>
 
     </LinearLayout>
 

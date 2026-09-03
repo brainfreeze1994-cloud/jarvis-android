@@ -289,43 +289,43 @@ public class ScreenRecordResultActivity extends AppCompatActivity {
 
         if (selectedPlatform.equals("TikTok")) {
             if (selectedTone.equals("Viral")) {
-                caption = "POV: You turned your phone into Tony Stark's actual lab 🦾⚡ Wait till you see what happens at the end… 👀👇";
-                tags = "#TikTok #TechTok #Jarvis #IronMan #Android #ScreenRecording #ViralTech #FYP #ForYouPage #AI #FutureTech";
+                caption = "POV: You turned your phone into HENRY's actual superintelligence lab 🦾⚡ Wait till you see what happens at the end… 👀👇";
+                tags = "#TikTok #TechTok #HENRY #HENRYAI #Android #ScreenRecording #ViralTech #FYP #ForYouPage #AI #FutureTech";
             } else if (selectedTone.equals("Tech")) {
-                caption = "Full screen walkthrough of the high-speed AI interface running native on Android 🚀📱 Check this workflow:";
-                tags = "#Tech #AndroidDev #TechTutorial #Software #ScreenRecord #Productivity #Coding #AI #Innovation";
+                caption = "Full screen walkthrough of the high-speed HENRY AI interface running native on Android 🚀📱 Check this workflow:";
+                tags = "#Tech #HENRY #HENRYAI #AndroidDev #TechTutorial #Software #ScreenRecord #Productivity #Coding #AI #Innovation";
             } else if (selectedTone.equals("Gaming")) {
                 caption = "Cleanest screen capture clip you'll see all day! 🎮🔥 Rate this play 1-10 in the comments 👇";
-                tags = "#Gaming #GamerTok #Clips #Gameplay #MobileGaming #Highlights #ScreenRecord #ViralGaming #FYP";
+                tags = "#Gaming #GamerTok #HENRY #HENRYAI #Clips #Gameplay #MobileGaming #Highlights #ScreenRecord #ViralGaming #FYP";
             } else {
                 caption = "Smooth visuals and pure futuristic vibes ✨📱 Crafted with H·E·N·R·Y.";
-                tags = "#Aesthetic #TechAesthetic #CleanUI #Cyberpunk #Futuristic #AndroidSetup #FYP #Satisfying";
+                tags = "#HENRY #HENRYAI #Aesthetic #TechAesthetic #CleanUI #Cyberpunk #Futuristic #AndroidSetup #FYP #Satisfying";
             }
         } else if (selectedPlatform.equals("YouTube")) {
             if (selectedTone.equals("Viral")) {
-                caption = "How I Built Tony Stark's AI System on Android! 🚀 (Full Screen Recording)\n\n" +
+                caption = "How I Built HENRY's AI System on Android! 🚀 (Full Screen Recording)\n\n" +
                     "Watch this live walkthrough demonstration. Drop a like and subscribe for more futuristic tech builds!";
-                tags = "#Shorts #YouTubeShorts #Tech #IronMan #Android #AI #ScreenRecording #Viral";
+                tags = "#Shorts #YouTubeShorts #Tech #HENRY #HENRYAI #Android #AI #ScreenRecording #Viral";
             } else if (selectedTone.equals("Tech")) {
-                caption = "Android Screen Capture & AI Workflow Demonstration ⚡\n\n" +
+                caption = "Android Screen Capture & HENRY AI Workflow Demonstration ⚡\n\n" +
                     "Step-by-step UI and architecture walkthrough. Make sure to hit Subscribe for daily tech tutorials.";
-                tags = "#Shorts #TechTutorial #Android #Coding #SoftwareEngineering #ScreenRecord #AI";
+                tags = "#Shorts #TechTutorial #HENRY #HENRYAI #Android #Coding #SoftwareEngineering #ScreenRecord #AI";
             } else if (selectedTone.equals("Gaming")) {
                 caption = "Insane Screen Recording Highlight! 🔥🎮\n\n" +
-                    "Recorded at 60 FPS in 1080p. Don't forget to Like and Subscribe!";
-                tags = "#Shorts #Gaming #Gameplay #GamingClips #MobileGaming #YouTubeGaming";
+                    "Recorded at 60 FPS in 1080p with HENRY. Don't forget to Like and Subscribe!";
+                tags = "#Shorts #Gaming #HENRY #HENRYAI #Gameplay #GamingClips #MobileGaming #YouTubeGaming";
             } else {
                 caption = "Futuristic UI Screen Capture — Aesthetic Showcase ✨\n\n" +
                     "High-definition interface preview powered by H·E·N·R·Y.";
-                tags = "#Shorts #Tech #Aesthetic #UIUX #Design #Android";
+                tags = "#Shorts #Tech #HENRY #HENRYAI #Aesthetic #UIUX #Design #Android";
             }
         } else { // Reels
             if (selectedTone.equals("Viral")) {
-                caption = "This changed the entire way I use my phone 🤯⚡ Save this for later! 📌";
-                tags = "#Reels #ExplorePage #TechReels #TrendingReels #Android #AI #TechHacks #ViralReels";
+                caption = "This changed the entire way I use my phone with HENRY 🤯⚡ Save this for later! 📌";
+                tags = "#Reels #ExplorePage #TechReels #TrendingReels #HENRY #HENRYAI #Android #AI #TechHacks #ViralReels";
             } else {
-                caption = "Futuristic Android screen recording in action ✨ Which feature would you use most?";
-                tags = "#Reels #Tech #Innovation #FutureTech #AndroidCommunity #Productivity #ReelsInstagram";
+                caption = "Futuristic Android screen recording in action with HENRY ✨ Which feature would you use most?";
+                tags = "#Reels #Tech #HENRY #HENRYAI #Innovation #FutureTech #AndroidCommunity #Productivity #ReelsInstagram";
             }
         }
 

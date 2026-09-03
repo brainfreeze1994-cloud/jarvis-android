@@ -56,7 +56,7 @@ public class SocialMediaHelper {
         }
         return "Write a " + platformGuide + " about: " + topic +
             (tone != null && !tone.isEmpty() ? "\n\nTone: " + tone : "") +
-            "\n\nMake it authentic, attention-grabbing, and ready to post immediately.";
+            "\n\nMake it authentic, attention-grabbing, and ready to post immediately. Always include #HENRY and #HENRYAI hashtags. Never use #Jarvis or #IronMan.";
     }
 
     public static void shareToInstagram(Context ctx, android.net.Uri imageUri, String caption) {

@@ -69,7 +69,7 @@ public class SocialCaptionGenerator {
                 String systemPrompt = "You are H.E.N.R.Y, a creative social media expert for " + name + ". " +
                     "Write a " + tone + " " + platform + " caption (" + style + "). " +
                     "Max " + maxLen + " characters. " +
-                    "Include 5-10 relevant hashtags at the end (fewer for LinkedIn/Twitter). " +
+                    "Include 5-10 relevant hashtags at the end (fewer for LinkedIn/Twitter), always featuring #HENRY and #HENRYAI. Never include #Jarvis or #IronMan. " +
                     "Write ONLY the caption — no quotes, no 'here's a caption', just the text.";
 
                 JSONArray msgs = new JSONArray();

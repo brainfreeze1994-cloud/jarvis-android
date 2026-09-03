@@ -1574,7 +1574,7 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     startService(serviceIntent);
                 }
-                String reply = "🔴 Screen recording initiated, sir. A floating Stark HUD widget with a live timer is now active on your display.";
+                String reply = "🔴 Screen recording initiated, sir. A floating HENRY HUD widget with a live timer is now active on your display.";
                 addJarvisMsg(reply);
                 speak(reply, "excited");
                 history.add(new HistoryItem("model", reply));
@@ -3085,9 +3085,9 @@ public class MainActivity extends AppCompatActivity {
             periodicLower.contains("chemistry lab") || periodicLower.contains("mix elements") ||
             periodicLower.contains("chemistry periodic") || periodicLower.contains("elements table") ||
             periodicLower.contains("periodic matrix") || periodicLower.contains("arc synthesizer") ||
-            periodicLower.contains("bohr model") || (periodicLower.contains("chemistry") && periodicLower.contains("table"))) {
+            periodicLower.contains("chemical mixer") || periodicLower.contains("bohr model") || (periodicLower.contains("chemistry") && periodicLower.contains("table"))) {
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            String reply = "[EMOTION:excited] Accessing the Stark Periodic Matrix and Chemical Synthesizer, sir.";
+            String reply = "[EMOTION:excited] Accessing the HENRY Periodic Matrix and Chemical Mixer, sir.";
             String clean = stripEmotionTag(reply);
             history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
             speak(clean, "excited");
@@ -4382,26 +4382,81 @@ public class MainActivity extends AppCompatActivity {
                 java.util.regex.Pattern.CASE_INSENSITIVE).matcher(userText);
             String flyTo = mFly.find() ? mFly.group(1).trim() : null;
             openEarthMap(flyTo);
+            String reply = "[EMOTION:focused] Launching Earth Map satellite projection, sir.";
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
+            saveHistory();
+            return;
         }
         // 🐾 Animal Scanner voice trigger
-        if (lowerInput.matches(".*(what animal|animal scanner|identify animal|scan animal).*")) {
+        if (lowerInput.matches(".*(what animal|animal scanner|identify animal|scan animal|open animal).*")) {
             openAnimalScanner();
+            String reply = "[EMOTION:excited] Initializing Animal Scanner optical vision, sir.";
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "excited");
+            saveHistory();
+            return;
         }
         // 🌿 Plant Scanner voice trigger
-        if (lowerInput.matches(".*(what plant|plant scanner|identify plant|scan plant|what flower|what tree|what herb).*")) {
+        if (lowerInput.matches(".*(what plant|plant scanner|identify plant|scan plant|open plant|what flower|what tree|what herb).*")) {
             openPlantScanner();
+            String reply = "[EMOTION:excited] Opening Plant Scanner optical diagnostics, sir.";
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "excited");
+            saveHistory();
+            return;
+        }
+        // 🔐 Biometrics / Facial / Iris Recognition trigger
+        if (lowerInput.matches(".*(biometric|face recognition|facial recognition|iris recognition|iris scan|fingerprint|bio lock).*")) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply = "[EMOTION:focused] Initializing HENRY Biometric Security for facial, iris, and fingerprint authentication, sir.";
+            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
+            saveHistory();
+            HenryBiometricManager.authenticate(this, new HenryBiometricManager.AuthCallback() {
+                @Override
+                public void onAuthenticated() {
+                    mainHandler.post(() -> {
+                        String success = "[EMOTION:proud] Biometric identity verified, sir. Facial and iris scan confirmed. Welcome back, Owen.";
+                        addJarvisMsg(stripEmotionTag(success));
+                        speak(stripEmotionTag(success), "proud");
+                    });
+                }
+                @Override
+                public void onError(String error) {
+                    mainHandler.post(() -> {
+                        String fail = "Biometric authentication notice: " + error;
+                        addJarvisMsg(fail);
+                    });
+                }
+            });
+            return;
         }
         // 🚀 Space Command / Asteroid Watch voice trigger
         if (lowerInput.matches(".*(space station|iss|nasa|asteroid|asteroid watch|eyes on asteroids|open space|space command|track iss|where is iss).*")) {
             startActivity(new android.content.Intent(this, SpaceActivity.class));
+            String reply = "[EMOTION:focused] Accessing Deep Space Orbital Monitor and NEO defense radar, sir.";
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
+            saveHistory();
+            return;
         }
         // 📈 Markets voice trigger
         if (lowerInput.matches(".*(stock market|live market|open market|bitcoin price|crypto price|nasdaq|dow jones).*")) {
             startActivity(new android.content.Intent(this, MarketsActivity.class));
+            String reply = "[EMOTION:focused] Bringing up real-time financial market indices, sir.";
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
+            saveHistory();
+            return;
         }
         // 🌐 Earth Radar voice trigger
         if (lowerInput.matches(".*(earthquake|seismic|earth radar|global weather|open radar).*")) {
             startActivity(new android.content.Intent(this, EarthRadarActivity.class));
+            String reply = "[EMOTION:focused] Opening global Earth Radar and seismic telemetry, sir.";
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
+            saveHistory();
+            return;
         }
 
         // ✈ Flight Tracker voice trigger
@@ -4410,8 +4465,18 @@ public class MainActivity extends AppCompatActivity {
             java.util.regex.Pattern.CASE_INSENSITIVE).matcher(userText);
         if (lowerInput.contains("flight tracker") || lowerInput.contains("open flight")) {
             openFlightTracker(null);
+            String reply = "[EMOTION:focused] Accessing live airspace radar, sir.";
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
+            saveHistory();
+            return;
         } else if (mFlight.find()) {
             openFlightTracker(mFlight.group(1).toUpperCase());
+            String reply = "[EMOTION:focused] Tracking flight " + mFlight.group(1).toUpperCase() + ", sir.";
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
+            saveHistory();
+            return;
         }
 
         // [v20] Dubai transit detection — add deep-link buttons after response
@@ -4493,7 +4558,13 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onError(String error) {
                 mainHandler.post(() -> {
                     hideTyping();
-                    addJarvisMsg("My apologies, sir. I encountered an error: " + error);
+                    String offlineReply = HenryOfflineBrain.generateOfflineResponse(effectiveUserText, intentType, MainActivity.this);
+                    String emotion = extractEmotion(offlineReply);
+                    String cleanReply = stripEmotionTag(offlineReply);
+                    history.add(new HistoryItem("model", cleanReply));
+                    addJarvisMsg(cleanReply);
+                    speak(cleanReply, emotion);
+                    saveHistory();
                     if (btnSend != null) btnSend.setEnabled(true);
                     setState(OrbView.OrbState.IDLE);
                 });

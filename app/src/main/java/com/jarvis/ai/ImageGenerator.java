@@ -50,12 +50,11 @@ public class ImageGenerator {
     public static String buildImageUrl(String prompt) {
         try {
             String clean = prompt.replaceAll("\\s+", " ").trim();
-            if (clean.length() > 250) clean = clean.substring(0, 250);
-            int seed = (int) (Math.random() * 999999);
+            if (clean.length() > 200) clean = clean.substring(0, 200);
             return BASE_URL + URLEncoder.encode(clean, "UTF-8") +
-                "?model=flux&width=512&height=512&nologo=true&enhance=true&seed=" + seed;
+                "?width=512&height=512&nologo=true";
         } catch (Exception e) {
-            return BASE_URL + "beautiful+artwork?model=flux&width=1024&height=1024&nologo=true";
+            return BASE_URL + "artwork?width=512&height=512&nologo=true";
         }
     }
 }

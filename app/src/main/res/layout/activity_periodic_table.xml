@@ -50,7 +50,7 @@
                     android:id="@+id/tv_lab_title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="STARK PERIODIC MATRIX"
+                    android:text="HENRY PERIODIC MATRIX"
                     android:textColor="#FFFFFF"
                     android:textSize="15sp"
                     android:textStyle="bold"
@@ -108,26 +108,11 @@
             <View android:layout_width="3dp" android:layout_height="match_parent"/>
 
             <TextView
-                android:id="@+id/tab_synthesizer"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:text="⚡ SYNTHESIZER"
-                android:textColor="#88AABB"
-                android:textSize="11sp"
-                android:gravity="center"
-                android:background="#0A1526"
-                android:clickable="true"
-                android:focusable="true"/>
-
-            <View android:layout_width="3dp" android:layout_height="match_parent"/>
-
-            <TextView
                 android:id="@+id/tab_mixer"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:text="🧪 MIXER"
+                android:text="🧪 CHEMICAL MIXER"
                 android:textColor="#88AABB"
                 android:textSize="11sp"
                 android:gravity="center"
@@ -142,7 +127,7 @@
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:text="🔬 BOHR"
+                android:text="🔬 BOHR ATOM"
                 android:textColor="#88AABB"
                 android:textSize="11sp"
                 android:gravity="center"
@@ -252,7 +237,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="💡 Tap element for Bohr atomic telemetry • Drag to combine"
+                    android:text="💡 Swipe horizontally &amp; vertically to explore all 118 elements • Tap to inspect"
                     android:textColor="#00FFCC"
                     android:textSize="10sp"/>
 
@@ -266,27 +251,21 @@
                     android:textStyle="bold"/>
             </LinearLayout>
 
-            <!-- Scrollable 18-Column Holographic Matrix -->
-            <HorizontalScrollView
-                android:id="@+id/h_scroll_table"
+            <!-- Scrollable 18-Column Holographic Matrix (Bidirectional 2D Scroll) -->
+            <com.jarvis.ai.TwoDScrollView
+                android:id="@+id/matrix_scroll_container"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:layout_below="@+id/matrix_hint_bar"
-                android:scrollbars="horizontal">
+                android:layout_above="@+id/card_mini_inspect"
+                android:scrollbars="horizontal|vertical">
 
-                <ScrollView
-                    android:id="@+id/v_scroll_table"
+                <FrameLayout
+                    android:id="@+id/table_layer"
                     android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:scrollbars="vertical">
-
-                    <FrameLayout
-                        android:id="@+id/table_layer"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:padding="8dp"/>
-                </ScrollView>
-            </HorizontalScrollView>
+                    android:layout_height="wrap_content"
+                    android:padding="8dp"/>
+            </com.jarvis.ai.TwoDScrollView>
 
             <!-- Floating Selected Element Mini-HUD Card at Bottom -->
             <LinearLayout
@@ -369,135 +348,7 @@
             </LinearLayout>
         </RelativeLayout>
 
-        <!-- ================= MODE 2: TONY STARK ARC REACTOR / PARTICLE SYNTHESIZER ================= -->
-        <ScrollView
-            android:id="@+id/panel_synthesizer"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <!-- Synthesizer Canvas View -->
-                <com.jarvis.ai.ArcReactorSynthesizerView
-                    android:id="@+id/arc_synth_canvas"
-                    android:layout_width="match_parent"
-                    android:layout_height="220dp"
-                    android:background="#1000E5FF"/>
-
-                <!-- Arc Reactor Power Diagnostics -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginTop="12dp"
-                    android:background="#0E1E34"
-                    android:padding="10dp">
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="PARTICLE FOCUS"
-                            android:textColor="#607D99"
-                            android:textSize="9sp"/>
-                        <TextView
-                            android:id="@+id/tv_synth_focus"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="100% COLLIMATED"
-                            android:textColor="#00FFCC"
-                            android:textSize="12sp"
-                            android:textStyle="bold"/>
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="CORE OUTPUT"
-                            android:textColor="#607D99"
-                            android:textSize="9sp"/>
-                        <TextView
-                            android:id="@+id/tv_synth_output"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="3.8 GJ / SECOND"
-                            android:textColor="#00D4FF"
-                            android:textSize="12sp"
-                            android:textStyle="bold"/>
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="TOXICITY LEVEL"
-                            android:textColor="#607D99"
-                            android:textSize="9sp"/>
-                        <TextView
-                            android:id="@+id/tv_synth_toxicity"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="0.0% (NON-TOXIC)"
-                            android:textColor="#00FF88"
-                            android:textSize="12sp"
-                            android:textStyle="bold"/>
-                    </LinearLayout>
-                </LinearLayout>
-
-                <!-- Synthesis Target Selector -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="SELECT SYNTHESIS TARGET // EXOTIC ALLOY / NEW ELEMENT:"
-                    android:textColor="#88AADD"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    android:layout_marginTop="16dp"
-                    android:layout_marginBottom="8dp"/>
-
-                <!-- Preset Synthesis Recipes -->
-                <LinearLayout
-                    android:id="@+id/recipes_container"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"/>
-
-                <!-- Laser Accelerator Launch Button -->
-                <TextView
-                    android:id="@+id/btn_ignite_laser"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:text="⚡ FIRE PARTICLE ACCELERATOR LASER"
-                    android:textColor="#001520"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    android:gravity="center"
-                    android:background="#00FFCC"
-                    android:layout_marginTop="16dp"
-                    android:clickable="true"
-                    android:focusable="true"/>
-            </LinearLayout>
-        </ScrollView>
-
-        <!-- ================= MODE 3: COMPOUND MIXER & REACTION LAB ================= -->
+        <!-- ================= MODE 2: MULTI-ELEMENT CHEMICAL MIXER & REACTION LAB ================= -->
         <ScrollView
             android:id="@+id/panel_mixer"
             android:layout_width="match_parent"
@@ -513,173 +364,92 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="🧪 ELEMENT COMBINER AND REACTION VESSEL"
+                    android:text="🧪 HENRY MOLECULAR CHEMICAL MIXER"
                     android:textColor="#FFFFFF"
-                    android:textSize="14sp"
-                    android:textStyle="bold"/>
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.08"/>
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Select any two elements to observe real chemical synthesis, bonding geometry, and industrial application."
+                    android:text="Combine multiple elements from the IUPAC periodic table to synthesize compounds, inspect 3D chemical structures, review synthesis reactions, and analyze their industrial and medical uses."
                     android:textColor="#88AADD"
                     android:textSize="11sp"
                     android:layout_marginTop="4dp"/>
 
-                <!-- Two Reactant Element Slots -->
+                <!-- Element Selection Bench Controls -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:gravity="center"
-                    android:layout_marginTop="16dp">
-
-                    <!-- Slot A -->
-                    <LinearLayout
-                        android:id="@+id/slot_element_a"
-                        android:layout_width="90dp"
-                        android:layout_height="100dp"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:background="#2000FFCC"
-                        android:clickable="true"
-                        android:focusable="true">
-
-                        <TextView
-                            android:id="@+id/tv_slot_a_z"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="11"
-                            android:textColor="#88AADD"
-                            android:textSize="10sp"/>
-
-                        <TextView
-                            android:id="@+id/tv_slot_a_symbol"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Na"
-                            android:textColor="#00FFCC"
-                            android:textSize="26sp"
-                            android:textStyle="bold"/>
-
-                        <TextView
-                            android:id="@+id/tv_slot_a_name"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Sodium"
-                            android:textColor="#FFFFFF"
-                            android:textSize="11sp"/>
-                    </LinearLayout>
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="14dp">
 
                     <TextView
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="+"
-                        android:textColor="#00D4FF"
-                        android:textSize="28sp"
-                        android:textStyle="bold"
-                        android:layout_marginHorizontal="16dp"/>
-
-                    <!-- Slot B -->
-                    <LinearLayout
-                        android:id="@+id/slot_element_b"
-                        android:layout_width="90dp"
-                        android:layout_height="100dp"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:background="#20FF9933"
-                        android:clickable="true"
-                        android:focusable="true">
-
-                        <TextView
-                            android:id="@+id/tv_slot_b_z"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="17"
-                            android:textColor="#88AADD"
-                            android:textSize="10sp"/>
-
-                        <TextView
-                            android:id="@+id/tv_slot_b_symbol"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Cl"
-                            android:textColor="#FF9933"
-                            android:textSize="26sp"
-                            android:textStyle="bold"/>
-
-                        <TextView
-                            android:id="@+id/tv_slot_b_name"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Chlorine"
-                            android:textColor="#FFFFFF"
-                            android:textSize="11sp"/>
-                    </LinearLayout>
-                </LinearLayout>
-
-                <!-- Reaction Result Card -->
-                <LinearLayout
-                    android:id="@+id/card_mixer_result"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:background="#0F2038"
-                    android:padding="16dp"
-                    android:layout_marginTop="18dp">
-
-                    <TextView
-                        android:id="@+id/tv_compound_formula"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="NaCl • Sodium Chloride"
-                        android:textColor="#00FFCC"
-                        android:textSize="17sp"
+                        android:layout_weight="1"
+                        android:text="SELECTED REACTANT ELEMENTS:"
+                        android:textColor="#607D99"
+                        android:textSize="10sp"
                         android:textStyle="bold"/>
 
                     <TextView
-                        android:id="@+id/tv_compound_common"
+                        android:id="@+id/btn_clear_elements"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Common Name: Table Salt"
-                        android:textColor="#00D4FF"
-                        android:textSize="13sp"
-                        android:layout_marginTop="2dp"/>
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="#204060"
-                        android:layout_marginVertical="10dp"/>
-
-                    <TextView
-                        android:id="@+id/tv_compound_bond"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Bond Type: Ionic • Crystal Lattice Structure"
-                        android:textColor="#E0E0E0"
-                        android:textSize="12sp"/>
-
-                    <TextView
-                        android:id="@+id/tv_compound_fact"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="💡 The salt on your food — a violently explosive metal and a toxic gas combine into something you eat every day."
-                        android:textColor="#A0C0E0"
-                        android:textSize="12sp"
-                        android:layout_marginTop="6dp"/>
+                        android:text="🗑 CLEAR"
+                        android:textColor="#FF6B6B"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:background="#20FF6B6B"
+                        android:paddingHorizontal="8dp"
+                        android:paddingVertical="4dp"
+                        android:clickable="true"
+                        android:focusable="true"/>
                 </LinearLayout>
 
-                <!-- Common Compound Quick Picker Pills -->
+                <!-- Reactants Scroll Bar (Dynamic Chips) -->
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/selected_elements_container"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"/>
+                </HorizontalScrollView>
+
+                <!-- Add Element Button -->
+                <TextView
+                    android:id="@+id/btn_add_element"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:text="➕ ADD ELEMENT FROM PERIODIC MATRIX (ALL 118)"
+                    android:textColor="#00FFCC"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    android:background="#1500FFCC"
+                    android:layout_marginTop="8dp"
+                    android:clickable="true"
+                    android:focusable="true"/>
+
+                <!-- Quick Multi-Element Reaction Recipes -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="QUICK SYNTHESIS SHORTCUTS:"
+                    android:text="POPULAR CHEMICAL COMBINATIONS:"
                     android:textColor="#607D99"
                     android:textSize="10sp"
                     android:textStyle="bold"
-                    android:layout_marginTop="16dp"
-                    android:layout_marginBottom="8dp"/>
+                    android:layout_marginTop="14dp"
+                    android:layout_marginBottom="6dp"/>
 
                 <HorizontalScrollView
                     android:layout_width="match_parent"
@@ -692,6 +462,257 @@
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"/>
                 </HorizontalScrollView>
+
+                <!-- Multiple Chemicals Possible Indicator -->
+                <LinearLayout
+                    android:id="@+id/card_multiple_compounds"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="#0C1B2E"
+                    android:padding="12dp"
+                    android:layout_marginTop="14dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/tv_multiple_compounds_title"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="⚗️ MULTIPLE CHEMICALS SYNTHESIZABLE:"
+                        android:textColor="#00FFCC"
+                        android:textSize="11sp"
+                        android:textStyle="bold"/>
+
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:scrollbars="none">
+
+                        <LinearLayout
+                            android:id="@+id/multiple_compounds_chips"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"/>
+                    </HorizontalScrollView>
+                </LinearLayout>
+
+                <!-- Reaction Result Card -->
+                <LinearLayout
+                    android:id="@+id/card_mixer_result"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="#0F2038"
+                    android:padding="16dp"
+                    android:layout_marginTop="14dp">
+
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
+
+                        <TextView
+                            android:id="@+id/tv_compound_formula"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="NaCl • Sodium Chloride"
+                            android:textColor="#00FFCC"
+                            android:textSize="18sp"
+                            android:textStyle="bold"
+                            android:layout_alignParentStart="true"/>
+
+                        <TextView
+                            android:id="@+id/tv_compound_common"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Common Name: Table Salt"
+                            android:textColor="#00D4FF"
+                            android:textSize="13sp"
+                            android:layout_below="@+id/tv_compound_formula"
+                            android:layout_marginTop="2dp"/>
+                    </RelativeLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#204060"
+                        android:layout_marginVertical="10dp"/>
+
+                    <!-- Molecular & Chemical Structure -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="📐 CHEMICAL STRUCTURE &amp; BONDING:"
+                        android:textColor="#CC88FF"
+                        android:textSize="11sp"
+                        android:textStyle="bold"/>
+
+                    <TextView
+                        android:id="@+id/tv_compound_structure"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Ionic Face-Centered Cubic (FCC) Lattice • Coordination number 6:6 [Na⁺ surrounded by 6 Cl⁻ octahedral geometry]."
+                        android:textColor="#FFFFFF"
+                        android:textSize="12sp"
+                        android:fontFamily="monospace"
+                        android:layout_marginTop="3dp"/>
+
+                    <TextView
+                        android:id="@+id/tv_compound_bond"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Bond Type: Strong Electrostatic Ionic Bond (ΔEN = 2.23) • Lattice Energy: 786 kJ/mol"
+                        android:textColor="#7799AA"
+                        android:textSize="11sp"
+                        android:layout_marginTop="3dp"/>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#204060"
+                        android:layout_marginVertical="10dp"/>
+
+                    <!-- How to synthesize / chemical reactions -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🔬 HOW TO SYNTHESIZE / REACTION MECHANISM:"
+                        android:textColor="#FFB84D"
+                        android:textSize="11sp"
+                        android:textStyle="bold"/>
+
+                    <TextView
+                        android:id="@+id/tv_compound_synthesis"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="2 Na (s) + Cl₂ (g) → 2 NaCl (s) + Heat (-411 kJ/mol)\nEnergetic exothermic synthesis where sodium burns with an intense yellow flame in chlorine gas."
+                        android:textColor="#EAEAEA"
+                        android:textSize="12sp"
+                        android:layout_marginTop="3dp"/>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#204060"
+                        android:layout_marginVertical="10dp"/>
+
+                    <!-- Practical Uses -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🏭 PRACTICAL USES &amp; INDUSTRIAL APPLICATIONS:"
+                        android:textColor="#00FF99"
+                        android:textSize="11sp"
+                        android:textStyle="bold"/>
+
+                    <TextView
+                        android:id="@+id/tv_compound_uses"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="• Food seasoning and preservation (osmotic antimicrobial).\n• De-icing roads via freezing-point depression.\n• Industrial chloralkali precursor for NaOH, chlorine, and PVC plastics.\n• Intravenous saline rehydration solutions in medicine."
+                        android:textColor="#A0C0E0"
+                        android:textSize="12sp"
+                        android:layout_marginTop="3dp"/>
+                </LinearLayout>
+
+                <!-- HENRY AI NOVEL CHEMICAL SYNTHESIS CARD -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="#160826"
+                    android:padding="16dp"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="24dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="✨ HENRY AI NOVEL CHEMICAL SYNTHESIS"
+                        android:textColor="#CC88FF"
+                        android:textSize="14sp"
+                        android:textStyle="bold"/>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Ask HENRY AI to invent a theoretically viable novel compound, calculate its molecular geometry, predict its synthesis protocol, and propose revolutionary practical applications."
+                        android:textColor="#B399CC"
+                        android:textSize="11sp"
+                        android:layout_marginTop="4dp"/>
+
+                    <TextView
+                        android:id="@+id/btn_novel_chemical"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:text="✨ SYNTHESIZE NOVEL CHEMICAL WITH HENRY"
+                        android:textColor="#020C1B"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:background="#CC88FF"
+                        android:layout_marginTop="12dp"
+                        android:clickable="true"
+                        android:focusable="true"/>
+
+                    <!-- Novel Chemical Output Container -->
+                    <LinearLayout
+                        android:id="@+id/novel_chemical_output"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:background="#240D3D"
+                        android:padding="12dp"
+                        android:layout_marginTop="12dp"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:id="@+id/tv_novel_name"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Novel Chemical Name"
+                            android:textColor="#00FFCC"
+                            android:textSize="15sp"
+                            android:textStyle="bold"/>
+
+                        <TextView
+                            android:id="@+id/tv_novel_formula"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Formula"
+                            android:textColor="#CC88FF"
+                            android:textSize="13sp"
+                            android:fontFamily="monospace"
+                            android:layout_marginTop="2dp"/>
+
+                        <TextView
+                            android:id="@+id/tv_novel_structure"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Molecular Structure"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12sp"
+                            android:layout_marginTop="6dp"/>
+
+                        <TextView
+                            android:id="@+id/tv_novel_synthesis"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="How to Synthesize / Use It"
+                            android:textColor="#FFD166"
+                            android:textSize="12sp"
+                            android:layout_marginTop="6dp"/>
+
+                        <TextView
+                            android:id="@+id/tv_novel_uses"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Revolutionary Uses"
+                            android:textColor="#06D6A0"
+                            android:textSize="12sp"
+                            android:layout_marginTop="6dp"/>
+                    </LinearLayout>
+                </LinearLayout>
             </LinearLayout>
         </ScrollView>
 

@@ -45,6 +45,12 @@ public class SpaceActivity extends AppCompatActivity {
     private AsteroidAdapter asteroidAdapter;
     private TextView tvIssPos, tvIssDesc, btnSpotStation;
     private TextView tvNasaTitle, tvNasaText;
+    private ImageView ivApodImage;
+    private ProgressBar pbApod;
+    private TextView tvApodDate, tvApodCredit;
+    private TextView btnApodHd, btnApodRefresh;
+    private String currentApodImageUrl = null;
+    private String currentApodHdUrl = null;
     private ProgressBar progress;
 
     private final List<AsteroidOrbitView.AsteroidOrbital> asteroidList = new ArrayList<>();
@@ -106,6 +112,12 @@ public class SpaceActivity extends AppCompatActivity {
 
         tvNasaTitle      = findViewById(R.id.tv_nasa_title);
         tvNasaText       = findViewById(R.id.tv_nasa_text);
+        ivApodImage      = findViewById(R.id.iv_apod_image);
+        pbApod           = findViewById(R.id.pb_apod);
+        tvApodDate       = findViewById(R.id.tv_apod_date);
+        tvApodCredit     = findViewById(R.id.tv_apod_credit);
+        btnApodHd        = findViewById(R.id.btn_apod_hd);
+        btnApodRefresh   = findViewById(R.id.btn_apod_refresh);
         progress         = findViewById(R.id.space_progress);
 
         if (rvAsteroids != null) {
@@ -134,6 +146,31 @@ public class SpaceActivity extends AppCompatActivity {
             btnSpotStation.setOnClickListener(v -> {
                 Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse("https://spotthestation.nasa.gov/"));
                 startActivity(i);
+            });
+        }
+
+        if (btnApodHd != null) {
+            btnApodHd.setOnClickListener(v -> {
+                String target = currentApodHdUrl != null ? currentApodHdUrl : currentApodImageUrl;
+                if (target != null && !target.isEmpty()) {
+                    try {
+                        Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(target));
+                        startActivity(i);
+                    } catch (Exception ignored) {}
+                }
+            });
+        }
+
+        if (ivApodImage != null) {
+            ivApodImage.setOnClickListener(v -> {
+                if (btnApodHd != null) btnApodHd.performClick();
+            });
+        }
+
+        if (btnApodRefresh != null) {
+            btnApodRefresh.setOnClickListener(v -> {
+                if (pbApod != null) pbApod.setVisibility(View.VISIBLE);
+                loadNASA();
             });
         }
 
@@ -459,17 +496,79 @@ public class SpaceActivity extends AppCompatActivity {
                     if (res.isSuccessful() && res.body() != null) {
                         JSONObject j = new JSONObject(res.body().string());
                         String title = j.optString("title", "NASA Astronomy Picture of the Day");
+                        String date = j.optString("date", "TODAY");
+                        String credit = j.optString("copyright", "NASA / STScI / ESA");
                         String expl = j.optString("explanation", "").replace("\n", " ");
-                        if (expl.length() > 280) expl = expl.substring(0, 280) + "…";
-                        final String t = title, x = expl;
+                        String imgUrl = j.optString("url", null);
+                        String hdUrl = j.optString("hdurl", imgUrl);
+
+                        currentApodImageUrl = imgUrl;
+                        currentApodHdUrl = hdUrl;
+
                         mainHandler.post(() -> {
-                            if (tvNasaTitle != null) tvNasaTitle.setText(t);
-                            if (tvNasaText != null) tvNasaText.setText(x);
+                            if (tvNasaTitle != null) tvNasaTitle.setText(title);
+                            if (tvApodDate != null) tvApodDate.setText(date);
+                            if (tvApodCredit != null) tvApodCredit.setText("Credit: " + credit);
+                            if (tvNasaText != null) tvNasaText.setText(expl);
                         });
+
+                        if (imgUrl != null && !imgUrl.isEmpty()) {
+                            fetchAndDisplayApodBitmap(imgUrl);
+                            return;
+                        }
                     }
                 }
             } catch (Exception ignored) {}
+
+            // Graceful fallback if offline or API rate limit
+            loadFallbackAPOD();
         }).start();
+    }
+
+    private void fetchAndDisplayApodBitmap(String url) {
+        new Thread(() -> {
+            try {
+                Request imgReq = new Request.Builder()
+                        .url(url)
+                        .header("User-Agent", "Mozilla/5.0 (Android; Mobile)")
+                        .build();
+                try (Response imgRes = client.newCall(imgReq).execute()) {
+                    if (imgRes.isSuccessful() && imgRes.body() != null) {
+                        android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(imgRes.body().byteStream());
+                        if (bmp != null) {
+                            mainHandler.post(() -> {
+                                if (ivApodImage != null) {
+                                    ivApodImage.setImageBitmap(bmp);
+                                }
+                                if (pbApod != null) pbApod.setVisibility(View.GONE);
+                            });
+                            return;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+            mainHandler.post(() -> {
+                if (pbApod != null) pbApod.setVisibility(View.GONE);
+            });
+        }).start();
+    }
+
+    private void loadFallbackAPOD() {
+        mainHandler.post(() -> {
+            String title = "Cosmic Cliffs in the Carina Nebula";
+            String date = "JWST DEEP FIELD";
+            String credit = "NASA, ESA, CSA, STScI";
+            String expl = "Captured in infrared light by NASA's James Webb Space Telescope, this image reveals previously invisible areas of star birth in the Carina Nebula (NGC 3324). Towering gas cliffs reach roughly 7 light-years high, sculpted by intense ultraviolet radiation and stellar winds from massive young stars.";
+            currentApodImageUrl = "https://images-assets.nasa.gov/image/PIA25430/PIA25430~orig.jpg";
+            currentApodHdUrl = "https://images-assets.nasa.gov/image/PIA25430/PIA25430~orig.jpg";
+
+            if (tvNasaTitle != null) tvNasaTitle.setText(title);
+            if (tvApodDate != null) tvApodDate.setText(date);
+            if (tvApodCredit != null) tvApodCredit.setText("Credit: " + credit);
+            if (tvNasaText != null) tvNasaText.setText(expl);
+
+            fetchAndDisplayApodBitmap(currentApodImageUrl);
+        });
     }
 
     @Override

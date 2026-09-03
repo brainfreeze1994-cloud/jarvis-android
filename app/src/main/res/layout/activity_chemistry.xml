@@ -20,11 +20,11 @@
             android:gravity="center"
             android:padding="16dp" />
 
-        <!-- Periodic Table -->
+        <!-- Periodic Matrix -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Periodic Table"
+            android:text="HENRY Periodic Matrix"
             android:textSize="18sp"
             android:textColor="#2196F3"
             android:layout_marginTop="16dp" />

@@ -135,7 +135,17 @@ public class JarvisApi {
                     cb.onSuccess(reply, imageUrl, followUps);
                 }
             } catch (Exception e) {
-                cb.onError(e.getMessage() != null ? e.getMessage() : "Network error");
+                String lastUserMsg = "";
+                if (history != null && !history.isEmpty()) {
+                    for (int i = history.size() - 1; i >= 0; i--) {
+                        if ("user".equalsIgnoreCase(history.get(i).role)) {
+                            lastUserMsg = history.get(i).text;
+                            break;
+                        }
+                    }
+                }
+                String offlineReply = HenryOfflineBrain.generateOfflineResponse(lastUserMsg, queryType, memCtx);
+                cb.onSuccess(offlineReply, null, null);
             }
         }).start();
     }
@@ -229,7 +239,17 @@ public class JarvisApi {
                     cb.onSuccess(reply, imageUrl, followUps);
                 }
             } catch (Exception e) {
-                cb.onError(e.getMessage() != null ? e.getMessage() : "Network error");
+                String lastUserMsg = "";
+                if (history != null && !history.isEmpty()) {
+                    for (int i = history.size() - 1; i >= 0; i--) {
+                        if ("user".equalsIgnoreCase(history.get(i).role)) {
+                            lastUserMsg = history.get(i).text;
+                            break;
+                        }
+                    }
+                }
+                String offlineReply = HenryOfflineBrain.generateOfflineResponse(lastUserMsg, queryType, memCtx);
+                cb.onSuccess(offlineReply, null, null);
             }
         }).start();
     }

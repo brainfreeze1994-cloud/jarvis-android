@@ -22,8 +22,22 @@ import java.util.regex.Pattern;
 
 public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
 
+    private static final okhttp3.OkHttpClient IMAGE_CLIENT = new okhttp3.OkHttpClient.Builder()
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+            .followRedirects(true)
+            .build();
+
     private final List<Message> items;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    private static String sanitizeImageUrl(String rawUrl) {
+        if (rawUrl == null) return "";
+        return rawUrl.replace("model=flux", "model=turbo")
+                     .replace("&enhance=true", "")
+                     .replace("?enhance=true&", "?")
+                     .replace("?enhance=true", "");
+    }
 
     public ChatAdapter(List<Message> items) { this.items = items; }
 
@@ -75,57 +89,64 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
             if (h.ivImage != null) h.ivImage.setVisibility(View.INVISIBLE);
 
             if (h.ivImage != null && m.imageUrl != null) {
-                final String url = m.imageUrl;
+                final String rawUrl = m.imageUrl;
+                final String url = sanitizeImageUrl(rawUrl);
                 final ImageView iv = h.ivImage;
                 final ProgressBar pb = h.progressBar;
+                final View hintView = h.itemView.findViewById(R.id.tv_hint);
+                iv.setTag(url);
 
                 new Thread(() -> {
+                    Bitmap bmp = null;
                     try {
-                        Bitmap bmp = null;
                         if (url.startsWith("data:image")) {
                             String b64 = url.substring(url.indexOf(',') + 1);
                             byte[] bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
                             bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
                         } else {
-                            // Try multiple times with increasing timeout
-                            for (int attempt = 0; attempt < 3 && bmp == null; attempt++) {
+                            for (int attempt = 0; attempt < 2 && bmp == null; attempt++) {
                                 try {
-                                    HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-                                    conn.setConnectTimeout(12000);
-                                    conn.setReadTimeout(30000);
-                                    conn.setInstanceFollowRedirects(true);
-                                    conn.connect();
-                                    if (conn.getResponseCode() == 200) {
-                                        InputStream is = conn.getInputStream();
-                                        bmp = BitmapFactory.decodeStream(is);
-                                        is.close();
+                                    okhttp3.Request req = new okhttp3.Request.Builder()
+                                            .url(url)
+                                            .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
+                                            .header("Accept", "image/jpeg,image/png,image/webp,image/*;q=0.8")
+                                            .build();
+                                    try (okhttp3.Response resp = IMAGE_CLIENT.newCall(req).execute()) {
+                                        if (resp.isSuccessful() && resp.body() != null) {
+                                            byte[] bytes = resp.body().bytes();
+                                            if (bytes.length > 0) {
+                                                bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                                            }
+                                        }
                                     }
-                                } catch (Exception retryEx) {
-                                    Thread.sleep(1500);
+                                } catch (Exception ex) {
+                                    Thread.sleep(800);
                                 }
                             }
                         }
-                        if (bmp != null) {
-                            final Bitmap finalBmp = bmp;
-                            mainHandler.post(() -> {
+                        final Bitmap finalBmp = bmp;
+                        mainHandler.post(() -> {
+                            if (!url.equals(iv.getTag())) return;
+                            if (pb != null) pb.setVisibility(View.GONE);
+                            if (finalBmp != null) {
                                 iv.setImageBitmap(finalBmp);
                                 iv.setVisibility(View.VISIBLE);
-                                if (pb != null) pb.setVisibility(View.GONE);
-                            });
-                        } else {
-                            mainHandler.post(() -> {
-                                if (pb != null) pb.setVisibility(View.GONE);
+                                if (hintView != null) hintView.setVisibility(View.VISIBLE);
+                            } else {
                                 iv.setVisibility(View.VISIBLE);
                                 iv.setImageResource(android.R.drawable.ic_menu_gallery);
-                                if (h.tvMsg != null) h.tvMsg.setText("Image could not be loaded. Tap to open in browser.");
-                            });
-                        }
+                                if (h.tvMsg != null) h.tvMsg.setText("Tap image to view in browser.");
+                                if (hintView != null) hintView.setVisibility(View.VISIBLE);
+                            }
+                        });
                     } catch (Exception e) {
                         mainHandler.post(() -> {
+                            if (!url.equals(iv.getTag())) return;
                             if (pb != null) pb.setVisibility(View.GONE);
                             iv.setVisibility(View.VISIBLE);
                             iv.setImageResource(android.R.drawable.ic_menu_gallery);
-                            if (h.tvMsg != null) h.tvMsg.setText("Image failed to load. Tap to open in browser.");
+                            if (h.tvMsg != null) h.tvMsg.setText("Tap image to view in browser.");
+                            if (hintView != null) hintView.setVisibility(View.VISIBLE);
                         });
                     }
                 }).start();

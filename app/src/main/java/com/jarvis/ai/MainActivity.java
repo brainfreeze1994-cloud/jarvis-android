@@ -4564,7 +4564,7 @@ public class MainActivity extends AppCompatActivity {
                     executor.excute(() -> {
                     
                     String offlineReply = HenryOfflineBrain.generateOfflineResponse(finalEffectiveUserText, finalintentType, MainActivity.this);
-                    ...
+                    
                     });
                     
                     String emotion = extractEmotion(offlineReply);

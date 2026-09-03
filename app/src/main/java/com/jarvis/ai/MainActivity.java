@@ -4560,7 +4560,7 @@ public class MainActivity extends AppCompatActivity {
                     hideTyping();
                     final String userTextForLambda = effectiveUserText;
                     final var intentTypeForLambda = intentType;
-                    String offlineReply = HenryOfflineBrain.generateOfflineResponse(effectiveUserForLambda, intentTypeForLambda, MainActivity.this);
+                    String offlineReply = HenryOfflineBrain.generateOfflineResponse(userTextForLambda, intentTypeForLambda, MainActivity.this);
                     String emotion = extractEmotion(offlineReply);
                     String cleanReply = stripEmotionTag(offlineReply);
                     history.add(new HistoryItem("model", cleanReply));

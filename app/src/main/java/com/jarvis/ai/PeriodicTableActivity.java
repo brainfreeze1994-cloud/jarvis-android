@@ -851,7 +851,7 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
             multipleCompoundsChips.removeAllViews();
 
             for (int i = 0; i < matchingCompounds.size(); i++) {
-                final Compound comp = matchingCompounds[i];
+                final Compound comp = matchingCompounds.get(i);
                 boolean isSelected = (selectedCompound == comp || (selectedCompound == null && i == 0));
                 if (isSelected && selectedCompound == null) {
                     selectedCompound = comp;

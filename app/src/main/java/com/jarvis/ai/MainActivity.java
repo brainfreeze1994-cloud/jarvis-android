@@ -4556,25 +4556,22 @@ public class MainActivity extends AppCompatActivity {
                 });
             }
             @Override public void onError(String error) {
-                mainHandler.post(() -> {
-                    hideTyping();
-                    final String finalEffectiveUserText = effectiveUserText;
-                    final String finalintentType= intentType;
-
-                    executor.excute(() -> {
-                    
-                    String offlineReply = HenryOfflineBrain.generateOfflineResponse(finalEffectiveUserText, finalintentType, MainActivity.this);
-                    
-                    });
-                    
+                mainHandler.post(() -> hideTyping()){;
+                  new Thread()) -> {
+                        String offlineReply = HenryOfflineBrain.generateOfflineResponse
+                            (finalEffectiveUserText, finalintentType, MainActivity.this);
+                      
                     String emotion = extractEmotion(offlineReply);
-                    String cleanReply = stripEmotionTag(offlineReply);
-                    history.add(new HistoryItem("model", cleanReply));
-                    addJarvisMsg(cleanReply);
-                    speak(cleanReply, emotion);
-                    saveHistory();
-                    if (btnSend != null) btnSend.setEnabled(true);
-                    setState(OrbView.OrbState.IDLE);
+                      
+                    String CleanReply = StripEmotionTag(offlineReply);
+
+                   nainHandler.post(() -> {
+                        history.add(new HistoryItem("model", cleanReply));
+                        addJarvisMsg(cleanReply);
+                        speak(cleanReply, emotion);
+                        saveHistory();
+                        if (btnSend != null) btnSend.setEnabled(true);
+                        setState(OrbView.OrbState.IDLE);
                 });
             }
         });

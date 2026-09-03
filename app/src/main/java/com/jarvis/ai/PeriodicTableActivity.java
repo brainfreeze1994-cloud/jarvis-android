@@ -777,7 +777,7 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
         }
 
         for (int i = 0; i < selectedReactantElements.size(); i++) {
-            final Elem elem = selectedReactantElements[i];
+            final Elem elem = selectedReactantElements.get(i);
 
             LinearLayout chip = new LinearLayout(this);
             chip.setOrientation(LinearLayout.HORIZONTAL);

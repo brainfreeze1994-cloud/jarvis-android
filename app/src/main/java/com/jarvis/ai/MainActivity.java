@@ -4555,29 +4555,25 @@ public class MainActivity extends AppCompatActivity {
                     updateMoodOrb();
                 });
             }
-           // 1. Declare final copies right ABOVE the onError method:
+          // Step 1: Right ABOVE 'public void onError(...)', declare the final copies:
 final String finalUserText = effectiveUserText;
 final String finalIntent = intentType;
 
-
-// 2. Replace the onError method with this exact block:
+// Step 2: Ensure all 4 closing levels are present:
 @Override 
 public void onError(String error) {
     mainHandler.post(() -> hideTyping());
 
     new Thread(() -> {
-        // Run brain generation on background thread
         String offlineReply = HenryOfflineBrain.generateOfflineResponse(
             finalUserText, 
             finalIntent, 
             MainActivity.this
         );
 
-        // Parse reply INSIDE the thread scope so offlineReply is visible
         String emotion = extractEmotion(offlineReply);
         String cleanReply = stripEmotionTag(offlineReply);
 
-        // Switch to the UI thread for UI updates
         mainHandler.post(() -> {
             history.add(new HistoryItem("model", cleanReply));
             addJarvisMsg(cleanReply);
@@ -4587,9 +4583,10 @@ public void onError(String error) {
                 btnSend.setEnabled(true);
             }
             setState(OrbView.OrbState.IDLE);
-        });
-    }).start();
-}
+        }); // <-- 1. Closes mainHandler.post
+    }).start(); // <-- 2. Closes new Thread
+} // <-- 3. Closes public void onError
+                    }); // <-- 4. Closes the anonymous callback class and the surrounding method call!
 
     // ── Contacts / Calls / SMS ────────────────────────────────────────────────
     private void handleContactCommand(String cmd, String userText) {

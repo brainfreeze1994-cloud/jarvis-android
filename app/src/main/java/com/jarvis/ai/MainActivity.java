@@ -4590,7 +4590,7 @@ public void onError(String error) {
 }                   // 5. Closes the method that started the callback
 
 private void handleContactCommand(String cmd, String userText) {
-private void handleContactCommand(String cmd, String userText) {
+
 
     // ── Contacts / Calls / SMS ────────────────────────────────────────────────
     private void handleContactCommand(String cmd, String userText) {

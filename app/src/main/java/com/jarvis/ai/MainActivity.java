@@ -4555,23 +4555,29 @@ public class MainActivity extends AppCompatActivity {
                     updateMoodOrb();
                 });
             }
-            @Override 
+           // 1. Declare final copies right ABOVE the onError method:
+final String finalUserText = effectiveUserText;
+final String finalIntent = intentType;
+
+
+// 2. Replace the onError method with this exact block:
+@Override 
 public void onError(String error) {
     mainHandler.post(() -> hideTyping());
 
     new Thread(() -> {
-        // 1. Generate response in background thread using final variables
+        // Run brain generation on background thread
         String offlineReply = HenryOfflineBrain.generateOfflineResponse(
             finalUserText, 
             finalIntent, 
             MainActivity.this
         );
 
-        // 2. Process reply (MUST be inside the thread so offlineReply is visible)
+        // Parse reply INSIDE the thread scope so offlineReply is visible
         String emotion = extractEmotion(offlineReply);
         String cleanReply = stripEmotionTag(offlineReply);
 
-        // 3. Post back to main UI thread
+        // Switch to the UI thread for UI updates
         mainHandler.post(() -> {
             history.add(new HistoryItem("model", cleanReply));
             addJarvisMsg(cleanReply);

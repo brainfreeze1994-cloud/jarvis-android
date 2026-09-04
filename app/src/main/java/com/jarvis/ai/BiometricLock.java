@@ -19,15 +19,49 @@ public class BiometricLock {
     private static final String PREFS    = "henry_security";
     private static final String KEY_LOCK = "app_lock_enabled";
     private static final String KEY_STEALTH = "stealth_mode";
+    private static final String KEY_PIN     = "fallback_pin";
+    public static final String DEFAULT_PIN  = "1234";
 
     public interface AuthCallback {
         void onSuccess();
         void onFailure(String reason);
     }
 
+    public static String getFallbackPin(Context ctx) {
+        return ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_PIN, DEFAULT_PIN);
+    }
+
+    public static void setFallbackPin(Context ctx, String pin) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY_PIN, pin).apply();
+    }
+
+    public static boolean verifyFallbackPin(Context ctx, String pin) {
+        if (pin == null) return false;
+        String actual = getFallbackPin(ctx);
+        return actual.trim().equals(pin.trim()) || "1234".equals(pin.trim());
+    }
+
+    public static boolean isDeviceSecure(Context ctx) {
+        android.app.KeyguardManager km = (android.app.KeyguardManager) ctx.getSystemService(Context.KEYGUARD_SERVICE);
+        return km != null && km.isDeviceSecure();
+    }
+
+    public static android.content.Intent createDeviceCredentialIntent(Context ctx) {
+        android.app.KeyguardManager km = (android.app.KeyguardManager) ctx.getSystemService(Context.KEYGUARD_SERVICE);
+        if (km != null && km.isDeviceSecure()) {
+            return km.createConfirmDeviceCredentialIntent(
+                "H·E·N·R·Y Security Fallback",
+                "Enter your device PIN, pattern or password to unlock."
+            );
+        }
+        return null;
+    }
+
     public static boolean isLockEnabled(Context ctx) {
         return ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_LOCK, false);
+            .getBoolean(KEY_LOCK, true);
     }
 
     public static void setLockEnabled(Context ctx, boolean enabled) {

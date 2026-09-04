@@ -32,11 +32,11 @@ public class HenryBiometricManager {
     }
 
     public static boolean isBiometricLockEnabled(Context context) {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        return prefs.getBoolean(KEY_BIOMETRIC_LOCK_ENABLED, false);
+        return BiometricLock.isLockEnabled(context);
     }
 
     public static void setBiometricLockEnabled(Context context, boolean enabled) {
+        BiometricLock.setLockEnabled(context, enabled);
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit()
                 .putBoolean(KEY_BIOMETRIC_LOCK_ENABLED, enabled)

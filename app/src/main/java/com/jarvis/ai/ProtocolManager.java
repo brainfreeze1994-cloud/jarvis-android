@@ -20,7 +20,7 @@ import java.util.Locale;
  * Deliberately reuses the existing command pipeline rather than calling
  * action classes directly — a protocol step is just plain text ("turn on
  * do not disturb", "what's the weather") that gets replayed through
- * askJarvis() exactly as if you'd typed it. This means a protocol can use
+ * askHenry() exactly as if you'd typed it. This means a protocol can use
  * ANY command HENRY already understands, with zero new wiring needed per
  * feature, and it automatically stays in sync as new commands get added.
  *

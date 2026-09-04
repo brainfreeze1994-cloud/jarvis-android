@@ -69,6 +69,23 @@
             android:layout_marginEnd="6dp"
             android:background="@drawable/bg_status_badge"/>
 
+        <!-- Biometric lock status & settings toggle button -->
+        <TextView
+            android:id="@+id/btn_top_security"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔒 SECURE"
+            android:textColor="#00FFCC"
+            android:textSize="8sp"
+            android:letterSpacing="0.1"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="5dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/bg_chip"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Biometric Security Settings and Startup Lock Toggle"/>
+
         <!-- Voice button -->
         <TextView
             android:id="@+id/btn_voice"
@@ -731,6 +748,320 @@
             </LinearLayout>
 
         </LinearLayout>
+    </FrameLayout>
+
+    <!-- ── Full-Screen Biometric Security Lock Overlay ── -->
+    <FrameLayout
+        android:id="@+id/layout_biometric_lock_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#020C1B"
+        android:clickable="true"
+        android:focusable="true"
+        android:elevation="120dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:paddingHorizontal="24dp"
+                android:paddingVertical="32dp">
+
+                <!-- Title & Header -->
+                <TextView
+                    android:id="@+id/tv_biometric_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="H·E·N·R·Y SECURITY"
+                    android:textColor="#00D4FF"
+                    android:textSize="18sp"
+                    android:letterSpacing="0.25"
+                    android:fontFamily="sans-serif-medium" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="FACIAL RECOGNITION &amp; BIOMETRIC GATEWAY"
+                    android:textColor="#2E6A8A"
+                    android:textSize="9sp"
+                    android:letterSpacing="0.2"
+                    android:layout_marginTop="2dp" />
+
+                <!-- Mode Selection Chips -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="16dp">
+
+                    <Button
+                        android:id="@+id/btn_mode_face"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:background="@drawable/bg_chip"
+                        android:text="👤 FACE SCAN"
+                        android:textColor="#00FFCC"
+                        android:textSize="10sp"
+                        android:letterSpacing="0.05"
+                        android:paddingHorizontal="12dp"
+                        android:layout_marginEnd="6dp" />
+
+                    <Button
+                        android:id="@+id/btn_mode_sensor"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:background="@drawable/bg_chip"
+                        android:text="👆 BIOMETRICS"
+                        android:textColor="#7A9BB8"
+                        android:textSize="10sp"
+                        android:letterSpacing="0.05"
+                        android:paddingHorizontal="12dp"
+                        android:layout_marginEnd="6dp" />
+
+                    <Button
+                        android:id="@+id/btn_mode_pin"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:background="@drawable/bg_chip"
+                        android:text="🔢 PIN FALLBACK"
+                        android:textColor="#7A9BB8"
+                        android:textSize="10sp"
+                        android:letterSpacing="0.05"
+                        android:paddingHorizontal="12dp" />
+                </LinearLayout>
+
+                <!-- Security Card Container -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:gravity="center_horizontal"
+                    android:background="@drawable/bg_biometric_card"
+                    android:paddingHorizontal="20dp"
+                    android:paddingVertical="24dp"
+                    android:layout_marginTop="16dp">
+
+                    <!-- Holographic Facial Recognition Scanner Container -->
+                    <FrameLayout
+                        android:id="@+id/fl_scanner_container"
+                        android:layout_width="220dp"
+                        android:layout_height="220dp"
+                        android:background="@drawable/bg_scanner_frame"
+                        android:layout_gravity="center">
+
+                        <!-- Front Camera Preview for Facial Recognition -->
+                        <androidx.camera.view.PreviewView
+                            android:id="@+id/pv_face_camera"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:visibility="gone" />
+
+                        <!-- Animated Holographic Scanner HUD -->
+                        <com.jarvis.ai.FacialBiometricScanView
+                            android:id="@+id/biometric_scan_view"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent" />
+                    </FrameLayout>
+
+                    <!-- Status Text -->
+                    <TextView
+                        android:id="@+id/tv_biometric_status"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="FACIAL RECOGNITION ACTIVE"
+                        android:textColor="#00FFCC"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.08"
+                        android:gravity="center"
+                        android:layout_marginTop="16dp" />
+
+                    <!-- Subtext description -->
+                    <TextView
+                        android:id="@+id/tv_biometric_subtext"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Position face within target reticle to unlock H.E.N.R.Y."
+                        android:textColor="#7A9BB8"
+                        android:textSize="11sp"
+                        android:gravity="center"
+                        android:lineSpacingMultiplier="1.2"
+                        android:layout_marginTop="6dp" />
+
+                    <!-- Indeterminate Scanning Progress Bar -->
+                    <ProgressBar
+                        android:id="@+id/pb_biometric_scan"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="4dp"
+                        android:indeterminate="true"
+                        android:indeterminateTint="#00D4FF"
+                        android:layout_marginTop="12dp" />
+
+                    <!-- PIN Fallback Keypad Panel (Toggled via button) -->
+                    <LinearLayout
+                        android:id="@+id/layout_pin_fallback_panel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center_horizontal"
+                        android:visibility="gone"
+                        android:layout_marginTop="14dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="MASTER SECURITY PIN FALLBACK"
+                            android:textColor="#00D4FF"
+                            android:textSize="10sp"
+                            android:letterSpacing="0.15" />
+
+                        <TextView
+                            android:id="@+id/tv_pin_dots"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="○   ○   ○   ○"
+                            android:textColor="#00FFCC"
+                            android:textSize="22sp"
+                            android:letterSpacing="0.25"
+                            android:layout_marginTop="8dp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Default Passcode: 1234"
+                            android:textColor="#4A6F8A"
+                            android:textSize="9sp"
+                            android:layout_marginTop="2dp" />
+
+                        <!-- Keypad Rows -->
+                        <GridLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:columnCount="3"
+                            android:rowCount="4"
+                            android:layout_marginTop="12dp">
+
+                            <!-- Row 1 -->
+                            <Button android:id="@+id/btn_key_1" style="?android:attr/button"
+                                android:layout_width="60dp" android:layout_height="44dp"
+                                android:layout_margin="3dp" android:background="@drawable/bg_keypad_btn"
+                                android:text="1" android:textColor="#00D4FF" android:textSize="16sp" />
+                            <Button android:id="@+id/btn_key_2" style="?android:attr/button"
+                                android:layout_width="60dp" android:layout_height="44dp"
+                                android:layout_margin="3dp" android:background="@drawable/bg_keypad_btn"
+                                android:text="2" android:textColor="#00D4FF" android:textSize="16sp" />
+                            <Button android:id="@+id/btn_key_3" style="?android:attr/button"
+                                android:layout_width="60dp" android:layout_height="44dp"
+                                android:layout_margin="3dp" android:background="@drawable/bg_keypad_btn"
+                                android:text="3" android:textColor="#00D4FF" android:textSize="16sp" />
+
+                            <!-- Row 2 -->
+                            <Button android:id="@+id/btn_key_4" style="?android:attr/button"
+                                android:layout_width="60dp" android:layout_height="44dp"
+                                android:layout_margin="3dp" android:background="@drawable/bg_keypad_btn"
+                                android:text="4" android:textColor="#00D4FF" android:textSize="16sp" />
+                            <Button android:id="@+id/btn_key_5" style="?android:attr/button"
+                                android:layout_width="60dp" android:layout_height="44dp"
+                                android:layout_margin="3dp" android:background="@drawable/bg_keypad_btn"
+                                android:text="5" android:textColor="#00D4FF" android:textSize="16sp" />
+                            <Button android:id="@+id/btn_key_6" style="?android:attr/button"
+                                android:layout_width="60dp" android:layout_height="44dp"
+                                android:layout_margin="3dp" android:background="@drawable/bg_keypad_btn"
+                                android:text="6" android:textColor="#00D4FF" android:textSize="16sp" />
+
+                            <!-- Row 3 -->
+                            <Button android:id="@+id/btn_key_7" style="?android:attr/button"
+                                android:layout_width="60dp" android:layout_height="44dp"
+                                android:layout_margin="3dp" android:background="@drawable/bg_keypad_btn"
+                                android:text="7" android:textColor="#00D4FF" android:textSize="16sp" />
+                            <Button android:id="@+id/btn_key_8" style="?android:attr/button"
+                                android:layout_width="60dp" android:layout_height="44dp"
+                                android:layout_margin="3dp" android:background="@drawable/bg_keypad_btn"
+                                android:text="8" android:textColor="#00D4FF" android:textSize="16sp" />
+                            <Button android:id="@+id/btn_key_9" style="?android:attr/button"
+                                android:layout_width="60dp" android:layout_height="44dp"
+                                android:layout_margin="3dp" android:background="@drawable/bg_keypad_btn"
+                                android:text="9" android:textColor="#00D4FF" android:textSize="16sp" />
+
+                            <!-- Row 4 -->
+                            <Button android:id="@+id/btn_key_clear" style="?android:attr/button"
+                                android:layout_width="60dp" android:layout_height="44dp"
+                                android:layout_margin="3dp" android:background="@drawable/bg_keypad_btn"
+                                android:text="CLR" android:textColor="#FF6688" android:textSize="11sp" />
+                            <Button android:id="@+id/btn_key_0" style="?android:attr/button"
+                                android:layout_width="60dp" android:layout_height="44dp"
+                                android:layout_margin="3dp" android:background="@drawable/bg_keypad_btn"
+                                android:text="0" android:textColor="#00D4FF" android:textSize="16sp" />
+                            <Button android:id="@+id/btn_key_del" style="?android:attr/button"
+                                android:layout_width="60dp" android:layout_height="44dp"
+                                android:layout_margin="3dp" android:background="@drawable/bg_keypad_btn"
+                                android:text="⌫" android:textColor="#00D4FF" android:textSize="16sp" />
+                        </GridLayout>
+
+                        <!-- Device Credential Button -->
+                        <Button
+                            android:id="@+id/btn_device_credential_fallback"
+                            android:layout_width="match_parent"
+                            android:layout_height="40dp"
+                            android:background="@drawable/bg_chip"
+                            android:text="DEVICE LOCK (PIN/PATTERN)"
+                            android:textColor="#00D4FF"
+                            android:textSize="11sp"
+                            android:layout_marginTop="10dp" />
+                    </LinearLayout>
+
+                    <!-- Action Buttons -->
+                    <Button
+                        android:id="@+id/btn_biometric_unlock"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:background="@drawable/bg_biometric_btn"
+                        android:text="SCAN WITH SYSTEM BIOMETRICS"
+                        android:textColor="#020C1B"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.08"
+                        android:layout_marginTop="18dp" />
+
+                    <Button
+                        android:id="@+id/btn_biometric_fallback_toggle"
+                        android:layout_width="match_parent"
+                        android:layout_height="42dp"
+                        android:background="@drawable/bg_chip"
+                        android:text="USE PIN / PASSCODE FALLBACK"
+                        android:textColor="#00FFCC"
+                        android:textSize="11sp"
+                        android:letterSpacing="0.08"
+                        android:layout_marginTop="8dp" />
+
+                    <Button
+                        android:id="@+id/btn_biometric_exit"
+                        android:layout_width="match_parent"
+                        android:layout_height="38dp"
+                        android:background="@android:color/transparent"
+                        android:text="EXIT APPLICATION"
+                        android:textColor="#4A6F8A"
+                        android:textSize="11sp"
+                        android:letterSpacing="0.1"
+                        android:layout_marginTop="6dp" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+        </ScrollView>
+
     </FrameLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

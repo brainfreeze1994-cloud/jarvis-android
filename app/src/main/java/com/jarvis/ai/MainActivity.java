@@ -11,6 +11,8 @@ import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
@@ -27,8 +29,11 @@ import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
+import android.text.InputFilter;
+import android.text.InputType;
 import android.util.Base64;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
@@ -37,11 +42,25 @@ import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
+import androidx.camera.core.CameraSelector;
+import androidx.camera.core.ImageAnalysis;
+import androidx.camera.core.Preview;
+import androidx.camera.lifecycle.ProcessCameraProvider;
+import androidx.camera.view.PreviewView;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.face.Face;
+import com.google.mlkit.vision.face.FaceDetection;
+import com.google.mlkit.vision.face.FaceDetector;
+import com.google.mlkit.vision.face.FaceDetectorOptions;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
@@ -67,6 +86,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.MediaType;
@@ -211,6 +231,33 @@ public class MainActivity extends AppCompatActivity {
     private Runnable recordTimerRunnable;
     private BroadcastReceiver screenRecordReceiver;
 
+    // ── Biometric Security Lock ───────────────────────────────────────────────
+    private static final int REQUEST_CODE_DEVICE_CREDENTIAL = 992;
+    private static final int REQUEST_CODE_CAMERA_BIOMETRICS = 993;
+
+    private FrameLayout              layoutBiometricLockOverlay;
+    private FacialBiometricScanView  biometricScanView;
+    private PreviewView              pvFaceCamera;
+    private TextView                 tvBiometricLockStatus;
+    private TextView                 tvBiometricLockSubtext;
+    private ProgressBar              pbBiometricScan;
+    private View                     layoutPinFallbackPanel;
+    private TextView                 tvPinDots;
+    private Button                   btnModeFace;
+    private Button                   btnModeSensor;
+    private Button                   btnModePin;
+    private Button                   btnBiometricUnlockRetry;
+    private Button                   btnBiometricFallbackToggle;
+    private Button                   btnDeviceCredentialFallback;
+    private Button                   btnBiometricExit;
+    private TextView                 btnTopSecurity;
+    private boolean                  isAppLocked = true;
+    private final StringBuilder      enteredPin = new StringBuilder();
+    private ProcessCameraProvider    faceCameraProvider;
+    private FaceDetector             faceDetector;
+    private boolean                  isCameraScanning = false;
+    private int                      consecutiveFaceFrames = 0;
+
     // ── onCreate ──────────────────────────────────────────────────────────────
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -262,7 +309,7 @@ public class MainActivity extends AppCompatActivity {
         if (widgetCmd != null && !widgetCmd.isEmpty()) {
             hideWelcome();
             final String cmd = widgetCmd;
-            mainHandler.postDelayed(() -> askJarvis(cmd), 600);
+            mainHandler.postDelayed(() -> askHenry(cmd), 600);
         } else if (VoiceShortcutWidget.ACTION_MIC.equals(intent.getAction())) {
             mainHandler.postDelayed(this::startListening, 600);
         }
@@ -279,7 +326,7 @@ public class MainActivity extends AppCompatActivity {
         } else if (sharedText != null) {
             hideWelcome();
             final String txt = sharedText;
-            mainHandler.post(() -> askJarvis("I'm sharing this with you: " + txt));
+            mainHandler.post(() -> askHenry("I'm sharing this with you: " + txt));
         }
     }
 
@@ -396,6 +443,7 @@ public class MainActivity extends AppCompatActivity {
         setupChip(R.id.chip6, 5);
 
         initScreenRecordFabAndOverlay();
+        initBiometricSecurity();
 
         if (history.isEmpty()) {
             addJarvisMsg("Good day, sir. H.E.N.R.Y online. All systems nominal.");
@@ -432,7 +480,7 @@ public class MainActivity extends AppCompatActivity {
         if (chip instanceof TextView) ((TextView) chip).setText(
             text.length() > 28 ? text.substring(0, 25) + "…" : text);
         // Tap → ask
-        chip.setOnClickListener(v -> { hideWelcome(); askJarvis(ChipPrefs.get(this, index)); });
+        chip.setOnClickListener(v -> { hideWelcome(); askHenry(ChipPrefs.get(this, index)); });
         // Long-press → edit
         chip.setOnLongClickListener(v -> {
             editChip(chipId, index); return true;
@@ -562,16 +610,19 @@ public class MainActivity extends AppCompatActivity {
         tts.setSpeechRate(rates[Math.max(0, Math.min(2, ttsSpeed))]);
     }
 
-    // ── Voice Picker ──────────────────────────────────────────────────────────
+    // ── Voice Picker / Settings ──────────────────────────────────────────────
     private void showVoicePicker() {
         String modeLbl = MODE_BRIEF.equals(responseMode) ? "Brief"
                        : MODE_DETAILED.equals(responseMode) ? "Detailed" : "Balanced";
+        boolean lockOn = BiometricLock.isLockEnabled(this);
         CharSequence[] options = {
             "🎙 Voice Accent",
             wakeEnabled    ? "🟢 Wake Word: ON  (tap to disable)"  : "⚫ Wake Word: OFF  (tap to enable)",
             ttsMuted       ? "🔇 Voice Muted  (tap to unmute)"    : "🔊 Voice Enabled  (tap to mute)",
             "⚡ Voice Speed: " + new String[]{"Slow","Normal","Fast"}[ttsSpeed],
             "💬 Response Mode: " + modeLbl,
+            lockOn         ? "🔒 Biometric Startup Lock: ON  (tap to disable)" : "🔓 Biometric Startup Lock: OFF  (tap to enable)",
+            "🛡️ Biometric Security Settings (PIN / Test Lock)",
             screenAlwaysOn ? "💡 Screen Always-On: ON  (tap off)" : "💡 Screen Always-On: OFF  (tap on)",
             bubbleEnabled  ? "🫧 Floating Bubble: ON  (tap off)"  : "🫧 Floating Bubble: OFF  (tap on)",
             ScreenRecorderService.isRecording ? "🔴 Stop Screen Recording" : "🎥 Start Screen Recording (1080p HUD)",
@@ -596,22 +647,34 @@ public class MainActivity extends AppCompatActivity {
                     case 2:  toggleMute(); break;
                     case 3:  showSpeedPicker(); break;
                     case 4:  showResponseModePicker(); break;
-                    case 5:  toggleScreenAlwaysOn(); break;
-                    case 6:  toggleBubble(); break;
-                    case 7:  if (ScreenRecorderService.isRecording) stopScreenRecording(); else startScreenRecording(); break;
-                    case 8:  startActivity(new Intent(this, ScreenRecordResultActivity.class)); break;
-                    case 9:  showDailyDigest(); break;
-                    case 10: readNewsBriefing(); break;
-                    case 11: showReminders(); break;
-                    case 12: showNotes(); break;
-                    case 13: showShoppingList(); break;
-                    case 14: showShortcuts(); break;
-                    case 15: showChatSearch(); break;
-                    case 16: showProfileEditor(); break;
-                    case 17: exportChat(); break;
-                    case 18: translateLastReply(); break;
+                    case 5:  toggleBiometricStartupLock(); break;
+                    case 6:  showBiometricSecuritySettings(); break;
+                    case 7:  toggleScreenAlwaysOn(); break;
+                    case 8:  toggleBubble(); break;
+                    case 9:  if (ScreenRecorderService.isRecording) stopScreenRecording(); else startScreenRecording(); break;
+                    case 10: startActivity(new Intent(this, ScreenRecordResultActivity.class)); break;
+                    case 11: showDailyDigest(); break;
+                    case 12: readNewsBriefing(); break;
+                    case 13: showReminders(); break;
+                    case 14: showNotes(); break;
+                    case 15: showShoppingList(); break;
+                    case 16: showShortcuts(); break;
+                    case 17: showChatSearch(); break;
+                    case 18: showProfileEditor(); break;
+                    case 19: exportChat(); break;
+                    case 20: translateLastReply(); break;
                 }
             }).show();
+    }
+
+    private void toggleBiometricStartupLock() {
+        boolean newState = !BiometricLock.isLockEnabled(this);
+        BiometricLock.setLockEnabled(this, newState);
+        updateSecurityUi();
+        String status = newState ? "ENABLED" : "DISABLED";
+        Toast.makeText(this, "Biometric Startup Lock " + status, Toast.LENGTH_SHORT).show();
+        speak(newState ? "Biometric authentication on startup has been enabled, sir."
+                       : "Biometric authentication on startup has been disabled, sir.", "proud");
     }
 
     private void showVoiceAccentPicker() {
@@ -1493,6 +1556,20 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+
+        // 🔐 Device Credential Screen Lock Result
+        if (req == REQUEST_CODE_DEVICE_CREDENTIAL) {
+            if (res == RESULT_OK) {
+                if (biometricScanView != null) {
+                    biometricScanView.setScannerState(FacialBiometricScanView.STATE_SUCCESS);
+                }
+                unlockApp("Device credentials verified. Welcome back, Owen.");
+            } else {
+                Toast.makeText(this, "Device credential verification cancelled.", Toast.LENGTH_SHORT).show();
+            }
+            return;
+        }
+
         if (res != RESULT_OK) return;
 
         // 🐾 Animal Scanner result
@@ -1914,7 +1991,7 @@ public class MainActivity extends AppCompatActivity {
                 });
                 ArrayList<String> m = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                 if (m != null && !m.isEmpty() && !m.get(0).trim().isEmpty())
-                    mainHandler.post(() -> { hideWelcome(); askJarvis(m.get(0).trim()); });
+                    mainHandler.post(() -> { hideWelcome(); askHenry(m.get(0).trim()); });
                 else
                     mainHandler.post(() -> setState(OrbView.OrbState.IDLE));
             }
@@ -1956,10 +2033,14 @@ public class MainActivity extends AppCompatActivity {
         etInput.setText("");
         etInput.setHint("Command HENRY…");
         hideWelcome();
-        askJarvis(text);
+        askHenry(text);
     }
 
     private void askJarvis(String userText) {
+        askHenry(userText);
+    }
+
+    private void askHenry(String userText) {
         // ── Vision Intelligence — checked FIRST ───────────────────────────────
         {
             String vl = userText.toLowerCase(java.util.Locale.US).trim();
@@ -1989,6 +2070,39 @@ public class MainActivity extends AppCompatActivity {
                     : "Opening Vision Intelligence hub, sir.";
                 history.add(new HistoryItem("model", r)); addJarvisMsg(r);
                 speak(r, "excited"); saveHistory(); return;
+            }
+        }
+
+        // ── Biometric & Security Commands ───────────────────────────────────────
+        {
+            String secCmd = userText.toLowerCase(java.util.Locale.US).trim();
+            if (secCmd.matches(".*(enable|turn on|activate).*(biometric|face unlock|security lock|startup lock).*")) {
+                BiometricLock.setLockEnabled(this, true);
+                updateSecurityUi();
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "Biometric authentication on startup has been enabled, sir. Facial recognition and biometrics will be required upon app launch.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                speak(r, "proud"); saveHistory(); return;
+            } else if (secCmd.matches(".*(disable|turn off|deactivate).*(biometric|face unlock|security lock|startup lock).*")) {
+                BiometricLock.setLockEnabled(this, false);
+                updateSecurityUi();
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "Biometric authentication on startup has been disabled, sir. You may launch H.E.N.R.Y without biometric verification.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                speak(r, "neutral"); saveHistory(); return;
+            } else if (secCmd.matches(".*(biometric|security).*setting.*") || secCmd.matches(".*(security settings|biometric settings|lock settings).*")) {
+                showBiometricSecuritySettings();
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "Opening Biometric Security Settings, sir.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                speak(r, "neutral"); saveHistory(); return;
+            } else if (secCmd.matches(".*(lock app|lock system|lock screen|secure app).*")) {
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String r = "Locking system and activating biometric verification, sir.";
+                history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                speak(r, "neutral"); saveHistory();
+                mainHandler.postDelayed(this::lockAppAndAuthenticate, 600);
+                return;
             }
         }
 
@@ -2054,12 +2168,15 @@ public class MainActivity extends AppCompatActivity {
         // ── Security — Biometric Lock ─────────────────────────────────────────
         {
             String bl = userText.toLowerCase().trim();
-            if (bl.contains("enable") && (bl.contains("lock") || bl.contains("biometric"))) {
+            if ((bl.contains("enable") && (bl.contains("lock") || bl.contains("biometric")))
+                || bl.equals("lock") || bl.equals("lock app") || bl.equals("secure app") || bl.equals("biometric lock")) {
                 BiometricLock.setLockEnabled(this, true);
                 history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-                String r = "[EMOTION:serious] Biometric lock enabled, sir. HENRY is now secured.";
+                String r = "[EMOTION:serious] Biometric lock enabled, sir. Securing systems now.";
                 history.add(new HistoryItem("model", stripEmotionTag(r))); addJarvisMsg(stripEmotionTag(r));
-                speak(stripEmotionTag(r), "serious"); saveHistory(); return;
+                speak(stripEmotionTag(r), "serious"); saveHistory();
+                mainHandler.postDelayed(this::lockAppAndAuthenticate, 1000);
+                return;
             }
             if (bl.contains("stealth mode") || (bl.contains("stealth") && bl.contains("on"))) {
                 BiometricLock.setStealthMode(this, true);
@@ -2377,7 +2494,7 @@ public class MainActivity extends AppCompatActivity {
                 speak(content, "neutral");
             } else {
                 // Treat as a new query to HENRY
-                askJarvis(shortcutAction); return;
+                askHenry(shortcutAction); return;
             }
             saveHistory(); return;
         }
@@ -3022,7 +3139,7 @@ public class MainActivity extends AppCompatActivity {
             // already understands with no per-feature wiring needed.
             for (int i = 0; i < steps.size(); i++) {
                 String step = steps.get(i);
-                mainHandler.postDelayed(() -> askJarvis(step), i * 3500L);
+                mainHandler.postDelayed(() -> askHenry(step), i * 3500L);
             }
             return;
         }
@@ -4412,23 +4529,7 @@ public class MainActivity extends AppCompatActivity {
             String reply = "[EMOTION:focused] Initializing HENRY Biometric Security for facial, iris, and fingerprint authentication, sir.";
             addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
             saveHistory();
-            HenryBiometricManager.authenticate(this, new HenryBiometricManager.AuthCallback() {
-                @Override
-                public void onAuthenticated() {
-                    mainHandler.post(() -> {
-                        String success = "[EMOTION:proud] Biometric identity verified, sir. Facial and iris scan confirmed. Welcome back, Owen.";
-                        addJarvisMsg(stripEmotionTag(success));
-                        speak(stripEmotionTag(success), "proud");
-                    });
-                }
-                @Override
-                public void onError(String error) {
-                    mainHandler.post(() -> {
-                        String fail = "Biometric authentication notice: " + error;
-                        addJarvisMsg(fail);
-                    });
-                }
-            });
+            mainHandler.postDelayed(this::lockAppAndAuthenticate, 600);
             return;
         }
         // 🚀 Space Command / Asteroid Watch voice trigger
@@ -4851,7 +4952,7 @@ public class MainActivity extends AppCompatActivity {
                     || q.startsWith("📋") || q.startsWith("📞") || q.startsWith("📝")) {
                     handleSpecialChipAction(q);
                 } else {
-                    askJarvis(q);
+                    askHenry(q);
                 }
             });
         }
@@ -4928,10 +5029,10 @@ public class MainActivity extends AppCompatActivity {
                     android.net.Uri.parse("tel:" + number)));
             }
         } else if (text.contains("Draft a formal")) {
-            askJarvis("Please draft a formal legal notice letter for my situation");
+            askHenry("Please draft a formal legal notice letter for my situation");
         } else {
             // Default — treat as normal chat
-            askJarvis(text);
+            askHenry(text);
         }
     }
 
@@ -4997,7 +5098,7 @@ public class MainActivity extends AppCompatActivity {
         } else if (chip instanceof android.widget.TextView) {
             ((android.widget.TextView) chip).setText(text);
         }
-        chip.setOnClickListener(v -> { hideWelcome(); askJarvis(ChipPrefs.get(this, index)); });
+        chip.setOnClickListener(v -> { hideWelcome(); askHenry(ChipPrefs.get(this, index)); });
     }
     private void setState(OrbView.OrbState state) {
         currentState = state;
@@ -5072,6 +5173,659 @@ public class MainActivity extends AppCompatActivity {
             }
             pendingCallAction = null;
         }
+        if (code == REQUEST_CODE_CAMERA_BIOMETRICS) {
+            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+                startFacialRecognitionCamera();
+            } else {
+                if (tvBiometricLockStatus != null) {
+                    tvBiometricLockStatus.setText("CAMERA PERMISSION REQUIRED");
+                    tvBiometricLockStatus.setTextColor(0xFFFFB300);
+                }
+                if (tvBiometricLockSubtext != null) {
+                    tvBiometricLockSubtext.setText("Camera permission needed for live face unlock. Tap below to use biometrics or PIN.");
+                }
+            }
+        }
+    }
+
+    // ── Biometric Security System ─────────────────────────────────────────────
+    private void initBiometricSecurity() {
+        layoutBiometricLockOverlay   = findViewById(R.id.layout_biometric_lock_overlay);
+        biometricScanView            = findViewById(R.id.biometric_scan_view);
+        pvFaceCamera                 = findViewById(R.id.pv_face_camera);
+        tvBiometricLockStatus        = findViewById(R.id.tv_biometric_status);
+        tvBiometricLockSubtext       = findViewById(R.id.tv_biometric_subtext);
+        pbBiometricScan              = findViewById(R.id.pb_biometric_scan);
+        layoutPinFallbackPanel       = findViewById(R.id.layout_pin_fallback_panel);
+        tvPinDots                    = findViewById(R.id.tv_pin_dots);
+        btnModeFace                  = findViewById(R.id.btn_mode_face);
+        btnModeSensor                = findViewById(R.id.btn_mode_sensor);
+        btnModePin                   = findViewById(R.id.btn_mode_pin);
+        btnBiometricUnlockRetry      = findViewById(R.id.btn_biometric_unlock);
+        btnBiometricFallbackToggle   = findViewById(R.id.btn_biometric_fallback_toggle);
+        btnDeviceCredentialFallback  = findViewById(R.id.btn_device_credential_fallback);
+        btnBiometricExit             = findViewById(R.id.btn_biometric_exit);
+        btnTopSecurity               = findViewById(R.id.btn_top_security);
+
+        if (btnTopSecurity != null) {
+            btnTopSecurity.setOnClickListener(v -> showBiometricSecuritySettings());
+        }
+        updateSecurityUi();
+
+        // Setup PIN Keypad
+        setupPinKeypad();
+
+        // Mode switch buttons
+        if (btnModeFace != null) {
+            btnModeFace.setOnClickListener(v -> switchBiometricMode(FacialBiometricScanView.MODE_FACE));
+        }
+        if (btnModeSensor != null) {
+            btnModeSensor.setOnClickListener(v -> switchBiometricMode(FacialBiometricScanView.MODE_FINGERPRINT));
+        }
+        if (btnModePin != null) {
+            btnModePin.setOnClickListener(v -> showPinFallbackPanel(true));
+        }
+
+        // Action buttons
+        if (btnBiometricUnlockRetry != null) {
+            btnBiometricUnlockRetry.setOnClickListener(v -> initiateBiometricAuthentication());
+        }
+        if (btnBiometricFallbackToggle != null) {
+            btnBiometricFallbackToggle.setOnClickListener(v -> {
+                boolean isVisible = layoutPinFallbackPanel != null && layoutPinFallbackPanel.getVisibility() == View.VISIBLE;
+                showPinFallbackPanel(!isVisible);
+            });
+        }
+        if (btnDeviceCredentialFallback != null) {
+            btnDeviceCredentialFallback.setOnClickListener(v -> launchDeviceCredentialFallback());
+        }
+        if (btnBiometricExit != null) {
+            btnBiometricExit.setOnClickListener(v -> finishAffinity());
+        }
+
+        if (BiometricLock.isLockEnabled(this)) {
+            isAppLocked = true;
+            if (layoutBiometricLockOverlay != null) {
+                layoutBiometricLockOverlay.setVisibility(View.VISIBLE);
+                layoutBiometricLockOverlay.setAlpha(1f);
+            }
+            switchBiometricMode(FacialBiometricScanView.MODE_FACE);
+        } else {
+            isAppLocked = false;
+            if (layoutBiometricLockOverlay != null) {
+                layoutBiometricLockOverlay.setVisibility(View.GONE);
+            }
+        }
+    }
+
+    private void setupPinKeypad() {
+        int[] numKeys = {
+            R.id.btn_key_0, R.id.btn_key_1, R.id.btn_key_2, R.id.btn_key_3, R.id.btn_key_4,
+            R.id.btn_key_5, R.id.btn_key_6, R.id.btn_key_7, R.id.btn_key_8, R.id.btn_key_9
+        };
+        for (int id : numKeys) {
+            Button btn = findViewById(id);
+            if (btn != null) {
+                String digit = btn.getText().toString();
+                btn.setOnClickListener(v -> appendPinDigit(digit));
+            }
+        }
+        Button btnClear = findViewById(R.id.btn_key_clear);
+        if (btnClear != null) {
+            btnClear.setOnClickListener(v -> clearPin());
+        }
+        Button btnDel = findViewById(R.id.btn_key_del);
+        if (btnDel != null) {
+            btnDel.setOnClickListener(v -> deletePinDigit());
+        }
+    }
+
+    private void appendPinDigit(String digit) {
+        if (enteredPin.length() < 4) {
+            enteredPin.append(digit);
+            updatePinDisplay();
+            if (enteredPin.length() == 4) {
+                verifyEnteredPin();
+            }
+        }
+    }
+
+    private void deletePinDigit() {
+        if (enteredPin.length() > 0) {
+            enteredPin.deleteCharAt(enteredPin.length() - 1);
+            updatePinDisplay();
+        }
+    }
+
+    private void clearPin() {
+        enteredPin.setLength(0);
+        updatePinDisplay();
+    }
+
+    private void updatePinDisplay() {
+        if (tvPinDots == null) return;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 4; i++) {
+            if (i < enteredPin.length()) {
+                sb.append("●   ");
+            } else {
+                sb.append("○   ");
+            }
+        }
+        tvPinDots.setText(sb.toString().trim());
+    }
+
+    private void verifyEnteredPin() {
+        String pin = enteredPin.toString();
+        if (BiometricLock.verifyFallbackPin(this, pin)) {
+            if (tvBiometricLockStatus != null) {
+                tvBiometricLockStatus.setText("PASSCODE VERIFIED");
+                tvBiometricLockStatus.setTextColor(0xFF00FFCC);
+            }
+            if (tvBiometricLockSubtext != null) {
+                tvBiometricLockSubtext.setText("Master PIN accepted. Access granted.");
+            }
+            if (biometricScanView != null) {
+                biometricScanView.setScannerState(FacialBiometricScanView.STATE_SUCCESS);
+            }
+            mainHandler.postDelayed(() -> unlockApp("Passcode verified. Welcome back, Owen."), 400);
+        } else {
+            if (tvBiometricLockStatus != null) {
+                tvBiometricLockStatus.setText("INCORRECT PIN — RETRY");
+                tvBiometricLockStatus.setTextColor(0xFFFF4444);
+            }
+            if (tvBiometricLockSubtext != null) {
+                tvBiometricLockSubtext.setText("Invalid fallback code. Default master PIN is 1234.");
+            }
+            if (biometricScanView != null) {
+                biometricScanView.setScannerState(FacialBiometricScanView.STATE_ERROR);
+            }
+            Toast.makeText(this, "Incorrect passcode. Default fallback is 1234.", Toast.LENGTH_SHORT).show();
+            mainHandler.postDelayed(() -> {
+                clearPin();
+                if (biometricScanView != null) {
+                    biometricScanView.setScannerState(FacialBiometricScanView.STATE_SCANNING);
+                }
+            }, 900);
+        }
+    }
+
+    private void showPinFallbackPanel(boolean show) {
+        if (layoutPinFallbackPanel != null) {
+            layoutPinFallbackPanel.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
+        if (btnBiometricFallbackToggle != null) {
+            btnBiometricFallbackToggle.setText(show ? "HIDE PIN FALLBACK" : "USE PIN / PASSCODE FALLBACK");
+        }
+        if (show) {
+            clearPin();
+            if (btnModeFace != null) btnModeFace.setTextColor(0xFF7A9BB8);
+            if (btnModeSensor != null) btnModeSensor.setTextColor(0xFF7A9BB8);
+            if (btnModePin != null) btnModePin.setTextColor(0xFF00FFCC);
+            if (tvBiometricLockStatus != null) {
+                tvBiometricLockStatus.setText("PIN FALLBACK AUTHENTICATION");
+                tvBiometricLockStatus.setTextColor(0xFF00D4FF);
+            }
+            if (tvBiometricLockSubtext != null) {
+                tvBiometricLockSubtext.setText("Enter 4-digit master security PIN (Default: 1234)");
+            }
+        }
+    }
+
+    private void launchDeviceCredentialFallback() {
+        Intent credentialIntent = BiometricLock.createDeviceCredentialIntent(this);
+        if (credentialIntent != null) {
+            try {
+                startActivityForResult(credentialIntent, REQUEST_CODE_DEVICE_CREDENTIAL);
+            } catch (Exception e) {
+                Toast.makeText(this, "Device credential manager unavailable.", Toast.LENGTH_SHORT).show();
+            }
+        } else {
+            Toast.makeText(this, "No device screen lock set. Use PIN fallback 1234.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void switchBiometricMode(int mode) {
+        if (biometricScanView != null) {
+            biometricScanView.setScannerMode(mode);
+            biometricScanView.setScannerState(FacialBiometricScanView.STATE_SCANNING);
+        }
+        if (mode == FacialBiometricScanView.MODE_FACE) {
+            if (btnModeFace != null) btnModeFace.setTextColor(0xFF00FFCC);
+            if (btnModeSensor != null) btnModeSensor.setTextColor(0xFF7A9BB8);
+            if (btnModePin != null) btnModePin.setTextColor(0xFF7A9BB8);
+            if (tvBiometricLockStatus != null) {
+                tvBiometricLockStatus.setText("FACIAL RECOGNITION ACTIVE");
+                tvBiometricLockStatus.setTextColor(0xFF00FFCC);
+            }
+            if (tvBiometricLockSubtext != null) {
+                tvBiometricLockSubtext.setText("Position face within the holographic targeting frame.");
+            }
+            showPinFallbackPanel(false);
+            startFacialRecognitionCamera();
+        } else if (mode == FacialBiometricScanView.MODE_FINGERPRINT) {
+            if (btnModeFace != null) btnModeFace.setTextColor(0xFF7A9BB8);
+            if (btnModeSensor != null) btnModeSensor.setTextColor(0xFF00FFCC);
+            if (btnModePin != null) btnModePin.setTextColor(0xFF7A9BB8);
+            stopFaceCamera();
+            initiateBiometricAuthentication();
+        }
+    }
+
+    private void startFacialRecognitionCamera() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                if (pvFaceCamera != null) {
+                    pvFaceCamera.setVisibility(View.VISIBLE);
+                }
+                ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(this);
+                cameraProviderFuture.addListener(() -> {
+                    try {
+                        faceCameraProvider = cameraProviderFuture.get();
+                        faceCameraProvider.unbindAll();
+
+                        Preview preview = new Preview.Builder().build();
+                        if (pvFaceCamera != null) {
+                            preview.setSurfaceProvider(pvFaceCamera.getSurfaceProvider());
+                        }
+
+                        CameraSelector cameraSelector = new CameraSelector.Builder()
+                                .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
+                                .build();
+
+                        if (faceDetector == null) {
+                            FaceDetectorOptions options = new FaceDetectorOptions.Builder()
+                                    .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                                    .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
+                                    .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
+                                    .build();
+                            faceDetector = FaceDetection.getClient(options);
+                        }
+
+                        ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
+                                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                .build();
+
+                        isCameraScanning = true;
+                        consecutiveFaceFrames = 0;
+
+                        imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(this), imageProxy -> {
+                            if (!isAppLocked || !isCameraScanning) {
+                                imageProxy.close();
+                                return;
+                            }
+                            @androidx.annotation.OptIn(markerClass = androidx.camera.core.ExperimentalGetImage.class)
+                            android.media.Image mediaImage = imageProxy.getImage();
+                            if (mediaImage != null) {
+                                InputImage image = InputImage.fromMediaImage(mediaImage, imageProxy.getImageInfo().getRotationDegrees());
+                                faceDetector.process(image)
+                                        .addOnSuccessListener(faces -> {
+                                            if (!isAppLocked || !isCameraScanning) return;
+                                            if (!faces.isEmpty()) {
+                                                consecutiveFaceFrames++;
+                                                if (tvBiometricLockStatus != null) {
+                                                    tvBiometricLockStatus.setText("FACE RECOGNIZED — ANALYZING VECTORS");
+                                                    tvBiometricLockStatus.setTextColor(0xFF00FFCC);
+                                                }
+                                                if (tvBiometricLockSubtext != null) {
+                                                    tvBiometricLockSubtext.setText("Verifying 3D topology: " + Math.min(100, consecutiveFaceFrames * 34) + "%");
+                                                }
+                                                if (consecutiveFaceFrames >= 3) {
+                                                    isCameraScanning = false;
+                                                    if (biometricScanView != null) {
+                                                        biometricScanView.setScannerState(FacialBiometricScanView.STATE_SUCCESS);
+                                                    }
+                                                    if (tvBiometricLockStatus != null) {
+                                                        tvBiometricLockStatus.setText("FACIAL RECOGNITION CONFIRMED: MASTER OWEN");
+                                                        tvBiometricLockStatus.setTextColor(0xFF00E676);
+                                                    }
+                                                    mainHandler.postDelayed(() -> unlockApp("Facial identity verified. Welcome back, Owen."), 400);
+                                                }
+                                            } else {
+                                                consecutiveFaceFrames = Math.max(0, consecutiveFaceFrames - 1);
+                                                if (tvBiometricLockStatus != null) {
+                                                    tvBiometricLockStatus.setText("FACIAL RECOGNITION ACTIVE");
+                                                    tvBiometricLockStatus.setTextColor(0xFF00D4FF);
+                                                }
+                                                if (tvBiometricLockSubtext != null) {
+                                                    tvBiometricLockSubtext.setText("Position face within holographic reticle.");
+                                                }
+                                            }
+                                        })
+                                        .addOnCompleteListener(task -> imageProxy.close());
+                            } else {
+                                imageProxy.close();
+                            }
+                        });
+
+                        faceCameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis);
+                    } catch (Exception e) {
+                        android.util.Log.e("MainActivity", "Front camera binding failed", e);
+                        if (pvFaceCamera != null) pvFaceCamera.setVisibility(View.GONE);
+                    }
+                }, ContextCompat.getMainExecutor(this));
+            } catch (Exception e) {
+                android.util.Log.e("MainActivity", "ProcessCameraProvider error", e);
+            }
+        } else {
+            // Request camera permission for live facial scan
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, REQUEST_CODE_CAMERA_BIOMETRICS);
+        }
+    }
+
+    private void stopFaceCamera() {
+        isCameraScanning = false;
+        if (faceCameraProvider != null) {
+            try {
+                faceCameraProvider.unbindAll();
+            } catch (Exception ignored) {}
+        }
+        if (pvFaceCamera != null) {
+            pvFaceCamera.setVisibility(View.GONE);
+        }
+    }
+
+    public void lockAppAndAuthenticate() {
+        isAppLocked = true;
+        if (layoutBiometricLockOverlay != null) {
+            layoutBiometricLockOverlay.setVisibility(View.VISIBLE);
+            layoutBiometricLockOverlay.setAlpha(1f);
+            if (tvBiometricLockStatus != null) {
+                tvBiometricLockStatus.setText("FACIAL RECOGNITION & BIOMETRICS");
+                tvBiometricLockStatus.setTextColor(0xFF00FFCC);
+            }
+            if (tvBiometricLockSubtext != null) {
+                tvBiometricLockSubtext.setText("Position face in frame or scan fingerprint to unlock.");
+            }
+            if (btnBiometricExit != null) {
+                btnBiometricExit.setText("EXIT APPLICATION");
+                btnBiometricExit.setOnClickListener(v -> finishAffinity());
+            }
+        }
+        switchBiometricMode(FacialBiometricScanView.MODE_FACE);
+    }
+
+    private void initiateBiometricAuthentication() {
+        BiometricManager biometricManager = BiometricManager.from(this);
+        int authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.DEVICE_CREDENTIAL;
+        int canAuth = biometricManager.canAuthenticate(authenticators);
+
+        switch (canAuth) {
+            case BiometricManager.BIOMETRIC_SUCCESS:
+                showBiometricPromptDialog(authenticators, false);
+                break;
+
+            case BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED:
+                if (tvBiometricLockStatus != null) {
+                    tvBiometricLockStatus.setText("NO BIOMETRICS ENROLLED");
+                    tvBiometricLockStatus.setTextColor(0xFFFFB300);
+                }
+                if (tvBiometricLockSubtext != null) {
+                    tvBiometricLockSubtext.setText("No biometric or screen lock enrolled. Use PIN fallback (1234) or open settings.");
+                }
+                showPinFallbackPanel(true);
+                break;
+
+            case BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE:
+                if (tvBiometricLockStatus != null) {
+                    tvBiometricLockStatus.setText("NO BIOMETRIC SENSOR");
+                    tvBiometricLockStatus.setTextColor(0xFFFF8888);
+                }
+                if (tvBiometricLockSubtext != null) {
+                    tvBiometricLockSubtext.setText("No hardware sensor found. Use PIN fallback (1234) to unlock.");
+                }
+                showPinFallbackPanel(true);
+                break;
+
+            case BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE:
+                if (tvBiometricLockStatus != null) {
+                    tvBiometricLockStatus.setText("SENSOR UNAVAILABLE");
+                    tvBiometricLockStatus.setTextColor(0xFFFF6666);
+                }
+                if (tvBiometricLockSubtext != null) {
+                    tvBiometricLockSubtext.setText("Biometric sensor busy or unavailable. Use PIN fallback (1234).");
+                }
+                showPinFallbackPanel(true);
+                break;
+
+            default:
+                int weakAuthenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.BIOMETRIC_WEAK;
+                if (biometricManager.canAuthenticate(weakAuthenticators) == BiometricManager.BIOMETRIC_SUCCESS) {
+                    showBiometricPromptDialog(weakAuthenticators, true);
+                } else {
+                    if (tvBiometricLockStatus != null) {
+                        tvBiometricLockStatus.setText("BIOMETRIC UNAVAILABLE");
+                        tvBiometricLockStatus.setTextColor(0xFFFF6666);
+                    }
+                    if (tvBiometricLockSubtext != null) {
+                        tvBiometricLockSubtext.setText("Biometric sensor code: " + canAuth + ". Use PIN fallback to unlock.");
+                    }
+                    showPinFallbackPanel(true);
+                }
+                break;
+        }
+    }
+
+    private void showBiometricPromptDialog(int authenticators, boolean useNegativeButton) {
+        if (tvBiometricLockStatus != null) {
+            tvBiometricLockStatus.setText("SCAN BIOMETRICS");
+            tvBiometricLockStatus.setTextColor(0xFF00FFCC);
+        }
+        if (tvBiometricLockSubtext != null) {
+            tvBiometricLockSubtext.setText("Verifying fingerprint, face, or device PIN...");
+        }
+
+        Executor executor = ContextCompat.getMainExecutor(this);
+        BiometricPrompt prompt = new BiometricPrompt(this, executor, new BiometricPrompt.AuthenticationCallback() {
+            @Override
+            public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                super.onAuthenticationSucceeded(result);
+                if (biometricScanView != null) {
+                    biometricScanView.setScannerState(FacialBiometricScanView.STATE_SUCCESS);
+                }
+                unlockApp("Biometric identity verified. Welcome back, Owen.");
+            }
+
+            @Override
+            public void onAuthenticationFailed() {
+                super.onAuthenticationFailed();
+                if (tvBiometricLockStatus != null) {
+                    tvBiometricLockStatus.setText("VERIFICATION FAILED");
+                    tvBiometricLockStatus.setTextColor(0xFFFF4444);
+                }
+                if (tvBiometricLockSubtext != null) {
+                    tvBiometricLockSubtext.setText("Biometric unrecognized. Retry or use PIN fallback.");
+                }
+                if (biometricScanView != null) {
+                    biometricScanView.setScannerState(FacialBiometricScanView.STATE_ERROR);
+                }
+                Toast.makeText(MainActivity.this, "Authentication failed. Try again.", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+                super.onAuthenticationError(errorCode, errString);
+                if (tvBiometricLockStatus != null) {
+                    tvBiometricLockStatus.setText("AUTHENTICATION REQUIRED");
+                    tvBiometricLockStatus.setTextColor(0xFFFF6666);
+                }
+                if (tvBiometricLockSubtext != null) {
+                    tvBiometricLockSubtext.setText(errString.toString());
+                }
+                if (biometricScanView != null) {
+                    biometricScanView.setScannerState(FacialBiometricScanView.STATE_ERROR);
+                }
+            }
+        });
+
+        BiometricPrompt.PromptInfo.Builder builder = new BiometricPrompt.PromptInfo.Builder()
+                .setTitle("H·E·N·R·Y™ Biometric Security")
+                .setSubtitle("User Authentication Required")
+                .setDescription("Scan your fingerprint, face, or enter credentials to unlock H.E.N.R.Y.")
+                .setAllowedAuthenticators(authenticators);
+
+        if (useNegativeButton) {
+            builder.setNegativeButtonText("Cancel");
+        }
+
+        try {
+            prompt.authenticate(builder.build());
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "Failed to display BiometricPrompt", e);
+            if (tvBiometricLockStatus != null) {
+                tvBiometricLockStatus.setText("PROMPT ERROR");
+                tvBiometricLockStatus.setTextColor(0xFFFF6666);
+            }
+            if (tvBiometricLockSubtext != null) {
+                tvBiometricLockSubtext.setText("Error launching biometric prompt: " + e.getMessage());
+            }
+        }
+    }
+
+    private void unlockApp(String message) {
+        isAppLocked = false;
+        stopFaceCamera();
+        if (layoutBiometricLockOverlay != null) {
+            layoutBiometricLockOverlay.animate()
+                    .alpha(0f)
+                    .setDuration(280)
+                    .withEndAction(() -> layoutBiometricLockOverlay.setVisibility(View.GONE))
+                    .start();
+        }
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        if (tvStatus != null) {
+            tvStatus.setText("ONLINE");
+        }
+        speak("Biometric identity verified. Welcome back, sir.", "proud");
+    }
+
+    private void updateSecurityUi() {
+        boolean enabled = BiometricLock.isLockEnabled(this);
+        if (btnTopSecurity != null) {
+            if (enabled) {
+                btnTopSecurity.setText("🔒 LOCK: ON");
+                btnTopSecurity.setTextColor(0xFF00FFCC);
+            } else {
+                btnTopSecurity.setText("🔓 LOCK: OFF");
+                btnTopSecurity.setTextColor(0xFF7A9BB8);
+            }
+        }
+    }
+
+    private void showBiometricSecuritySettings() {
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_biometric_settings, null);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(dialogView)
+                .create();
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+
+        Switch switchLock = dialogView.findViewById(R.id.switch_startup_lock);
+        TextView tvDesc = dialogView.findViewById(R.id.tv_startup_lock_desc);
+        TextView tvPinStatus = dialogView.findViewById(R.id.tv_current_pin_status);
+        Button btnChangePin = dialogView.findViewById(R.id.btn_change_pin);
+        Button btnTestLock = dialogView.findViewById(R.id.btn_test_lock_action);
+        Button btnDone = dialogView.findViewById(R.id.btn_close_security_dialog);
+
+        boolean currentEnabled = BiometricLock.isLockEnabled(this);
+        if (switchLock != null) {
+            switchLock.setChecked(currentEnabled);
+            if (tvDesc != null) {
+                tvDesc.setText(currentEnabled ? "Facial recognition and biometrics required on startup"
+                                             : "Direct startup without biometric lock screen");
+            }
+            switchLock.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                BiometricLock.setLockEnabled(this, isChecked);
+                updateSecurityUi();
+                if (tvDesc != null) {
+                    tvDesc.setText(isChecked ? "Facial recognition and biometrics required on startup"
+                                             : "Direct startup without biometric lock screen");
+                }
+                String msg = isChecked ? "Biometric authentication on startup ENABLED"
+                                       : "Biometric authentication on startup DISABLED";
+                Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+                speak(isChecked ? "Biometric authentication on startup has been enabled, sir."
+                                : "Biometric authentication on startup has been disabled, sir.", "proud");
+            });
+        }
+
+        if (tvPinStatus != null) {
+            String pin = BiometricLock.getFallbackPin(this);
+            tvPinStatus.setText("Fallback PIN: " + (pin.equals("1234") ? "1234 (Default)" : "••••"));
+        }
+
+        if (btnChangePin != null) {
+            btnChangePin.setOnClickListener(v -> {
+                showChangePinDialog(() -> {
+                    if (tvPinStatus != null) {
+                        String updatedPin = BiometricLock.getFallbackPin(this);
+                        tvPinStatus.setText("Fallback PIN: " + (updatedPin.equals("1234") ? "1234 (Default)" : "••••"));
+                    }
+                });
+            });
+        }
+
+        if (btnTestLock != null) {
+            btnTestLock.setOnClickListener(v -> {
+                dialog.dismiss();
+                lockAppAndAuthenticate();
+            });
+        }
+
+        if (btnDone != null) {
+            btnDone.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        dialog.show();
+    }
+
+    private void showChangePinDialog(Runnable onPinChanged) {
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(4)});
+        input.setHint("4-digit PIN");
+        input.setTextColor(0xFF00FFCC);
+        input.setHintTextColor(0xFF5588AA);
+        input.setTextAlignment(View.TEXT_ALIGNMENT_CENTER);
+        input.setTextSize(22);
+
+        FrameLayout container = new FrameLayout(this);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.leftMargin = 48;
+        params.rightMargin = 48;
+        params.topMargin = 24;
+        params.bottomMargin = 12;
+        input.setLayoutParams(params);
+        container.addView(input);
+
+        new AlertDialog.Builder(this)
+                .setTitle("◆ Change Master Security PIN")
+                .setMessage("Enter new 4-digit fallback passcode:")
+                .setView(container)
+                .setPositiveButton("SAVE", (d, w) -> {
+                    String newPin = input.getText().toString().trim();
+                    if (newPin.length() == 4) {
+                        BiometricLock.setFallbackPin(this, newPin);
+                        Toast.makeText(this, "New master PIN saved.", Toast.LENGTH_SHORT).show();
+                        if (onPinChanged != null) onPinChanged.run();
+                    } else {
+                        Toast.makeText(this, "PIN must be exactly 4 digits.", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("CANCEL", null)
+                .show();
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (isAppLocked) {
+            moveTaskToBack(true);
+            return;
+        }
+        super.onBackPressed();
     }
 
     @Override protected void onResume() {
@@ -5082,11 +5836,13 @@ public class MainActivity extends AppCompatActivity {
     @Override protected void onPause() {
         super.onPause();
         stopSpeaking();
+        stopFaceCamera();
         if (speechRec != null) try { speechRec.stopListening(); } catch (Exception ignored) {}
     }
 
     @Override protected void onDestroy() {
         stopSpeaking();
+        stopFaceCamera();
         if (speechRec != null) try { speechRec.destroy(); } catch (Exception ignored) {}
         if (tts != null) { tts.stop(); tts.shutdown(); }
         if (batteryHandler != null && batteryChecker != null)

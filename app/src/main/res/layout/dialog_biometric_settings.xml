@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#0A1424"
+    android:padding="20dp">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="12dp">
+
+        <ImageView
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:src="@drawable/ic_biometric_lock"
+            android:contentDescription="Biometric Security"
+            app:tint="#00FFCC"/>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginStart="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="BIOMETRIC SECURITY"
+                android:textColor="#00FFCC"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.12"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="STARTUP AUTHENTICATION PROTOCOLS"
+                android:textColor="#7A9BB8"
+                android:textSize="9sp"
+                android:letterSpacing="0.08"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#1B3A5A"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- Startup Lock Toggle Row -->
+    <LinearLayout
+        android:id="@+id/row_startup_lock"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_biometric_card"
+        android:padding="14dp"
+        android:layout_marginBottom="12dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Require Biometric on Startup"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/tv_startup_lock_desc"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Scan face or biometrics every time the app launches"
+                android:textColor="#7A9BB8"
+                android:textSize="11sp"
+                android:layout_marginTop="2dp"/>
+        </LinearLayout>
+
+        <Switch
+            android:id="@+id/switch_startup_lock"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"/>
+    </LinearLayout>
+
+    <!-- Master PIN Fallback Row -->
+    <LinearLayout
+        android:id="@+id/row_master_pin"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_biometric_card"
+        android:padding="14dp"
+        android:layout_marginBottom="12dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Master Security PIN"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:id="@+id/tv_current_pin_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Fallback PIN: ••••"
+                android:textColor="#7A9BB8"
+                android:textSize="11sp"
+                android:layout_marginTop="2dp"/>
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btn_change_pin"
+            style="@android:style/Widget.Material.Button.Borderless"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="CHANGE"
+            android:textColor="#00FFCC"
+            android:textSize="11sp"
+            android:background="@drawable/bg_chip"
+            android:paddingHorizontal="12dp"/>
+    </LinearLayout>
+
+    <!-- Test Lock Row -->
+    <LinearLayout
+        android:id="@+id/row_test_lock"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_biometric_card"
+        android:padding="14dp"
+        android:layout_marginBottom="18dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Test Facial Recognition Lock"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Lock H.E.N.R.Y now to test camera &amp; biometric scanner"
+                android:textColor="#7A9BB8"
+                android:textSize="11sp"
+                android:layout_marginTop="2dp"/>
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btn_test_lock_action"
+            style="@android:style/Widget.Material.Button.Borderless"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="LOCK NOW"
+            android:textColor="#00D4FF"
+            android:textSize="11sp"
+            android:background="@drawable/bg_chip"
+            android:paddingHorizontal="12dp"/>
+    </LinearLayout>
+
+    <!-- Close button -->
+    <Button
+        android:id="@+id/btn_close_security_dialog"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:text="DONE"
+        android:textColor="#050B14"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.1"
+        android:background="@drawable/bg_biometric_btn"/>
+
+</LinearLayout>

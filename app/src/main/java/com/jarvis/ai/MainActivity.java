@@ -4582,11 +4582,15 @@ public void onError(String error) {
             if (btnSend != null) {
                 btnSend.setEnabled(true);
             }
-            setState(OrbView.OrbState.IDLE);
-        }); // <-- 1. Closes mainHandler.post
-    }).start(); // <-- 2. Closes new Thread
-} // <-- 3. Closes public void onError
-                    }); // <-- 4. Closes the anonymous callback class and the surrounding method call!
+           setState(OrbView.OrbState.IDLE);
+        });         // 1. Closes mainHandler.post
+    }).start();     // 2. Closes new Thread
+}                   // 3. Closes public void onError
+});                 // 4. Closes new Callback() { ... }
+}                   // 5. Closes the method that started the callback
+
+private void handleContactCommand(String cmd, String userText) {
+private void handleContactCommand(String cmd, String userText) {
 
     // ── Contacts / Calls / SMS ────────────────────────────────────────────────
     private void handleContactCommand(String cmd, String userText) {

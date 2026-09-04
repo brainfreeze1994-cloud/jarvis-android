@@ -4555,43 +4555,39 @@ public class MainActivity extends AppCompatActivity {
                     updateMoodOrb();
                 });
             }
-          // Step 1: Right ABOVE 'public void onError(...)', declare the final copies:
-final String finalUserText = effectiveUserText;
-final String finalIntent = intentType;
 
-// Step 2: Ensure all 4 closing levels are present:
-@Override 
-public void onError(String error) {
-    mainHandler.post(() -> hideTyping());
+            @Override 
+            public void onError(String error) {
+                mainHandler.post(() -> hideTyping());
 
-    new Thread(() -> {
-        String offlineReply = HenryOfflineBrain.generateOfflineResponse(
-            finalUserText, 
-            finalIntent, 
-            MainActivity.this
-        );
+                new Thread(() -> {
+                    String offlineReply = HenryOfflineBrain.generateOfflineResponse(
+                        finalUserText, 
+                        finalIntent, 
+                        MainActivity.this
+                    );
 
-        String emotion = extractEmotion(offlineReply);
-        String cleanReply = stripEmotionTag(offlineReply);
+                    String emotion = extractEmotion(offlineReply);
+                    String cleanReply = stripEmotionTag(offlineReply);
 
-        mainHandler.post(() -> {
-            history.add(new HistoryItem("model", cleanReply));
-            addJarvisMsg(cleanReply);
-            speak(cleanReply, emotion);
-            saveHistory();
-            if (btnSend != null) {
-                btnSend.setEnabled(true);
+                    mainHandler.post(() -> {
+                        history.add(new HistoryItem("model", cleanReply));
+                        addJarvisMsg(cleanReply);
+                        speak(cleanReply, emotion);
+                        saveHistory();
+                        if (btnSend != null) {
+                            btnSend.setEnabled(true);
+                        }
+                        setState(OrbView.OrbState.IDLE);
+                    });
+                }).start();
             }
-           setState(OrbView.OrbState.IDLE);
-        });         // 1. Closes mainHandler.post
-    }).start();     // 2. Closes new Thread
-}                   // 3. Closes public void onError
-});                 // 4. Closes new Callback() { ... }
-}                   // 5. Closes the method that started the callback
+        });
+    }
 
-private void handleContactCommand(String cmd, String userText) {
-
-
+    // ── Contacts / Calls / SMS ────────────────────────────────────────────────
+    private void handleContactCommand(String cmd, String userText) {
+        // ... (body of handleContactCommand)
     // ── Contacts / Calls / SMS ────────────────────────────────────────────────
     private void handleContactCommand(String cmd, String userText) {
         history.add(new HistoryItem("user", userText));

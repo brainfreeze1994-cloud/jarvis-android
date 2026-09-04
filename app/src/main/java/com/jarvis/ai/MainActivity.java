@@ -4614,6 +4614,9 @@ public class MainActivity extends AppCompatActivity {
         boolean useTournament = isImportantQuery(userText);
         boolean useChain      = isDeepReasoningQuery(userText);
 
+        final String offlineQueryText   = effectiveUserText;
+        final String offlineQueryIntent = intentType;
+
         JarvisApi.askV20(apiHistory, imageB64, responseMode, userProfile, intentType,
                 this, emotionStr, relCtx.isEmpty() ? null : relCtx,
                 useTournament, useChain,
@@ -4662,13 +4665,10 @@ public class MainActivity extends AppCompatActivity {
             public void onError(String error) {
                 mainHandler.post(() -> hideTyping());
 
-                final String finalUserText = effectiveUserText;
-                final String finalIntent = intentType;
-
                 new Thread(() -> {
                     String offlineReply = HenryOfflineBrain.generateOfflineResponse(
-                        finalUserText, 
-                        finalIntent, 
+                        offlineQueryText, 
+                        offlineQueryIntent, 
                         MainActivity.this
                     );
 

@@ -4663,8 +4663,8 @@ public class MainActivity extends AppCompatActivity {
 
                 new Thread(() -> {
                     String offlineReply = HenryOfflineBrain.generateOfflineResponse(
-                        finalUserText, 
-                        finalIntent, 
+                        effectiveUserText, 
+                        intentType, 
                         MainActivity.this
                     );
 
@@ -4686,9 +4686,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    // ── Contacts / Calls / SMS ────────────────────────────────────────────────
-    private void handleContactCommand(String cmd, String userText) {
-        // ... (body of handleContactCommand)
     // ── Contacts / Calls / SMS ────────────────────────────────────────────────
     private void handleContactCommand(String cmd, String userText) {
         history.add(new HistoryItem("user", userText));

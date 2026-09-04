@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="top"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp">
+
+    <TextView
+        android:id="@+id/tv_avatar"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:gravity="center"
+        android:text="HNR"
+        android:textColor="#00BEFF"
+        android:textSize="8sp"
+        android:letterSpacing="0.05"
+        android:fontFamily="sans-serif-medium"
+        android:background="@drawable/bg_avatar"
+        android:layout_marginEnd="8dp"/>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginEnd="8dp"
+        android:orientation="vertical"
+        android:background="@drawable/bg_file_card"
+        android:padding="14dp">
+
+        <!-- Top Header: Icon + Title + Badge -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tv_file_icon"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:gravity="center"
+                android:textSize="24sp"
+                android:text="📄"
+                android:background="#152744"
+                android:textColor="#FFFFFF"/>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="10dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_file_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="History_of_Earth.docx"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:maxLines="2"
+                    android:ellipsize="end"/>
+
+                <TextView
+                    android:id="@+id/tv_file_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="DOCX • 34 KB • Word Document"
+                    android:textColor="#00D2FF"
+                    android:textSize="11sp"
+                    android:fontFamily="sans-serif-medium"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#1B355A"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="10dp"/>
+
+        <!-- Details / Summary Text -->
+        <TextView
+            android:id="@+id/tv_file_details"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#C5DCEF"
+            android:textSize="13sp"
+            android:lineSpacingMultiplier="1.3"
+            android:text="Generated document with 8 detailed sections and APA 7th Edition references."/>
+
+        <!-- Action Buttons Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="12dp">
+
+            <TextView
+                android:id="@+id/btn_open_file"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:background="@drawable/bg_file_btn"
+                android:text="OPEN FILE"
+                android:textColor="#0A192F"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.05"
+                android:clickable="true"
+                android:focusable="true"
+                android:layout_marginEnd="6dp"/>
+
+            <TextView
+                android:id="@+id/btn_share_file"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:background="@drawable/bg_file_btn_secondary"
+                android:text="SHARE"
+                android:textColor="#00D2FF"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.05"
+                android:clickable="true"
+                android:focusable="true"
+                android:layout_marginStart="6dp"/>
+        </LinearLayout>
+    </LinearLayout>
+
+</LinearLayout>

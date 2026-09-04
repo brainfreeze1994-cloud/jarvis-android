@@ -4270,6 +4270,75 @@ public class MainActivity extends AppCompatActivity {
             speak(clean, extractEmotion(reply)); saveHistory(); return;
         }
 
+        // ── [v18] H.E.N.R.Y. Document & File Creation Engine ─────────────────
+        if (HenryFileEngine.isCreationRequest(userText)) {
+            history.add(new HistoryItem("user", userText));
+            addUserMsg(userText);
+            saveHistory();
+
+            final HenryFileEngine.FileType fileType = HenryFileEngine.detectFileType(userText);
+            final String docTitle = HenryFileEngine.extractTitleAndTopic(userText);
+
+            String announce = "Engaging H.E.N.R.Y. Document Engine… Generating your **"
+                    + fileType.displayName + "** on **\"" + docTitle + "\"**.";
+            addJarvisMsg(announce);
+            speak("Generating your " + fileType.displayName + " on " + docTitle + " now, sir.", "excited");
+            setState(OrbView.OrbState.THINKING);
+
+            Bitmap userAttachedBmp = null;
+            if (pendingImageUriStr != null) {
+                try {
+                    userAttachedBmp = MediaStore.Images.Media.getBitmap(getContentResolver(), Uri.parse(pendingImageUriStr));
+                } catch (Exception ignored) {}
+            }
+            clearAttachment();
+
+            final String promptToProcess = userText;
+            HenryFileEngine.processCreationRequest(this, promptToProcess, userAttachedBmp, new HenryFileEngine.GenerationCallback() {
+                @Override
+                public void onProgress(String status) {
+                    // Ongoing generation
+                }
+
+                @Override
+                public void onSuccess(java.io.File file, HenryFileEngine.FileType type, String title, String summary, int referenceCount) {
+                    mainHandler.post(() -> {
+                        setState(OrbView.OrbState.IDLE);
+                        long sizeKb = file.length() / 1024;
+                        String sizeStr = sizeKb > 0 ? sizeKb + " KB" : file.length() + " B";
+                        String badge = type.name() + " • " + sizeStr + " • " + type.displayName;
+
+                        Message fileMsg = new Message(Message.TYPE_FILE_CARD, "Generated " + type.displayName + ": " + title,
+                                file.getAbsolutePath(), type.mimeType, file.getName(), summary, badge, type.icon);
+                        messages.add(fileMsg);
+                        adapter.notifyItemInserted(messages.size() - 1);
+                        scrollToBottom();
+
+                        String confirmText = "Your **" + type.displayName + "** titled **\"" + title + "\"** has been generated.\n\n"
+                                + summary;
+                        history.add(new HistoryItem("model", confirmText));
+                        saveHistory();
+
+                        speak("Your " + type.displayName + " is ready, sir."
+                                + (referenceCount > 0 ? " Complete with APA 7th Edition references." : ""), "proud");
+                    });
+                }
+
+                @Override
+                public void onError(String error) {
+                    mainHandler.post(() -> {
+                        setState(OrbView.OrbState.IDLE);
+                        String errMsg = "I encountered an issue generating your file: " + error;
+                        history.add(new HistoryItem("model", errMsg));
+                        addJarvisMsg(errMsg);
+                        speak("I encountered an issue generating your file, sir.", "concerned");
+                        saveHistory();
+                    });
+                }
+            });
+            return;
+        }
+
         // ── Google Workspace (Docs / Sheets / Slides) ─────────────────────────
         if (GoogleWorkspaceHelper.isDocCommand(userText)) {
             GoogleWorkspaceHelper.DocType docType = GoogleWorkspaceHelper.detectType(userText);

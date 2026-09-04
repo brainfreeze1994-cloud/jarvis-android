@@ -50,6 +50,7 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
             case Message.TYPE_USER:      layout = R.layout.item_message_user;      break;
             case Message.TYPE_IMAGE:     layout = R.layout.item_message_image;     break;
             case Message.TYPE_URL_IMAGE: layout = R.layout.item_message_url_image; break;
+            case Message.TYPE_FILE_CARD: layout = R.layout.item_message_file_card; break;
             default:                     layout = R.layout.item_message;           break;
         }
         View v = LayoutInflater.from(parent.getContext()).inflate(layout, parent, false);
@@ -164,6 +165,26 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
             return;
         }
 
+        if (m.type == Message.TYPE_FILE_CARD) {
+            if (h.tvFileIcon != null && m.fileIcon != null) h.tvFileIcon.setText(m.fileIcon);
+            if (h.tvFileTitle != null && m.fileTitle != null) h.tvFileTitle.setText(m.fileTitle);
+            if (h.tvFileBadge != null && m.fileBadge != null) h.tvFileBadge.setText(m.fileBadge);
+            if (h.tvFileDetails != null && m.fileDetails != null) h.tvFileDetails.setText(m.fileDetails);
+            if (h.tvAvatar != null) h.tvAvatar.setText("HNR");
+
+            if (h.btnOpenFile != null && m.filePath != null) {
+                h.btnOpenFile.setOnClickListener(v -> {
+                    HenryFileEngine.openFile(v.getContext(), new java.io.File(m.filePath), m.fileMimeType);
+                });
+            }
+            if (h.btnShareFile != null && m.filePath != null) {
+                h.btnShareFile.setOnClickListener(v -> {
+                    HenryFileEngine.shareFile(v.getContext(), new java.io.File(m.filePath), m.fileMimeType, m.fileTitle);
+                });
+            }
+            return;
+        }
+
         // Normal JARVIS or USER message — strip markdown for clean display
         if (h.tvMsg != null) {
             String displayText = (m.type == Message.TYPE_USER) ? m.text : stripMarkdown(m.text);
@@ -222,12 +243,23 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
         ImageView   ivImage;
         ProgressBar progressBar;
 
+        // File Card Views
+        TextView    tvFileIcon, tvFileTitle, tvFileBadge, tvFileDetails;
+        TextView    btnOpenFile, btnShareFile;
+
         MsgVH(View v) {
             super(v);
             tvMsg       = v.findViewById(R.id.tv_message);
             tvAvatar    = v.findViewById(R.id.tv_avatar);
             ivImage     = v.findViewById(R.id.iv_image);
             progressBar = v.findViewById(R.id.pb_loading);
+
+            tvFileIcon    = v.findViewById(R.id.tv_file_icon);
+            tvFileTitle   = v.findViewById(R.id.tv_file_title);
+            tvFileBadge   = v.findViewById(R.id.tv_file_badge);
+            tvFileDetails = v.findViewById(R.id.tv_file_details);
+            btnOpenFile   = v.findViewById(R.id.btn_open_file);
+            btnShareFile  = v.findViewById(R.id.btn_share_file);
         }
     }
 }

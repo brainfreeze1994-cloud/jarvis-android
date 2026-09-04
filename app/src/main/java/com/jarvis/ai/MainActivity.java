@@ -4555,27 +4555,35 @@ public class MainActivity extends AppCompatActivity {
                     updateMoodOrb();
                 });
             }
-            @Override public void onError(String error) {
-                mainHandler.post(() -> hideTyping()){;
-                  new Thread()) -> {
-                        String offlineReply = HenryOfflineBrain.generateOfflineResponse
-                            (finalEffectiveUserText, finalintentType, MainActivity.this);
-                      
-                    String emotion = extractEmotion(offlineReply);
-                      
-                    String CleanReply = StripEmotionTag(offlineReply);
+            @Override 
+public void onError(String error) {
+    mainHandler.post(() -> hideTyping());
 
-                   nainHandler.post(() -> {
-                        history.add(new HistoryItem("model", cleanReply));
-                        addJarvisMsg(cleanReply);
-                        speak(cleanReply, emotion);
-                        saveHistory();
-                        if (btnSend != null) btnSend.setEnabled(true);
-                        setState(OrbView.OrbState.IDLE);
-                });
+    new Thread(() -> {
+        // 1. Generate response in background thread using final variables
+        String offlineReply = HenryOfflineBrain.generateOfflineResponse(
+            finalUserText, 
+            finalIntent, 
+            MainActivity.this
+        );
+
+        // 2. Process reply (MUST be inside the thread so offlineReply is visible)
+        String emotion = extractEmotion(offlineReply);
+        String cleanReply = stripEmotionTag(offlineReply);
+
+        // 3. Post back to main UI thread
+        mainHandler.post(() -> {
+            history.add(new HistoryItem("model", cleanReply));
+            addJarvisMsg(cleanReply);
+            speak(cleanReply, emotion);
+            saveHistory();
+            if (btnSend != null) {
+                btnSend.setEnabled(true);
             }
+            setState(OrbView.OrbState.IDLE);
         });
-    }
+    }).start();
+}
 
     // ── Contacts / Calls / SMS ────────────────────────────────────────────────
     private void handleContactCommand(String cmd, String userText) {

@@ -4662,10 +4662,13 @@ public class MainActivity extends AppCompatActivity {
             public void onError(String error) {
                 mainHandler.post(() -> hideTyping());
 
+                final String finalUserText = effectiveUserText;
+                final String finalIntent = intentType;
+
                 new Thread(() -> {
                     String offlineReply = HenryOfflineBrain.generateOfflineResponse(
-                        effectiveUserText, 
-                        intentType, 
+                        finalUserText, 
+                        finalIntent, 
                         MainActivity.this
                     );
 

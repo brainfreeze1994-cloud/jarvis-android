@@ -1222,26 +1222,26 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
                 currentStructureData = data;
                 if (molecularVisualizer != null) {
                     molecularVisualizer.setVisibility(View.VISIBLE);
-                    molecularVisualizer.setStructureData(data);
+                    molecularVisualizer.setMolecularData(data);
                 }
 
                 if (tvPropGeometry != null) tvPropGeometry.setText(data.molecularGeometry);
                 if (tvPropElectronGeometry != null) tvPropElectronGeometry.setText(data.electronGeometry);
                 if (tvPropHybridization != null) tvPropHybridization.setText(data.hybridization);
                 if (tvPropBondAngle != null) tvPropBondAngle.setText(data.bondAngle);
-                if (tvPropPolarity != null) tvPropPolarity.setText(data.polarityDescription);
+                if (tvPropPolarity != null) tvPropPolarity.setText(data.polarityAnalysis != null ? data.polarityAnalysis : data.polarity);
                 if (tvPropWeight != null) tvPropWeight.setText(data.molecularWeight);
                 if (tvPropImf != null) tvPropImf.setText(data.intermolecularForces);
 
-                if (tvAnalysisVsepr != null) tvAnalysisVsepr.setText("VSEPR Theory: " + data.vseprJustification);
-                if (tvAnalysisBonding != null) tvAnalysisBonding.setText("Bonding Mechanism: " + data.bondingExplanation);
-                if (tvCompoundSafetyNotice != null) tvCompoundSafetyNotice.setText("⚠️ SYNTHESIS & SAFETY: " + data.safetyNotice);
+                if (tvAnalysisVsepr != null) tvAnalysisVsepr.setText("VSEPR Theory: " + data.geometryExplanation);
+                if (tvAnalysisBonding != null) tvAnalysisBonding.setText("Bonding Mechanism: " + data.bondFormationReason);
+                if (tvCompoundSafetyNotice != null) tvCompoundSafetyNotice.setText("⚠️ SYNTHESIS & SAFETY: " + data.synthesisSafetyDisclaimer);
 
                 // Populate Educational Q&A
                 if (educationalQaContainer != null) {
                     educationalQaContainer.removeAllViews();
                     if (data.educationalItems != null && !data.educationalItems.isEmpty()) {
-                        for (MolecularStructureData.EducationalQA qa : data.educationalItems) {
+                        for (MolecularStructureData.EducationalItem qa : data.educationalItems) {
                             LinearLayout card = new LinearLayout(this);
                             card.setOrientation(LinearLayout.VERTICAL);
                             card.setBackgroundColor(0x1800FFCC);
@@ -1270,7 +1270,7 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
                     }
                 }
             } else {
-                if (molecularVisualizer != null) molecularVisualizer.setStructureData(null);
+                if (molecularVisualizer != null) molecularVisualizer.setMolecularData(null);
             }
         } else if (selectedReactantElements.size() >= 2) {
             // Check accuracy engine for scientific unverified/non-bonding explanation
@@ -1281,7 +1281,7 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
             cardMixerResult.setVisibility(View.GONE);
             cardUnverifiedCompound.setVisibility(View.VISIBLE);
             tvUnverifiedReason.setText(unverifiedExp);
-            if (molecularVisualizer != null) molecularVisualizer.setStructureData(null);
+            if (molecularVisualizer != null) molecularVisualizer.setMolecularData(null);
             if (cardAtomInspector != null) cardAtomInspector.setVisibility(View.GONE);
         } else {
             cardMixerResult.setVisibility(View.VISIBLE);
@@ -1305,7 +1305,7 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
             if (tvAnalysisBonding != null) tvAnalysisBonding.setText("--");
             if (tvCompoundSafetyNotice != null) tvCompoundSafetyNotice.setText("⚠️ Awaiting chemical reactants in vessel.");
             if (educationalQaContainer != null) educationalQaContainer.removeAllViews();
-            if (molecularVisualizer != null) molecularVisualizer.setStructureData(null);
+            if (molecularVisualizer != null) molecularVisualizer.setMolecularData(null);
         }
     }
 

@@ -51,13 +51,25 @@ public class MolecularStructureData {
     public final String productSummary;
     public final String synthesisSafetyDisclaimer;
 
+    // Backwards-compatible aliases
+    public final String vseprJustification;
+    public final String bondingExplanation;
+    public final String polarityDescription;
+    public final String safetyNotice;
+
     // Educational Mode Pedagogical Insights
-    public static class EducationalItem {
+    public static class EducationalQA {
         public final String question;
         public final String answer;
-        public EducationalItem(String q, String a) {
+        public EducationalQA(String q, String a) {
             this.question = q;
             this.answer = a;
+        }
+    }
+
+    public static class EducationalItem extends EducationalQA {
+        public EducationalItem(String q, String a) {
+            super(q, a);
         }
     }
     public final List<EducationalItem> educationalItems = new ArrayList<>();
@@ -99,6 +111,11 @@ public class MolecularStructureData {
         this.bondRearrangementSummary = bondRearrangementSummary;
         this.productSummary = productSummary;
         this.synthesisSafetyDisclaimer = synthesisSafetyDisclaimer;
+
+        this.vseprJustification = geometryExplanation;
+        this.bondingExplanation = bondFormationReason;
+        this.polarityDescription = polarityAnalysis != null ? polarityAnalysis : polarity;
+        this.safetyNotice = synthesisSafetyDisclaimer;
     }
 
     public void addAtom(Atom3D atom) {

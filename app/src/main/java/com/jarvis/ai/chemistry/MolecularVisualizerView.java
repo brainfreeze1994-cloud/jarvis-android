@@ -201,8 +201,16 @@ public class MolecularVisualizerView extends View {
         invalidate();
     }
 
+    public void setStructureData(MolecularStructureData data) {
+        setMolecularData(data);
+    }
+
     public MolecularStructureData getMolecularData() {
         return currentMolecule;
+    }
+
+    public MolecularStructureData getStructureData() {
+        return getMolecularData();
     }
 
     public void setMode(int mode) {

@@ -160,6 +160,8 @@ public class MainActivity extends AppCompatActivity {
     private Uri    cameraImageUri;
     private String pendingImageBase64;
     private String pendingImageUriStr;
+    private final List<String> pendingImagesBase64 = new ArrayList<>();
+    private final List<Uri>    pendingImagesUris   = new ArrayList<>();
     private String pendingPdfText;      // PDF text waiting to be sent
     private String pendingDocScanQuestion; // question asked when scan launched
 
@@ -663,7 +665,9 @@ public class MainActivity extends AppCompatActivity {
     // ── Voice Picker / Settings ──────────────────────────────────────────────
     private void showVoicePicker() {
         String modeLbl = MODE_BRIEF.equals(responseMode) ? "Brief"
-                       : MODE_DETAILED.equals(responseMode) ? "Detailed" : "Balanced";
+                       : MODE_DETAILED.equals(responseMode) ? "Detailed"
+                       : JarvisApi.MODE_WITTY.equals(responseMode) ? "Witty & Genius"
+                       : "Balanced";
         boolean lockOn = BiometricLock.isLockEnabled(this);
         CharSequence[] options = {
             "🎙 Voice Accent",
@@ -799,8 +803,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showResponseModePicker() {
-        final String[] labels  = { "⚡ Brief — 1-2 sentences max", "⚖ Balanced — default", "📖 Detailed — full explanations" };
-        final String[] modes   = { MODE_BRIEF, MODE_BALANCED, MODE_DETAILED };
+        final String[] labels  = {
+            "⚡ Brief — 1-2 sentences max",
+            "⚖ Balanced — default",
+            "📖 Detailed — full explanations",
+            "🎭 Witty & Hyperintelligent — Sharp banter & genius reasoning (ChatGPT/Claude/Gemini grade)"
+        };
+        final String[] modes   = { MODE_BRIEF, MODE_BALANCED, MODE_DETAILED, JarvisApi.MODE_WITTY };
         int cur = 0;
         for (int i = 0; i < modes.length; i++) if (modes[i].equals(responseMode)) { cur = i; break; }
         final int[] sel = { cur };
@@ -814,10 +823,11 @@ public class MainActivity extends AppCompatActivity {
                 switch (responseMode) {
                     case MODE_BRIEF:    msg = "Switching to brief mode, sir. Short and sharp."; break;
                     case MODE_DETAILED: msg = "Detailed mode, sir. I will hold nothing back."; break;
+                    case JarvisApi.MODE_WITTY: msg = "Witty and Hyperintelligent mode online, sir. Sarcasm subroutines primed, computational intellect exceeding standard parameters."; break;
                     default:            msg = "Balanced mode restored, sir."; break;
                 }
                 Toast.makeText(this, "Mode: " + responseMode, Toast.LENGTH_SHORT).show();
-                speak(msg, "neutral");
+                speak(msg, "confident");
             })
             .setNegativeButton("Cancel", null).show();
     }
@@ -1567,7 +1577,7 @@ public class MainActivity extends AppCompatActivity {
     private void showAttachDialog() {
         new AlertDialog.Builder(this)
             .setTitle("Attach")
-            .setItems(new String[]{"📷 Take photo", "🖼 Choose image", "📄 Read PDF"}, (d, which) -> {
+            .setItems(new String[]{"📷 Take photo", "🖼 Choose image(s) [Multiple]", "📄 Read PDF"}, (d, which) -> {
                 if (which == 0)      openCamera();
                 else if (which == 1) openGallery();
                 else                 openPdf();
@@ -1593,8 +1603,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void openGallery() {
-        Intent i = new Intent(Intent.ACTION_GET_CONTENT); i.setType("image/*");
-        startActivityForResult(Intent.createChooser(i, "Select image"), REQUEST_GALLERY);
+        Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+        i.setType("image/*");
+        i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        startActivityForResult(Intent.createChooser(i, "Select images (single or multiple)"), REQUEST_GALLERY);
     }
 
     private void openPdf() {
@@ -1774,9 +1786,25 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        if (req == REQUEST_GALLERY && data != null) {
+            List<Uri> galleryUris = new ArrayList<>();
+            if (data.getClipData() != null) {
+                int count = data.getClipData().getItemCount();
+                for (int idx = 0; idx < count; idx++) {
+                    Uri u = data.getClipData().getItemAt(idx).getUri();
+                    if (u != null) galleryUris.add(u);
+                }
+            } else if (data.getData() != null) {
+                galleryUris.add(data.getData());
+            }
+            if (!galleryUris.isEmpty()) {
+                encodeImagesAsync(galleryUris);
+                return;
+            }
+        }
+
         Uri uri = null;
         if (req == REQUEST_CAMERA && cameraImageUri != null) uri = cameraImageUri;
-        else if (req == REQUEST_GALLERY && data != null)     uri = data.getData();
         if (uri != null) {
             // If doc scan was pending, use OCR path instead of image attachment
             if (pendingDocScanQuestion != null && req == REQUEST_CAMERA) {
@@ -1818,7 +1846,9 @@ public class MainActivity extends AppCompatActivity {
                     }
                 });
             } else {
-                encodeImageAsync(uri);
+                List<Uri> camUris = new ArrayList<>();
+                camUris.add(uri);
+                encodeImagesAsync(camUris);
             }
         }
     }
@@ -1931,6 +1961,8 @@ public class MainActivity extends AppCompatActivity {
     private void clearAttachment() {
         pendingImageBase64 = null;
         pendingImageUriStr = null;
+        pendingImagesBase64.clear();
+        pendingImagesUris.clear();
         pendingPdfText     = null;
         if (ivAttachPreview != null) {
             ivAttachPreview.setImageDrawable(null);
@@ -1941,35 +1973,66 @@ public class MainActivity extends AppCompatActivity {
 
     // ── Image encoding ────────────────────────────────────────────────────────
     private void encodeImageAsync(Uri uri) {
+        List<Uri> list = new ArrayList<>();
+        if (uri != null) list.add(uri);
+        encodeImagesAsync(list);
+    }
+
+    private void encodeImagesAsync(List<Uri> uris) {
+        if (uris == null || uris.isEmpty()) return;
         new Thread(() -> {
-            try (InputStream is = getContentResolver().openInputStream(uri)) {
-                if (is == null) throw new IOException("Cannot open stream");
-                Bitmap bmp = BitmapFactory.decodeStream(is);
-                if (bmp == null) throw new IOException("Cannot decode bitmap");
-                int w = bmp.getWidth(), h = bmp.getHeight(), maxPx = 768;
-                if (w > maxPx || h > maxPx) {
-                    float s = Math.min((float) maxPx / w, (float) maxPx / h);
-                    bmp = Bitmap.createScaledBitmap(bmp, (int)(w*s), (int)(h*s), true);
-                }
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                bmp.compress(Bitmap.CompressFormat.JPEG, 72, baos);
-                String b64 = "data:image/jpeg;base64,"
-                    + Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
-                mainHandler.post(() -> {
-                    pendingImageBase64 = b64;
-                    pendingImageUriStr = uri.toString();
-                    pendingPdfText     = null;
-                    if (ivAttachPreview != null) {
-                        ivAttachPreview.setImageURI(uri);
-                        ivAttachPreview.setVisibility(View.VISIBLE);
+            List<String> b64List = new ArrayList<>();
+            List<Uri> validUris = new ArrayList<>();
+            for (Uri uri : uris) {
+                if (uri == null) continue;
+                try (InputStream is = getContentResolver().openInputStream(uri)) {
+                    if (is == null) continue;
+                    Bitmap bmp = BitmapFactory.decodeStream(is);
+                    if (bmp == null) continue;
+                    int w = bmp.getWidth(), h = bmp.getHeight(), maxPx = 768;
+                    if (w > maxPx || h > maxPx) {
+                        float s = Math.min((float) maxPx / w, (float) maxPx / h);
+                        bmp = Bitmap.createScaledBitmap(bmp, (int)(w*s), (int)(h*s), true);
                     }
-                    if (etInput != null) etInput.setHint("Ask about the image…");
-                    Toast.makeText(this, "Image attached", Toast.LENGTH_SHORT).show();
-                });
-            } catch (Exception e) {
-                mainHandler.post(() ->
-                    Toast.makeText(this, "Failed: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    bmp.compress(Bitmap.CompressFormat.JPEG, 72, baos);
+                    String b64 = "data:image/jpeg;base64,"
+                        + Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
+                    b64List.add(b64);
+                    validUris.add(uri);
+                } catch (Exception ignored) {}
             }
+
+            if (b64List.isEmpty()) {
+                mainHandler.post(() ->
+                    Toast.makeText(this, "Failed to load selected image(s)", Toast.LENGTH_SHORT).show());
+                return;
+            }
+
+            mainHandler.post(() -> {
+                pendingImagesBase64.clear();
+                pendingImagesBase64.addAll(b64List);
+                pendingImagesUris.clear();
+                pendingImagesUris.addAll(validUris);
+
+                pendingImageBase64 = b64List.get(0);
+                pendingImageUriStr = validUris.get(0).toString();
+                pendingPdfText     = null;
+
+                if (ivAttachPreview != null) {
+                    ivAttachPreview.setImageURI(validUris.get(0));
+                    ivAttachPreview.setVisibility(View.VISIBLE);
+                }
+                if (etInput != null) {
+                    if (b64List.size() > 1) {
+                        etInput.setHint("Ask about these " + b64List.size() + " attachments…");
+                        Toast.makeText(this, b64List.size() + " images attached. Ready for multi-attachment analysis.", Toast.LENGTH_SHORT).show();
+                    } else {
+                        etInput.setHint("Ask about the image…");
+                        Toast.makeText(this, "Image attached", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
         }).start();
     }
 
@@ -2076,8 +2139,13 @@ public class MainActivity extends AppCompatActivity {
         boolean hasAttachment = pendingImageBase64 != null || pendingPdfText != null;
         if (text.isEmpty() && !hasAttachment) return;
         if (currentState == OrbView.OrbState.THINKING) return;
-        if (text.isEmpty() && pendingImageBase64 != null)
-            text = "Analyse this image and describe what you see in detail.";
+        if (text.isEmpty() && pendingImageBase64 != null) {
+            if (pendingImagesBase64.size() > 1) {
+                text = "Analyze these " + pendingImagesBase64.size() + " attached images in detail. Provide a witty, astute, and comprehensive synthesis.";
+            } else {
+                text = "Analyse this image and describe what you see in detail.";
+            }
+        }
         if (text.isEmpty() && pendingPdfText != null)
             text = "Summarise this document for me.";
         etInput.setText("");
@@ -3218,8 +3286,17 @@ public class MainActivity extends AppCompatActivity {
             srLower.contains("screen recording") || srLower.contains("capture screen") ||
             srLower.contains("record my screen") || srLower.contains("start recording") ||
             srLower.contains("start screen record") || srLower.contains("video record screen") ||
-            srLower.contains("record video of screen")) {
+            srLower.contains("record video of screen") ||
+            srLower.contains("record yourself") || srLower.contains("record itself") ||
+            srLower.contains("record self") || srLower.contains("self record") ||
+            srLower.contains("can you record yourself") || srLower.contains("can henry record") ||
+            srLower.contains("record your screen") || srLower.contains("record what you are doing")) {
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String confirmReply = "[EMOTION:proud] Affirmative, sir! Initiating internal screen recording and HUD telemetry to capture my interface.";
+            String clean = stripEmotionTag(confirmReply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, "proud");
+            saveHistory();
             startScreenRecording();
             return;
         }
@@ -4772,6 +4849,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (btnSend != null) btnSend.setEnabled(false);
         String imageB64 = pendingImageBase64;
+        List<String> imagesB64 = new ArrayList<>(pendingImagesBase64);
         clearAttachment();
 
         // Build history for API call
@@ -4793,7 +4871,7 @@ public class MainActivity extends AppCompatActivity {
         final String offlineQueryText   = effectiveUserText;
         final String offlineQueryIntent = intentType;
 
-        JarvisApi.askV20(apiHistory, imageB64, responseMode, userProfile, intentType,
+        JarvisApi.askV20(apiHistory, imageB64, imagesB64, responseMode, userProfile, intentType,
                 this, emotionStr, relCtx.isEmpty() ? null : relCtx,
                 useTournament, useChain,
                 new JarvisApi.Callback() {

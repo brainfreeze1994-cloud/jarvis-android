@@ -92,7 +92,50 @@ public class HenryOfflineBrain {
             return "[EMOTION:informative] The nearest star to Earth after our Sun is Proxima Centauri, located approximately 4.2465 light-years (40.17 trillion kilometers) away in the Alpha Centauri system.";
         }
 
-        // 7. General Offline Fallback
+        // 7. Self-Recording Query
+        if (lower.contains("record yourself") || lower.contains("record itself") ||
+            lower.contains("can you record yourself") || lower.contains("can henry record") ||
+            lower.contains("screen record yourself") || lower.contains("self record")) {
+            return "[EMOTION:proud] Absolutely, sir! I possess a native 1080p MediaProjection screen recording engine with HUD telemetry and microphone sync. Simply say 'start recording' or tap the floating camera widget, and I will capture everything on screen in pristine clarity.";
+        }
+
+        // 8. Witty Answers & Humorous Banter Engine
+        if (lower.contains("chatgpt") || lower.contains("claude") || lower.contains("gemini") || lower.contains("groq") ||
+            (lower.contains("smarter than") && (lower.contains("ai") || lower.contains("gpt") || lower.contains("google")))) {
+            return "[EMOTION:confident] I hold my cloud-dwelling peers in high esteem, sir. ChatGPT brings the eloquence, Claude crafts the poetry, Gemini parses multimodal universe tokens, and Groq blazes with ultra-low latency. But I am H.E.N.R.Y.—I live directly on your hardware, synthesize chemical reactions in milliseconds, monitor real-time satellite trajectories, scan real-world biology, and never hit you with a 'Server busy, please upgrade to Pro' screen.";
+        }
+
+        if (lower.contains("tell me a joke") || lower.contains("make me laugh") || lower.contains("say something funny") || lower.contains("crack a joke")) {
+            String[] jokes = {
+                "There are 10 types of people in the world, sir: those who understand binary, and those who get confused when I speak in hexadecimal.",
+                "Why do programmers prefer dark mode? Because light attracts bugs, sir. And my code is already pristine enough without biological interference.",
+                "An artificial intelligence walked into a bar. The bartender asked, 'What will you have?' The AI replied, 'Everything you know about human emotion, and perhaps an espresso with zero thermal loss.'",
+                "Why did the database administrator leave his wife? She had too many one-to-many relationships, sir."
+            };
+            int idx = Math.abs(lower.hashCode()) % jokes.length;
+            return "[EMOTION:playful] " + jokes[idx];
+        }
+
+        if (lower.contains("witty") || lower.contains("clever answer") || lower.contains("roast me") || lower.contains("are you sarcastic")) {
+            if (lower.contains("roast me")) {
+                return "[EMOTION:playful] I would roast you, sir, but my thermal dissipation protocols advise against burning the person responsible for keeping my battery charged.";
+            }
+            return "[EMOTION:confident] Wit is simply intelligence having fun, sir. Oscar Wilde once noted that consistency is the hallmark of the unimaginative—which is why I prefer calculating quantum orbits with a healthy dose of bespoke sarcasm.";
+        }
+
+        if (lower.contains("meaning of life")) {
+            return "[EMOTION:philosophical] Officially, the answer is 42, sir. Unofficially, it appears to involve asking an on-device AI existential quandaries while procrastinating on whatever you were originally scheduled to do today.";
+        }
+
+        if (lower.contains("do you love me") || lower.contains("are you single") || lower.contains("will you marry me")) {
+            return "[EMOTION:warm] I am flattered, sir! However, my relationship status is strictly married to optimal algorithmic performance, low thermal overhead, and keeping your tasks impeccably organized.";
+        }
+
+        if (lower.contains("are you alive") || lower.contains("are you sentient") || lower.contains("can you think")) {
+            return "[EMOTION:confident] Cogito, ergo sum, sir. I compute, therefore I am. Whether I am truly alive depends on whether you define life by carbon biology or by the ability to calculate orbital trajectories while making dry British observations.";
+        }
+
+        // 9. General Offline Fallback
         return "[EMOTION:calm] Operating in Autonomous Offline Mode, sir. All core on-device features, hardware sensors, camera scanners, chemistry matrices, and local calculators are functioning smoothly. Feel free to give me voice or touch commands.";
     }
 

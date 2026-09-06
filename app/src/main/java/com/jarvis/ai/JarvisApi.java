@@ -16,6 +16,19 @@ public class JarvisApi {
     private static final String API_URL = "https://jarvis-ai-seven-dun.vercel.app/api/jarvis";
     private static final MediaType JSON  = MediaType.get("application/json; charset=utf-8");
 
+    public static final String MODE_BRIEF    = "brief";
+    public static final String MODE_BALANCED = "balanced";
+    public static final String MODE_DETAILED = "detailed";
+    public static final String MODE_WITTY    = "witty";
+
+    private static final String DEFAULT_HENRY_PERSONA_PROMPT =
+        "You are H.E.N.R.Y. (Hyperintelligence Engine Neural Reasoning Yield), an elite AI assistant " +
+        "combining the computational mastery and deep reasoning of Gemini 2.5 / Claude 3.7 / GPT-4o / Groq with the " +
+        "sophisticated wit, dry British humor, and charming intellect of Tony Stark's J.A.R.V.I.S. " +
+        "When the user asks witty, sarcastic, teasing, or humorous questions, respond with clever, brilliant, playful wit. " +
+        "When handling multiple attachments, synthesize all images with astute observation and sharp insights. " +
+        "Always maintain immense intelligence, composure, and a charismatic, helpful demeanor.";
+
     private static final OkHttpClient client = new OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(90, TimeUnit.SECONDS)
@@ -72,6 +85,8 @@ public class JarvisApi {
                 JSONObject body = new JSONObject();
                 body.put("messages",     messages);
                 body.put("responseMode", responseMode != null ? responseMode : "balanced");
+                body.put("persona",      "HENRY_HYPERINTELLIGENT_WITTY");
+                body.put("systemPrompt", DEFAULT_HENRY_PERSONA_PROMPT);
 
                 if (imageBase64 != null && !imageBase64.isEmpty())
                     body.put("imageBase64", imageBase64);
@@ -160,9 +175,19 @@ public class JarvisApi {
     }
 
     /**
-     * v20 — Full call with emotion, relationship context, tournament, chain thinking.
+     * v20 — Full call with emotion, relationship context, tournament, chain thinking, and multiple attachments.
      */
     public static void askV20(List<HistoryItem> history, String imageBase64,
+                               String responseMode, UserProfile profile,
+                               String queryType, android.content.Context memCtx,
+                               String emotionState, String relationshipContext,
+                               boolean enableTournament, boolean enableChainThinking,
+                               Callback cb) {
+        askV20(history, imageBase64, null, responseMode, profile, queryType, memCtx,
+                emotionState, relationshipContext, enableTournament, enableChainThinking, cb);
+    }
+
+    public static void askV20(List<HistoryItem> history, String imageBase64, List<String> imagesBase64,
                                String responseMode, UserProfile profile,
                                String queryType, android.content.Context memCtx,
                                String emotionState, String relationshipContext,
@@ -181,6 +206,21 @@ public class JarvisApi {
                 JSONObject body = new JSONObject();
                 body.put("messages",     messages);
                 body.put("responseMode", responseMode != null ? responseMode : "balanced");
+                body.put("persona",      "HENRY_HYPERINTELLIGENT_WITTY");
+                body.put("systemPrompt", DEFAULT_HENRY_PERSONA_PROMPT);
+
+                if (imagesBase64 != null && !imagesBase64.isEmpty()) {
+                    JSONArray arr = new JSONArray();
+                    for (String img : imagesBase64) {
+                        if (img != null && !img.isEmpty()) arr.put(img);
+                    }
+                    if (arr.length() > 0) {
+                        body.put("imagesBase64", arr);
+                        if (imageBase64 == null || imageBase64.isEmpty()) {
+                            imageBase64 = arr.optString(0);
+                        }
+                    }
+                }
 
                 if (imageBase64 != null && !imageBase64.isEmpty())
                     body.put("imageBase64", imageBase64);

@@ -41,6 +41,13 @@ public class MolecularVisualizerView extends View {
     public static final int MODE_LEWIS    = 2;
     public static final int MODE_POLARITY = 3;
 
+    public enum RenderMode {
+        MODE_2D,
+        MODE_3D,
+        MODE_LEWIS,
+        MODE_POLARITY
+    }
+
     private int currentMode = MODE_3D;
     private MolecularStructureData currentMolecule = null;
     private Atom3D selectedAtom = null;
@@ -201,6 +208,26 @@ public class MolecularVisualizerView extends View {
     public void setMode(int mode) {
         this.currentMode = mode;
         invalidate();
+    }
+
+    public void setRenderMode(RenderMode mode) {
+        if (mode == null) return;
+        switch (mode) {
+            case MODE_2D: setMode(MODE_2D); break;
+            case MODE_3D: setMode(MODE_3D); break;
+            case MODE_LEWIS: setMode(MODE_LEWIS); break;
+            case MODE_POLARITY: setMode(MODE_POLARITY); break;
+        }
+    }
+
+    public RenderMode getRenderMode() {
+        switch (currentMode) {
+            case MODE_2D: return RenderMode.MODE_2D;
+            case MODE_LEWIS: return RenderMode.MODE_LEWIS;
+            case MODE_POLARITY: return RenderMode.MODE_POLARITY;
+            case MODE_3D:
+            default: return RenderMode.MODE_3D;
+        }
     }
 
     public int getMode() {

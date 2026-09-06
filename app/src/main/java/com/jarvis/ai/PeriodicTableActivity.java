@@ -30,7 +30,15 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.FileProvider;
 
+import com.jarvis.ai.chemistry.Atom3D;
+import com.jarvis.ai.chemistry.ChemistryAccuracyEngine;
+import com.jarvis.ai.chemistry.MolecularStructureData;
+import com.jarvis.ai.chemistry.MolecularVisualizerView;
+
+import java.io.File;
+import java.io.FileOutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
@@ -38,6 +46,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import android.content.Intent;
+import android.net.Uri;
 
 /**
  * Stark Chemical Synthesizer & Holographic Periodic Matrix.
@@ -52,6 +62,14 @@ import java.util.Set;
  *  - J.A.R.V.I.S. / H.E.N.R.Y. Voice Intel Diagnostics
  */
 public class PeriodicTableActivity extends AppCompatActivity implements TextToSpeech.OnInitListener {
+
+    public static final String EXTRA_MODE = "EXTRA_MODE";
+    public static final String EXTRA_COMPOUND = "EXTRA_COMPOUND";
+    public static final String EXTRA_ELEMENT = "EXTRA_ELEMENT";
+
+    public static final String MODE_MATRIX = "matrix";
+    public static final String MODE_MIXER = "mixer";
+    public static final String MODE_BOHR = "bohr";
 
     private static final int CELL = 52; // dp per element tile
     private static final int TAP_THRESHOLD_DP = 8;
@@ -80,6 +98,25 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
     private TextView btnNovelChemical;
     private LinearLayout novelChemicalOutput;
     private TextView tvNovelName, tvNovelFormula, tvNovelStructure, tvNovelSynthesis, tvNovelUses;
+
+    // Advanced Molecular Visualizer & Pedagogical Engine
+    private MolecularVisualizerView molecularVisualizer;
+    private TextView btnMode2d, btnMode3d, btnModeLewis, btnModePolarity;
+    private TextView btnControlRotate, btnControlReset, btnControlLabels, btnControlExport;
+    private LinearLayout cardAtomInspector;
+    private TextView tvInspectorAtomTitle, btnInspectorClose, tvInspectorAtomRole, tvInspectorAtomDetails;
+    private TextView btnInspectorViewMatrix, btnInspectorViewBohr;
+    private TextView tvCompoundCategoryBadge, tvPropGeometry, tvPropElectronGeometry, tvPropHybridization;
+    private TextView tvPropBondAngle, tvPropPolarity, tvPropWeight, tvPropImf;
+    private TextView tvAnalysisVsepr, tvAnalysisBonding;
+    private TextView btnToggleEducational, tvCompoundSafetyNotice;
+    private LinearLayout educationalQaContainer;
+    private boolean educationalModeEnabled = true;
+    private LinearLayout cardUnverifiedCompound;
+    private TextView tvUnverifiedReason;
+
+    private MolecularStructureData currentStructureData = null;
+    private Atom3D inspectedAtom = null;
 
     private final List<Elem> selectedReactantElements = new ArrayList<>();
     private final List<Compound> matchingCompounds = new ArrayList<>();
@@ -390,7 +427,49 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
                     "Face-Centered Cubic (FCC) Alpha Solid Solution • Tin atoms distort copper lattice, inhibiting dislocation glide.",
                     "Metallic Bonding with High Tensile Strength and Ductility",
                     "Smelting molten copper (1,085°C) with tin ingots (232°C) under charcoal flux cover.",
-                    "• Ship marine propellers and underwater fittings (impervious to saltwater corrosion).\n• Heavy-duty low-friction machine bearings and bushings.\n• Musical acoustic guitar strings, cymbals, and church bells.\n• Historical monument sculpture casting.", "Alloy")
+                    "• Ship marine propellers and underwater fittings (impervious to saltwater corrosion).\n• Heavy-duty low-friction machine bearings and bushings.\n• Musical acoustic guitar strings, cymbals, and church bells.\n• Historical monument sculpture casting.", "Alloy"),
+
+            new Compound(new String[]{"B","F"}, "BF₃", "Boron Trifluoride", "BF3 Gas",
+                    "Trigonal Planar (120°) • Boron sp² hybridized incomplete octet (electron deficient)",
+                    "Polar Covalent B-F Bonds with Net Zero Dipole (Symmetric cancellation)",
+                    "B₂O₃ + 3 CaF₂ + 3 H₂SO₄ → 2 BF₃ + 3 CaSO₄ + 3 H₂O",
+                    "• Potent Lewis acid catalyst for Friedel-Crafts alkylation and polymerization.\n• Boron neutron capture therapy precursor.\n• Gas-filled ionization detectors for thermal neutrons.", "Lewis Acid Gas"),
+
+            new Compound(new String[]{"H","Cl"}, "HCl", "Hydrogen Chloride", "Muriatic Acid",
+                    "Linear Heteronuclear Diatomic • H-Cl single sigma bond (127 pm)",
+                    "Polar Covalent Bond (ΔEN = 0.96) • Dipole Moment μ = 1.05 D",
+                    "Direct combustion: H₂ (g) + Cl₂ (g) → 2 HCl (g) + 184 kJ/mol",
+                    "• Steel pickling and rust removal before processing.\n• Industrial synthesis of vinyl chloride monomer for PVC.\n• Stomach gastric acid for digestive protein breakdown.", "Mineral Acid"),
+
+            new Compound(new String[]{"H","F"}, "HF", "Hydrogen Fluoride", "Hydrofluoric Acid Precursor",
+                    "Linear Heteronuclear Diatomic • Extreme polar sigma bond (92 pm)",
+                    "Extreme Polar Covalent Bond (ΔEN = 1.78) • Dipole Moment μ = 1.82 D",
+                    "CaF₂ (fluorspar) + H₂SO₄ → CaSO₄ + 2 HF (Endothermic kiln reaction at 200-250°C)",
+                    "• Glass etching and semiconductor silicon wafer polishing.\n• Synthesis of organofluorine compounds and refrigerants (PTFE / Teflon).\n• Uranium hexafluoride processing for nuclear fuel enrichment.", "Etching Acid Precursor"),
+
+            new Compound(new String[]{"S","O"}, "SO₂", "Sulfur Dioxide", "Sulfur Dioxide Gas",
+                    "Bent Geometry (119.5°) • Central sulfur sp² hybridized with 1 stereochemically active lone pair",
+                    "Polar Covalent S=O Double Bonds (Resonance hybrid) • Dipole Moment μ = 1.63 D",
+                    "S (s) + O₂ (g) → SO₂ (g) (Combustion of sulfur in dry air or roasting metal sulfides)",
+                    "• Industrial precursor to Sulfuric Acid via catalytic Contact Process.\n• Antimicrobial preservative in winemaking and dried fruit.\n• Bleaching agent for wood pulp, paper, and textiles.", "Acidic Oxide"),
+
+            new Compound(new String[]{"C","H"}, "C₆H₆", "Benzene", "Aromatic Hydrocarbon",
+                    "Planar Hexagonal Ring (D6h symmetry) • All C-C bond lengths 139.7 pm with delocalized π sextet",
+                    "Nonpolar Symmetrical Hydrocarbon (Zero net dipole) • Aromatic resonance stabilization (152 kJ/mol)",
+                    "Catalytic reforming of petroleum naphtha: C₆H₁₂ → C₆H₆ + 3 H₂ at 500°C over Pt-Re catalyst",
+                    "• Fundamental feedstock for ethylbenzene (polystyrene), cumene (phenol/acetone), and cyclohexane (nylon).\n• Precursor in synthetic rubber and dye manufacturing.", "Aromatic Hydrocarbon"),
+
+            new Compound(new String[]{"S","F"}, "SF₆", "Sulfur Hexafluoride", "Dielectric Insulator Gas",
+                    "Regular Octahedral (Oh symmetry) • Central sulfur sp³d² hybridized with expanded octet (12 valence e⁻)",
+                    "Polar S-F Bonds cancelling to Zero Net Dipole • Extreme chemical inertness and non-flammability",
+                    "Direct fluorination: S₈ + 24 F₂ → 8 SF₆ (Exothermic burning in fluorine gas)",
+                    "• Electrical dielectric insulating gas in high-voltage circuit breakers and switchgear.\n• Inert gas tracer in atmospheric oceanography.\n• Contrast agent in ultrasound medical imaging and retinal detachment surgery.", "Inorganic Dielectric Gas"),
+
+            new Compound(new String[]{"P","Cl"}, "PCl₅", "Phosphorus Pentachloride", "PCl5 Reagent",
+                    "Trigonal Bipyramidal (D3h) in vapor • Central phosphorus sp³d hybridized with axial (214 pm) and equatorial (202 pm) bonds",
+                    "Polar P-Cl bonds cancelling to Zero Net Dipole in nonpolar gas phase • In solid state forms [PCl₄]⁺[PCl₆]⁻ salt",
+                    "PCl₃ (l) + Cl₂ (g) ⇌ PCl₅ (s) (Exothermic equilibrium chlorination)",
+                    "• Chlorinating reagent in organic synthesis to convert alcohols to alkyl chlorides and acids to acyl chlorides.\n• Catalyst in synthesis of triphenylphosphine oxide and pharmaceuticals.", "Chlorinating Agent")
     };
 
     // ── Draggable + Tappable Holographic Element Tile ──────────────────────────
@@ -474,6 +553,63 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
 
         // Default selected element: Iron (Fe)
         selectElement(ELEMENTS[25]);
+
+        handleIntent(getIntent());
+    }
+
+    private void handleIntent(Intent intent) {
+        if (intent == null) return;
+        String modeStr = intent.getStringExtra(EXTRA_MODE);
+        String compKey = intent.getStringExtra(EXTRA_COMPOUND);
+        String elemSymbol = intent.getStringExtra(EXTRA_ELEMENT);
+
+        if (elemSymbol != null && !elemSymbol.trim().isEmpty()) {
+            Elem e = findElement(elemSymbol.trim());
+            if (e != null) {
+                selectElement(e);
+            }
+        }
+
+        if (MODE_MIXER.equalsIgnoreCase(modeStr) || compKey != null) {
+            switchMode(Mode.MIXER);
+            if (compKey != null && !compKey.trim().isEmpty()) {
+                loadCompound(compKey.trim());
+            }
+        } else if (MODE_BOHR.equalsIgnoreCase(modeStr)) {
+            switchMode(Mode.BOHR);
+        } else if (MODE_MATRIX.equalsIgnoreCase(modeStr)) {
+            switchMode(Mode.MATRIX);
+        }
+    }
+
+    public void loadCompound(String formulaOrName) {
+        if (formulaOrName == null) return;
+        String clean = formulaOrName.trim();
+        for (Compound c : COMPOUNDS) {
+            if (c.formula.equalsIgnoreCase(clean) || c.name.equalsIgnoreCase(clean)
+                    || c.common.toLowerCase(Locale.US).contains(clean.toLowerCase(Locale.US))
+                    || c.formula.replace("₂", "2").replace("₃", "3").replace("₄", "4").replace("₅", "5").replace("₆", "6").replace("₈", "8").equalsIgnoreCase(clean)) {
+                selectedReactantElements.clear();
+                for (String sym : c.requiredElements) {
+                    Elem el = findElement(sym);
+                    if (el != null) selectedReactantElements.add(el);
+                }
+                selectedCompound = c;
+                updateMixerUI();
+                return;
+            }
+        }
+        MolecularStructureData m = ChemistryAccuracyEngine.findCompound(clean, clean);
+        if (m != null) {
+            selectedReactantElements.clear();
+            for (Atom3D atom : m.atoms) {
+                Elem el = findElement(atom.symbol);
+                if (el != null && !selectedReactantElements.contains(el)) {
+                    selectedReactantElements.add(el);
+                }
+            }
+            updateMixerUI();
+        }
     }
 
     @Override
@@ -710,6 +846,45 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
         tvCompoundSynthesis       = findViewById(R.id.tv_compound_synthesis);
         tvCompoundUses            = findViewById(R.id.tv_compound_uses);
 
+        // Advanced Molecular Visualizer Views
+        molecularVisualizer       = findViewById(R.id.molecular_visualizer);
+        btnMode2d                 = findViewById(R.id.btn_mode_2d);
+        btnMode3d                 = findViewById(R.id.btn_mode_3d);
+        btnModeLewis              = findViewById(R.id.btn_mode_lewis);
+        btnModePolarity           = findViewById(R.id.btn_mode_polarity);
+
+        btnControlRotate          = findViewById(R.id.btn_control_rotate);
+        btnControlReset           = findViewById(R.id.btn_control_reset);
+        btnControlLabels          = findViewById(R.id.btn_control_labels);
+        btnControlExport          = findViewById(R.id.btn_control_export);
+
+        cardAtomInspector         = findViewById(R.id.card_atom_inspector);
+        tvInspectorAtomTitle      = findViewById(R.id.tv_inspector_atom_title);
+        btnInspectorClose         = findViewById(R.id.btn_inspector_close);
+        tvInspectorAtomRole       = findViewById(R.id.tv_inspector_atom_role);
+        tvInspectorAtomDetails    = findViewById(R.id.tv_inspector_atom_details);
+        btnInspectorViewMatrix    = findViewById(R.id.btn_inspector_view_matrix);
+        btnInspectorViewBohr      = findViewById(R.id.btn_inspector_view_bohr);
+
+        tvCompoundCategoryBadge   = findViewById(R.id.tv_compound_category_badge);
+        tvPropGeometry            = findViewById(R.id.tv_prop_geometry);
+        tvPropElectronGeometry    = findViewById(R.id.tv_prop_electron_geometry);
+        tvPropHybridization       = findViewById(R.id.tv_prop_hybridization);
+        tvPropBondAngle           = findViewById(R.id.tv_prop_bond_angle);
+        tvPropPolarity            = findViewById(R.id.tv_prop_polarity);
+        tvPropWeight              = findViewById(R.id.tv_prop_weight);
+        tvPropImf                 = findViewById(R.id.tv_prop_imf);
+
+        tvAnalysisVsepr           = findViewById(R.id.tv_analysis_vsepr);
+        tvAnalysisBonding         = findViewById(R.id.tv_analysis_bonding);
+
+        btnToggleEducational      = findViewById(R.id.btn_toggle_educational);
+        educationalQaContainer    = findViewById(R.id.educational_qa_container);
+        tvCompoundSafetyNotice    = findViewById(R.id.tv_compound_safety_notice);
+
+        cardUnverifiedCompound    = findViewById(R.id.card_unverified_compound);
+        tvUnverifiedReason        = findViewById(R.id.tv_unverified_reason);
+
         commonCompoundsContainer  = findViewById(R.id.common_compounds_container);
 
         btnNovelChemical          = findViewById(R.id.btn_novel_chemical);
@@ -719,6 +894,94 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
         tvNovelStructure          = findViewById(R.id.tv_novel_structure);
         tvNovelSynthesis          = findViewById(R.id.tv_novel_synthesis);
         tvNovelUses               = findViewById(R.id.tv_novel_uses);
+
+        // Visualizer Mode Click Listeners
+        btnMode2d.setOnClickListener(v -> setVisualizerMode(MolecularVisualizerView.RenderMode.MODE_2D));
+        btnMode3d.setOnClickListener(v -> setVisualizerMode(MolecularVisualizerView.RenderMode.MODE_3D));
+        btnModeLewis.setOnClickListener(v -> setVisualizerMode(MolecularVisualizerView.RenderMode.MODE_LEWIS));
+        btnModePolarity.setOnClickListener(v -> setVisualizerMode(MolecularVisualizerView.RenderMode.MODE_POLARITY));
+
+        // Visualizer Toolbar Controls
+        btnControlRotate.setOnClickListener(v -> {
+            if (molecularVisualizer != null) {
+                boolean active = !molecularVisualizer.isAutoRotateEnabled();
+                molecularVisualizer.setAutoRotate(active);
+                btnControlRotate.setText(active ? "🔄 ROTATE: ON" : "🔄 ROTATE: OFF");
+                btnControlRotate.setTextColor(active ? 0xFF00FFCC : 0xFF88AABB);
+            }
+        });
+
+        btnControlReset.setOnClickListener(v -> {
+            if (molecularVisualizer != null) molecularVisualizer.resetCamera();
+        });
+
+        btnControlLabels.setOnClickListener(v -> {
+            if (molecularVisualizer != null) {
+                boolean labels = !molecularVisualizer.isShowingLabels();
+                molecularVisualizer.setShowLabels(labels);
+                btnControlLabels.setText(labels ? "🏷 LABELS: ON" : "🏷 LABELS: OFF");
+                btnControlLabels.setTextColor(labels ? 0xFF00FFCC : 0xFF88AABB);
+            }
+        });
+
+        btnControlExport.setOnClickListener(v -> exportMolecularStructureImage());
+
+        // Atom Selection Inspector Callback
+        if (molecularVisualizer != null) {
+            molecularVisualizer.setOnAtomSelectedListener(atom -> {
+                if (atom == null) {
+                    cardAtomInspector.setVisibility(View.GONE);
+                    inspectedAtom = null;
+                    return;
+                }
+                inspectedAtom = atom;
+                cardAtomInspector.setVisibility(View.VISIBLE);
+                tvInspectorAtomTitle.setText("ATOM TELEMETRY: " + atom.name + " (" + atom.symbol + ") • #" + atom.atomicNumber);
+                tvInspectorAtomRole.setText("Molecule Role: " + atom.roleInMolecule);
+                String formalSign = atom.formalCharge > 0 ? "+" : "";
+                String partialSign = atom.partialCharge > 0 ? "+" : "";
+                tvInspectorAtomDetails.setText(
+                        "Valence e⁻: " + atom.valenceElectrons +
+                                "  •  e⁻ Config: " + atom.electronConfig +
+                                "  •  Weight: " + atom.atomicMass + " u\n" +
+                                "Formal Charge: " + formalSign + atom.formalCharge +
+                                "  •  Partial Charge: " + partialSign + String.format(Locale.US, "%.2f", atom.partialCharge) + "δ"
+                );
+            });
+        }
+
+        btnInspectorClose.setOnClickListener(v -> {
+            cardAtomInspector.setVisibility(View.GONE);
+            if (molecularVisualizer != null) molecularVisualizer.clearSelection();
+            inspectedAtom = null;
+        });
+
+        btnInspectorViewMatrix.setOnClickListener(v -> {
+            if (inspectedAtom != null) {
+                Elem e = findElement(inspectedAtom.symbol);
+                if (e != null) {
+                    selectElement(e);
+                    switchMode(Mode.MATRIX);
+                }
+            }
+        });
+
+        btnInspectorViewBohr.setOnClickListener(v -> {
+            if (inspectedAtom != null) {
+                Elem e = findElement(inspectedAtom.symbol);
+                if (e != null) {
+                    selectElement(e);
+                    switchMode(Mode.BOHR);
+                }
+            }
+        });
+
+        btnToggleEducational.setOnClickListener(v -> {
+            educationalModeEnabled = !educationalModeEnabled;
+            btnToggleEducational.setText(educationalModeEnabled ? "MODE: ON" : "MODE: OFF");
+            btnToggleEducational.setTextColor(educationalModeEnabled ? 0xFF00FFCC : 0xFF88AABB);
+            educationalQaContainer.setVisibility(educationalModeEnabled ? View.VISIBLE : View.GONE);
+        });
 
         // Default combo: Sodium (Na) + Chlorine (Cl)
         selectedReactantElements.clear();
@@ -735,6 +998,55 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
 
         setupQuickCompounds();
         updateMixerUI();
+    }
+
+    private void setVisualizerMode(MolecularVisualizerView.RenderMode mode) {
+        if (molecularVisualizer != null) {
+            molecularVisualizer.setRenderMode(mode);
+        }
+        btnMode2d.setTextColor(mode == MolecularVisualizerView.RenderMode.MODE_2D ? 0xFF00FFCC : 0xFF88AABB);
+        btnMode2d.setBackgroundColor(mode == MolecularVisualizerView.RenderMode.MODE_2D ? 0x3500FFCC : 0x1500FFCC);
+
+        btnMode3d.setTextColor(mode == MolecularVisualizerView.RenderMode.MODE_3D ? 0xFF00FFCC : 0xFF88AABB);
+        btnMode3d.setBackgroundColor(mode == MolecularVisualizerView.RenderMode.MODE_3D ? 0x3500FFCC : 0x1500FFCC);
+
+        btnModeLewis.setTextColor(mode == MolecularVisualizerView.RenderMode.MODE_LEWIS ? 0xFF00FFCC : 0xFF88AABB);
+        btnModeLewis.setBackgroundColor(mode == MolecularVisualizerView.RenderMode.MODE_LEWIS ? 0x3500FFCC : 0x1500FFCC);
+
+        btnModePolarity.setTextColor(mode == MolecularVisualizerView.RenderMode.MODE_POLARITY ? 0xFF00FFCC : 0xFF88AABB);
+        btnModePolarity.setBackgroundColor(mode == MolecularVisualizerView.RenderMode.MODE_POLARITY ? 0x3500FFCC : 0x1500FFCC);
+    }
+
+    private void exportMolecularStructureImage() {
+        if (molecularVisualizer == null) return;
+        Bitmap bmp = molecularVisualizer.exportAsBitmap();
+        if (bmp == null) {
+            Toast.makeText(this, "Failed to capture molecular structure", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+            File cachePath = new File(getCacheDir(), "molecular_structures");
+            if (!cachePath.exists()) cachePath.mkdirs();
+            String formulaClean = (selectedCompound != null ? selectedCompound.formula.replaceAll("[^a-zA-Z0-9]", "") : "molecule");
+            File file = new File(cachePath, "molecular_" + formulaClean + "_" + System.currentTimeMillis() + ".png");
+            FileOutputStream fos = new FileOutputStream(file);
+            bmp.compress(Bitmap.CompressFormat.PNG, 100, fos);
+            fos.flush();
+            fos.close();
+
+            Uri contentUri = FileProvider.getUriForFile(this, getPackageName() + ".provider", file);
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType("image/png");
+            shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, "HENRY Molecular Structure: " + (selectedCompound != null ? selectedCompound.name : "Molecule"));
+            shareIntent.putExtra(Intent.EXTRA_TEXT, "Chemical Structure rendered with HENRY Molecular Visualization Engine:\n" +
+                    (selectedCompound != null ? selectedCompound.formula + " • " + selectedCompound.name : ""));
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(shareIntent, "Export Molecular Structure"));
+        } catch (Exception e) {
+            Toast.makeText(this, "Molecular structure exported to cache", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void showElementSelectorDialog() {
@@ -891,44 +1203,109 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
         }
 
         // Display current compound details or instructions
-        if (selectedCompound != null && matchingCompounds.contains(selectedCompound)) {
+        if (selectedCompound != null) {
             cardMixerResult.setVisibility(View.VISIBLE);
+            cardUnverifiedCompound.setVisibility(View.GONE);
+
             tvCompoundFormula.setText(selectedCompound.formula + " • " + selectedCompound.name);
             tvCompoundCommon.setText("Common Name: " + selectedCompound.common + " (" + selectedCompound.category + ")");
             tvCompoundStructure.setText(selectedCompound.structure);
             tvCompoundBond.setText(selectedCompound.bond);
             tvCompoundSynthesis.setText(selectedCompound.synthesis);
             tvCompoundUses.setText(selectedCompound.uses);
-        } else if (!matchingCompounds.isEmpty()) {
-            selectedCompound = matchingCompounds.get(0);
-            cardMixerResult.setVisibility(View.VISIBLE);
-            tvCompoundFormula.setText(selectedCompound.formula + " • " + selectedCompound.name);
-            tvCompoundCommon.setText("Common Name: " + selectedCompound.common + " (" + selectedCompound.category + ")");
-            tvCompoundStructure.setText(selectedCompound.structure);
-            tvCompoundBond.setText(selectedCompound.bond);
-            tvCompoundSynthesis.setText(selectedCompound.synthesis);
-            tvCompoundUses.setText(selectedCompound.uses);
-        } else if (selectedReactantElements.size() >= 2) {
-            cardMixerResult.setVisibility(View.VISIBLE);
-            StringBuilder sb = new StringBuilder();
-            for (Elem e : selectedReactantElements) {
-                if (sb.length() > 0) sb.append(" + ");
-                sb.append(e.symbol);
+            if (tvCompoundCategoryBadge != null) {
+                tvCompoundCategoryBadge.setText(selectedCompound.category.toUpperCase(Locale.US));
             }
-            tvCompoundFormula.setText(sb.toString() + " (Uncatalogued Binary/Multi-Phase)");
-            tvCompoundCommon.setText("No standard everyday room-temperature compound catalogued.");
-            tvCompoundStructure.setText("Multi-element precursor blend. Requires high-temperature sintering, chemical vapor deposition, or laser induction.");
-            tvCompoundBond.setText("Predicted intermetallic coordination / complex ionic crystal lattice.");
-            tvCompoundSynthesis.setText("High-temperature vacuum furnace melting (>1,200°C) or plasma spark sintering.");
-            tvCompoundUses.setText("• Potential high-entropy alloy or custom catalytic formulation.\n• Tap 'SYNTHESIZE NOVEL CHEMICAL WITH HENRY' below to predict a novel material!");
+
+            MolecularStructureData data = ChemistryAccuracyEngine.findCompound(selectedCompound.formula, selectedCompound.name);
+            if (data != null) {
+                currentStructureData = data;
+                if (molecularVisualizer != null) {
+                    molecularVisualizer.setVisibility(View.VISIBLE);
+                    molecularVisualizer.setStructureData(data);
+                }
+
+                if (tvPropGeometry != null) tvPropGeometry.setText(data.molecularGeometry);
+                if (tvPropElectronGeometry != null) tvPropElectronGeometry.setText(data.electronGeometry);
+                if (tvPropHybridization != null) tvPropHybridization.setText(data.hybridization);
+                if (tvPropBondAngle != null) tvPropBondAngle.setText(data.bondAngle);
+                if (tvPropPolarity != null) tvPropPolarity.setText(data.polarityDescription);
+                if (tvPropWeight != null) tvPropWeight.setText(data.molecularWeight);
+                if (tvPropImf != null) tvPropImf.setText(data.intermolecularForces);
+
+                if (tvAnalysisVsepr != null) tvAnalysisVsepr.setText("VSEPR Theory: " + data.vseprJustification);
+                if (tvAnalysisBonding != null) tvAnalysisBonding.setText("Bonding Mechanism: " + data.bondingExplanation);
+                if (tvCompoundSafetyNotice != null) tvCompoundSafetyNotice.setText("⚠️ SYNTHESIS & SAFETY: " + data.safetyNotice);
+
+                // Populate Educational Q&A
+                if (educationalQaContainer != null) {
+                    educationalQaContainer.removeAllViews();
+                    if (data.educationalItems != null && !data.educationalItems.isEmpty()) {
+                        for (MolecularStructureData.EducationalQA qa : data.educationalItems) {
+                            LinearLayout card = new LinearLayout(this);
+                            card.setOrientation(LinearLayout.VERTICAL);
+                            card.setBackgroundColor(0x1800FFCC);
+                            card.setPadding(dp(10), dp(8), dp(10), dp(8));
+                            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                            lp.setMargins(0, 0, 0, dp(6));
+                            card.setLayoutParams(lp);
+
+                            TextView qTv = new TextView(this);
+                            qTv.setText("Q: " + qa.question);
+                            qTv.setTextColor(0xFF00FFCC);
+                            qTv.setTextSize(11f);
+                            qTv.setTypeface(Typeface.DEFAULT_BOLD);
+                            card.addView(qTv);
+
+                            TextView aTv = new TextView(this);
+                            aTv.setText(qa.answer);
+                            aTv.setTextColor(0xFFD8E9F8);
+                            aTv.setTextSize(11f);
+                            aTv.setPadding(0, dp(3), 0, 0);
+                            card.addView(aTv);
+
+                            educationalQaContainer.addView(card);
+                        }
+                    }
+                }
+            } else {
+                if (molecularVisualizer != null) molecularVisualizer.setStructureData(null);
+            }
+        } else if (selectedReactantElements.size() >= 2) {
+            // Check accuracy engine for scientific unverified/non-bonding explanation
+            List<String> symList = new ArrayList<>();
+            for (Elem e : selectedReactantElements) symList.add(e.symbol);
+            String unverifiedExp = ChemistryAccuracyEngine.getUnverifiedExplanation(symList);
+
+            cardMixerResult.setVisibility(View.GONE);
+            cardUnverifiedCompound.setVisibility(View.VISIBLE);
+            tvUnverifiedReason.setText(unverifiedExp);
+            if (molecularVisualizer != null) molecularVisualizer.setStructureData(null);
+            if (cardAtomInspector != null) cardAtomInspector.setVisibility(View.GONE);
         } else {
             cardMixerResult.setVisibility(View.VISIBLE);
+            cardUnverifiedCompound.setVisibility(View.GONE);
+            if (cardAtomInspector != null) cardAtomInspector.setVisibility(View.GONE);
+
             tvCompoundFormula.setText("Awaiting Reactants");
             tvCompoundCommon.setText("Add 2 or more elements to inspect molecular reaction paths.");
             tvCompoundStructure.setText("--");
             tvCompoundBond.setText("--");
             tvCompoundSynthesis.setText("--");
             tvCompoundUses.setText("--");
+            if (tvPropGeometry != null) tvPropGeometry.setText("--");
+            if (tvPropElectronGeometry != null) tvPropElectronGeometry.setText("--");
+            if (tvPropHybridization != null) tvPropHybridization.setText("--");
+            if (tvPropBondAngle != null) tvPropBondAngle.setText("--");
+            if (tvPropPolarity != null) tvPropPolarity.setText("--");
+            if (tvPropWeight != null) tvPropWeight.setText("--");
+            if (tvPropImf != null) tvPropImf.setText("--");
+            if (tvAnalysisVsepr != null) tvAnalysisVsepr.setText("--");
+            if (tvAnalysisBonding != null) tvAnalysisBonding.setText("--");
+            if (tvCompoundSafetyNotice != null) tvCompoundSafetyNotice.setText("⚠️ Awaiting chemical reactants in vessel.");
+            if (educationalQaContainer != null) educationalQaContainer.removeAllViews();
+            if (molecularVisualizer != null) molecularVisualizer.setStructureData(null);
         }
     }
 
@@ -1011,14 +1388,20 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
         String[] quickCombos = {
                 "Water (H₂O)", "Table Salt (NaCl)", "Carbon Dioxide (CO₂)",
                 "Methane (CH₄)", "Ethanol (C₂H₅OH)", "Glucose (C₆H₁₂O₆)",
-                "Ammonia (NH₃)", "Nitinol (NiTi)", "Titanium-Gold (β-Ti₃Au)",
+                "Ammonia (NH₃)", "Boron Trifluoride (BF₃)", "Benzene (C₆H₆)",
+                "Sulfur Hexafluoride (SF₆)", "Phosphorus Pentachloride (PCl₅)",
+                "Sulfur Dioxide (SO₂)", "Hydrogen Fluoride (HF)", "Hydrochloric Acid (HCl)",
+                "Nitinol (NiTi)", "Titanium-Gold (β-Ti₃Au)",
                 "Stainless Steel (Fe-Cr-Ni-C)", "Silicon Dioxide (SiO₂)",
                 "Silicon Carbide (SiC)", "Gallium Nitride (GaN)"
         };
         String[][] combos = {
                 {"H", "O"}, {"Na", "Cl"}, {"C", "O"},
                 {"C", "H"}, {"C", "H", "O"}, {"C", "H", "O"},
-                {"N", "H"}, {"Ni", "Ti"}, {"Ti", "Au"},
+                {"N", "H"}, {"B", "F"}, {"C", "H"},
+                {"S", "F"}, {"P", "Cl"},
+                {"S", "O"}, {"H", "F"}, {"H", "Cl"},
+                {"Ni", "Ti"}, {"Ti", "Au"},
                 {"Fe", "C", "Cr", "Ni"}, {"Si", "O"},
                 {"Si", "C"}, {"Ga", "N"}
         };

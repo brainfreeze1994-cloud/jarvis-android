@@ -497,7 +497,7 @@
                     </HorizontalScrollView>
                 </LinearLayout>
 
-                <!-- Reaction Result Card -->
+                <!-- Reaction Result Card (Upgraded with Complete Molecular Visualization Engine) -->
                 <LinearLayout
                     android:id="@+id/card_mixer_result"
                     android:layout_width="match_parent"
@@ -507,6 +507,7 @@
                     android:padding="16dp"
                     android:layout_marginTop="14dp">
 
+                    <!-- Compound Identity Header -->
                     <RelativeLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content">
@@ -530,7 +531,267 @@
                             android:textSize="13sp"
                             android:layout_below="@+id/tv_compound_formula"
                             android:layout_marginTop="2dp"/>
+
+                        <TextView
+                            android:id="@+id/tv_compound_category_badge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true"
+                            android:text="VERIFIED STABLE"
+                            android:textColor="#00FFCC"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:background="#2000FFCC"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="4dp"/>
                     </RelativeLayout>
+
+                    <!-- Interactive Molecular Canvas -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🔬 INTERACTIVE MOLECULAR STRUCTURE (TAP ATOM TO INSPECT):"
+                        android:textColor="#88AABB"
+                        android:textSize="10sp"
+                        android:textStyle="bold"
+                        android:layout_marginTop="12dp"/>
+
+                    <com.jarvis.ai.chemistry.MolecularVisualizerView
+                        android:id="@+id/molecular_visualizer"
+                        android:layout_width="match_parent"
+                        android:layout_height="320dp"
+                        android:background="#060E1A"
+                        android:layout_marginTop="6dp"/>
+
+                    <!-- Visualization Mode Tabs -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="10dp">
+
+                        <TextView
+                            android:id="@+id/btn_mode_2d"
+                            android:layout_width="0dp"
+                            android:layout_height="36dp"
+                            android:layout_weight="1"
+                            android:text="2D STRUCTURE"
+                            android:textColor="#88AABB"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:gravity="center"
+                            android:background="#1500FFCC"
+                            android:layout_marginEnd="4dp"
+                            android:clickable="true"
+                            android:focusable="true"/>
+
+                        <TextView
+                            android:id="@+id/btn_mode_3d"
+                            android:layout_width="0dp"
+                            android:layout_height="36dp"
+                            android:layout_weight="1"
+                            android:text="3D MOLECULE"
+                            android:textColor="#00FFCC"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:gravity="center"
+                            android:background="#3500FFCC"
+                            android:layout_marginEnd="4dp"
+                            android:clickable="true"
+                            android:focusable="true"/>
+
+                        <TextView
+                            android:id="@+id/btn_mode_lewis"
+                            android:layout_width="0dp"
+                            android:layout_height="36dp"
+                            android:layout_weight="1"
+                            android:text="LEWIS"
+                            android:textColor="#88AABB"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:gravity="center"
+                            android:background="#1500FFCC"
+                            android:layout_marginEnd="4dp"
+                            android:clickable="true"
+                            android:focusable="true"/>
+
+                        <TextView
+                            android:id="@+id/btn_mode_polarity"
+                            android:layout_width="0dp"
+                            android:layout_height="36dp"
+                            android:layout_weight="1"
+                            android:text="POLARITY"
+                            android:textColor="#88AABB"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:gravity="center"
+                            android:background="#1500FFCC"
+                            android:clickable="true"
+                            android:focusable="true"/>
+                    </LinearLayout>
+
+                    <!-- Camera & Visualizer Control Toolbar -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="8dp">
+
+                        <TextView
+                            android:id="@+id/btn_control_rotate"
+                            android:layout_width="0dp"
+                            android:layout_height="32dp"
+                            android:layout_weight="1"
+                            android:text="🔄 ROTATE: ON"
+                            android:textColor="#00FFCC"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:gravity="center"
+                            android:background="#1500FFCC"
+                            android:layout_marginEnd="4dp"
+                            android:clickable="true"
+                            android:focusable="true"/>
+
+                        <TextView
+                            android:id="@+id/btn_control_reset"
+                            android:layout_width="0dp"
+                            android:layout_height="32dp"
+                            android:layout_weight="1"
+                            android:text="🔍 RESET"
+                            android:textColor="#88AABB"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:gravity="center"
+                            android:background="#1500FFCC"
+                            android:layout_marginEnd="4dp"
+                            android:clickable="true"
+                            android:focusable="true"/>
+
+                        <TextView
+                            android:id="@+id/btn_control_labels"
+                            android:layout_width="0dp"
+                            android:layout_height="32dp"
+                            android:layout_weight="1"
+                            android:text="🏷 LABELS: ON"
+                            android:textColor="#00FFCC"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:gravity="center"
+                            android:background="#1500FFCC"
+                            android:layout_marginEnd="4dp"
+                            android:clickable="true"
+                            android:focusable="true"/>
+
+                        <TextView
+                            android:id="@+id/btn_control_export"
+                            android:layout_width="0dp"
+                            android:layout_height="32dp"
+                            android:layout_weight="1"
+                            android:text="📤 EXPORT"
+                            android:textColor="#FFD700"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:gravity="center"
+                            android:background="#20FFD700"
+                            android:clickable="true"
+                            android:focusable="true"/>
+                    </LinearLayout>
+
+                    <!-- Atom Quantum Telemetry Inspector Card (Interactive Tapping) -->
+                    <LinearLayout
+                        android:id="@+id/card_atom_inspector"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:background="#0A1828"
+                        android:padding="12dp"
+                        android:layout_marginTop="10dp"
+                        android:visibility="gone">
+
+                        <RelativeLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content">
+
+                            <TextView
+                                android:id="@+id/tv_inspector_atom_title"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="ATOM TELEMETRY: Oxygen (O) • #8"
+                                android:textColor="#00FFCC"
+                                android:textSize="13sp"
+                                android:textStyle="bold"
+                                android:layout_alignParentStart="true"/>
+
+                            <TextView
+                                android:id="@+id/btn_inspector_close"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_alignParentEnd="true"
+                                android:text="✕"
+                                android:textColor="#FF6B6B"
+                                android:textSize="13sp"
+                                android:padding="4dp"
+                                android:clickable="true"
+                                android:focusable="true"/>
+                        </RelativeLayout>
+
+                        <TextView
+                            android:id="@+id/tv_inspector_atom_role"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Molecule Role: Central sp³ Hybridized Core Atom"
+                            android:textColor="#CC88FF"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:layout_marginTop="2dp"/>
+
+                        <TextView
+                            android:id="@+id/tv_inspector_atom_details"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Valence e⁻: 6  •  e⁻ Config: 1s² 2s² 2p⁴  •  Weight: 15.999 u\nFormal Charge: 0  •  Partial Charge: -0.66δ"
+                            android:textColor="#A0C0E0"
+                            android:textSize="11sp"
+                            android:fontFamily="monospace"
+                            android:layout_marginTop="4dp"/>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="8dp">
+
+                            <TextView
+                                android:id="@+id/btn_inspector_view_matrix"
+                                android:layout_width="0dp"
+                                android:layout_height="32dp"
+                                android:layout_weight="1"
+                                android:text="VIEW IN PERIODIC MATRIX"
+                                android:textColor="#00D4FF"
+                                android:textSize="10sp"
+                                android:textStyle="bold"
+                                android:gravity="center"
+                                android:background="#1500D4FF"
+                                android:layout_marginEnd="6dp"
+                                android:clickable="true"
+                                android:focusable="true"/>
+
+                            <TextView
+                                android:id="@+id/btn_inspector_view_bohr"
+                                android:layout_width="0dp"
+                                android:layout_height="32dp"
+                                android:layout_weight="1"
+                                android:text="INSPECT BOHR ORBITALS"
+                                android:textColor="#00FFCC"
+                                android:textSize="10sp"
+                                android:textStyle="bold"
+                                android:gravity="center"
+                                android:background="#1500FFCC"
+                                android:clickable="true"
+                                android:focusable="true"/>
+                        </LinearLayout>
+                    </LinearLayout>
 
                     <View
                         android:layout_width="match_parent"
@@ -538,11 +799,209 @@
                         android:background="#204060"
                         android:layout_marginVertical="10dp"/>
 
-                    <!-- Molecular & Chemical Structure -->
+                    <!-- Comprehensive Molecular Properties Table -->
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="📐 CHEMICAL STRUCTURE &amp; BONDING:"
+                        android:text="📊 COMPREHENSIVE MOLECULAR PARAMETERS:"
+                        android:textColor="#00D4FF"
+                        android:textSize="11sp"
+                        android:textStyle="bold"/>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:background="#091422"
+                        android:padding="10dp"
+                        android:layout_marginTop="6dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Molecular Geometry:"
+                                android:textColor="#88AABB"
+                                android:textSize="11sp"/>
+
+                            <TextView
+                                android:id="@+id/tv_prop_geometry"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1.4"
+                                android:text="Bent (104.5°)"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11sp"
+                                android:textStyle="bold"/>
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="4dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Electron Geometry:"
+                                android:textColor="#88AABB"
+                                android:textSize="11sp"/>
+
+                            <TextView
+                                android:id="@+id/tv_prop_electron_geometry"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1.4"
+                                android:text="Tetrahedral"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11sp"
+                                android:textStyle="bold"/>
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="4dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Hybridization:"
+                                android:textColor="#88AABB"
+                                android:textSize="11sp"/>
+
+                            <TextView
+                                android:id="@+id/tv_prop_hybridization"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1.4"
+                                android:text="sp³"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11sp"
+                                android:textStyle="bold"/>
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="4dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Bond Angles:"
+                                android:textColor="#88AABB"
+                                android:textSize="11sp"/>
+
+                            <TextView
+                                android:id="@+id/tv_prop_bond_angle"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1.4"
+                                android:text="104.5°"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11sp"
+                                android:textStyle="bold"/>
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="4dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Molecular Polarity:"
+                                android:textColor="#88AABB"
+                                android:textSize="11sp"/>
+
+                            <TextView
+                                android:id="@+id/tv_prop_polarity"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1.4"
+                                android:text="Polar (Net Dipole μ = 1.85 D)"
+                                android:textColor="#00FFCC"
+                                android:textSize="11sp"
+                                android:textStyle="bold"/>
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="4dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Molecular Weight:"
+                                android:textColor="#88AABB"
+                                android:textSize="11sp"/>
+
+                            <TextView
+                                android:id="@+id/tv_prop_weight"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1.4"
+                                android:text="18.015 g/mol"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11sp"
+                                android:textStyle="bold"/>
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="4dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="Intermolecular Forces:"
+                                android:textColor="#88AABB"
+                                android:textSize="11sp"/>
+
+                            <TextView
+                                android:id="@+id/tv_prop_imf"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1.4"
+                                android:text="Hydrogen Bonding, Dipole-Dipole, London Dispersion"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11sp"
+                                android:textStyle="bold"/>
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#204060"
+                        android:layout_marginVertical="10dp"/>
+
+                    <!-- Molecular Structure Analysis (Deep Pedagogical Insight) -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🔬 MOLECULAR STRUCTURE ANALYSIS:"
                         android:textColor="#CC88FF"
                         android:textSize="11sp"
                         android:textStyle="bold"/>
@@ -558,13 +1017,31 @@
                         android:layout_marginTop="3dp"/>
 
                     <TextView
+                        android:id="@+id/tv_analysis_vsepr"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="VSEPR Theory: 4 electron domains (2 bonding pairs + 2 lone pairs) adopt tetrahedral electron geometry. Lone pair-lone pair repulsion compresses H-O-H angle from 109.5° to 104.5°."
+                        android:textColor="#A0B8D0"
+                        android:textSize="11sp"
+                        android:layout_marginTop="4dp"/>
+
+                    <TextView
+                        android:id="@+id/tv_analysis_bonding"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Bonding Mechanism: Oxygen's high electronegativity (3.44) strongly attracts bonding electrons from Hydrogen (2.20), creating polarized covalent bonds."
+                        android:textColor="#A0B8D0"
+                        android:textSize="11sp"
+                        android:layout_marginTop="4dp"/>
+
+                    <TextView
                         android:id="@+id/tv_compound_bond"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Bond Type: Strong Electrostatic Ionic Bond (ΔEN = 2.23) • Lattice Energy: 786 kJ/mol"
                         android:textColor="#7799AA"
                         android:textSize="11sp"
-                        android:layout_marginTop="3dp"/>
+                        android:layout_marginTop="4dp"/>
 
                     <View
                         android:layout_width="match_parent"
@@ -572,11 +1049,55 @@
                         android:background="#204060"
                         android:layout_marginVertical="10dp"/>
 
-                    <!-- How to synthesize / chemical reactions -->
+                    <!-- Educational Mode Section -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🎓 EDUCATIONAL MODE:"
+                            android:textColor="#FFD700"
+                            android:textSize="11sp"
+                            android:textStyle="bold"/>
+
+                        <TextView
+                            android:id="@+id/btn_toggle_educational"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="MODE: ON"
+                            android:textColor="#00FFCC"
+                            android:textSize="10sp"
+                            android:textStyle="bold"
+                            android:background="#2000FFCC"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="4dp"
+                            android:clickable="true"
+                            android:focusable="true"/>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/educational_qa_container"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginTop="8dp"/>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="#204060"
+                        android:layout_marginVertical="10dp"/>
+
+                    <!-- Reaction Mechanism / Chemical Formation -->
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="🔬 HOW TO SYNTHESIZE / REACTION MECHANISM:"
+                        android:text="⚡ CHEMICAL FORMATION &amp; REACTION PATHWAY:"
                         android:textColor="#FFB84D"
                         android:textSize="11sp"
                         android:textStyle="bold"/>
@@ -590,13 +1111,24 @@
                         android:textSize="12sp"
                         android:layout_marginTop="3dp"/>
 
+                    <TextView
+                        android:id="@+id/tv_compound_safety_notice"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="⚠️ REAL-WORLD SYNTHESIS NOTICE: Elemental sodium and chlorine gas are hazardous; real laboratory synthesis requires controlled fume hood extraction."
+                        android:textColor="#FFAA44"
+                        android:textSize="10sp"
+                        android:background="#15FFAA44"
+                        android:padding="8dp"
+                        android:layout_marginTop="6dp"/>
+
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="1dp"
                         android:background="#204060"
                         android:layout_marginVertical="10dp"/>
 
-                    <!-- Practical Uses -->
+                    <!-- Practical Uses & Industrial Applications -->
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -613,6 +1145,43 @@
                         android:textColor="#A0C0E0"
                         android:textSize="12sp"
                         android:layout_marginTop="3dp"/>
+                </LinearLayout>
+
+                <!-- Unverified Chemical Combination Card -->
+                <LinearLayout
+                    android:id="@+id/card_unverified_compound"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="#221111"
+                    android:padding="16dp"
+                    android:layout_marginTop="14dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="⚠️ NO VERIFIED STABLE COMPOUND"
+                        android:textColor="#FF6B6B"
+                        android:textSize="16sp"
+                        android:textStyle="bold"/>
+
+                    <TextView
+                        android:id="@+id/tv_unverified_reason"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="The selected elements do not form a verified, stable stoichiometric compound under standard laboratory conditions."
+                        android:textColor="#E0A0A0"
+                        android:textSize="12sp"
+                        android:layout_marginTop="6dp"/>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="HENRY Accuracy Engine verified: Noble gas full octets, incompatible metallic matrices, or absence of viable electronegativity gradient."
+                        android:textColor="#88AABB"
+                        android:textSize="10sp"
+                        android:layout_marginTop="6dp"/>
                 </LinearLayout>
 
                 <!-- HENRY AI NOVEL CHEMICAL SYNTHESIS CARD -->

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_diagnostic_card"
+    android:padding="12dp"
+    android:layout_marginBottom="10dp">
+
+    <!-- Top Row: Name, Category, Status Badge -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tv_subsystem_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Subsystem Name"
+            android:textColor="#00D4FF"
+            android:textSize="13sp"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.04" />
+
+        <TextView
+            android:id="@+id/tv_subsystem_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="OPTIMAL"
+            android:textColor="#00FFCC"
+            android:textSize="9sp"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.08"
+            android:background="@drawable/bg_chip"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp" />
+    </LinearLayout>
+
+    <!-- Subsystem Summary -->
+    <TextView
+        android:id="@+id/tv_subsystem_summary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:text="Operational status summary."
+        android:textColor="#C5D9EB"
+        android:textSize="11.5sp"
+        android:lineSpacingExtra="2dp" />
+
+    <!-- Telemetry Details Container -->
+    <LinearLayout
+        android:id="@+id/layout_telemetry_details"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="6dp"
+        android:paddingTop="6dp"
+        android:background="#0800D4FF"
+        android:paddingHorizontal="8dp"
+        android:paddingBottom="6dp" />
+
+    <!-- Bottom Row: Latency indicator -->
+    <TextView
+        android:id="@+id/tv_subsystem_latency"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="⏱️ Latency: 12ms"
+        android:textColor="#1A7799"
+        android:textSize="10sp"
+        android:fontFamily="sans-serif-medium"
+        android:letterSpacing="0.04" />
+
+</LinearLayout>

@@ -259,6 +259,13 @@ public class MainActivity extends AppCompatActivity {
     private boolean                  isCameraScanning = false;
     private int                      consecutiveFaceFrames = 0;
 
+    // ── Network & Gemini API Connectivity Indicator ───────────────────────────
+    private LinearLayout bannerNetworkStatus;
+    private ImageView    ivNetworkIcon;
+    private TextView     tvNetworkStatusText;
+    private TextView     btnNetworkRetry;
+    private ConnectivityManager.OnConnectivityChangeListener connectivityChangeListener;
+
     // ── onCreate ──────────────────────────────────────────────────────────────
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -361,6 +368,27 @@ public class MainActivity extends AppCompatActivity {
         chipsRow2       = findViewById(R.id.chips_row2);
         chipsRow3       = findViewById(R.id.chips_row3);
         scrollMain      = findViewById(R.id.scroll_main);
+
+        // ── Real-Time Network & Gemini API Connectivity Indicator ───────────
+        bannerNetworkStatus = findViewById(R.id.banner_network_status);
+        ivNetworkIcon       = findViewById(R.id.iv_network_icon);
+        tvNetworkStatusText = findViewById(R.id.tv_network_status_text);
+        btnNetworkRetry     = findViewById(R.id.btn_network_retry);
+
+        if (btnNetworkRetry != null) {
+            btnNetworkRetry.setOnClickListener(v -> {
+                btnNetworkRetry.setText("CHECKING…");
+                btnNetworkRetry.setEnabled(false);
+                ConnectivityManager.getInstance(this).checkGeminiConnectionNow();
+                mainHandler.postDelayed(() -> {
+                    if (btnNetworkRetry != null) {
+                        btnNetworkRetry.setText("RETRY");
+                        btnNetworkRetry.setEnabled(true);
+                    }
+                }, 3000);
+            });
+        }
+        initConnectivityMonitoring();
 
         adapter = new ChatAdapter(messages);
         LinearLayoutManager llm = new LinearLayoutManager(this);
@@ -3197,20 +3225,56 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // ── Periodic Table / Element Mixer ──────────────────────────────────
+        // ── Periodic Table / Element Mixer / Molecular Visualizer ────────────
         String periodicLower = userText.toLowerCase(Locale.US);
-        if (periodicLower.contains("periodic table") || periodicLower.contains("element mixer") ||
+        boolean isChemical = periodicLower.contains("periodic table") || periodicLower.contains("element mixer") ||
             periodicLower.contains("chemistry lab") || periodicLower.contains("mix elements") ||
             periodicLower.contains("chemistry periodic") || periodicLower.contains("elements table") ||
             periodicLower.contains("periodic matrix") || periodicLower.contains("arc synthesizer") ||
-            periodicLower.contains("chemical mixer") || periodicLower.contains("bohr model") || (periodicLower.contains("chemistry") && periodicLower.contains("table"))) {
+            periodicLower.contains("chemical mixer") || periodicLower.contains("bohr model") ||
+            (periodicLower.contains("chemistry") && periodicLower.contains("table")) ||
+            periodicLower.contains("molecular structure") || periodicLower.contains("chemical structure") ||
+            periodicLower.contains("lewis structure") || periodicLower.contains("molecule visualizer") ||
+            (periodicLower.contains("molecular") && (periodicLower.contains("water") || periodicLower.contains("geometry") || periodicLower.contains("weight") || periodicLower.contains("3d") || periodicLower.contains("2d"))) ||
+            (periodicLower.contains("chemical") && (periodicLower.contains("mixer") || periodicLower.contains("reaction") || periodicLower.contains("compound") || periodicLower.contains("formula"))) ||
+            (periodicLower.contains("mix") && (periodicLower.contains("hydrogen") || periodicLower.contains("oxygen") || periodicLower.contains("sodium") || periodicLower.contains("chlorine") || periodicLower.contains("elements")));
+
+        if (isChemical) {
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            String reply = "[EMOTION:excited] Accessing the HENRY Periodic Matrix and Chemical Mixer, sir.";
+            String reply = "[EMOTION:excited] Accessing the HENRY Periodic Matrix and Chemical Synthesizer, sir.";
             String clean = stripEmotionTag(reply);
             history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
             speak(clean, "excited");
             saveHistory();
-            startActivity(new Intent(this, PeriodicTableActivity.class));
+
+            Intent chemIntent = new Intent(this, PeriodicTableActivity.class);
+            if (periodicLower.contains("mixer") || periodicLower.contains("mix") || periodicLower.contains("molecule") || periodicLower.contains("molecular") || periodicLower.contains("structure") || periodicLower.contains("compound") || periodicLower.contains("reaction")) {
+                chemIntent.putExtra(PeriodicTableActivity.EXTRA_MODE, PeriodicTableActivity.MODE_MIXER);
+            } else if (periodicLower.contains("bohr") || periodicLower.contains("orbital")) {
+                chemIntent.putExtra(PeriodicTableActivity.EXTRA_MODE, PeriodicTableActivity.MODE_BOHR);
+            }
+
+            if (periodicLower.contains("water") || periodicLower.contains("h2o")) {
+                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "H2O");
+            } else if (periodicLower.contains("peroxide") || periodicLower.contains("h2o2")) {
+                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "H2O2");
+            } else if (periodicLower.contains("salt") || periodicLower.contains("nacl")) {
+                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "NaCl");
+            } else if (periodicLower.contains("methane") || periodicLower.contains("ch4")) {
+                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "CH4");
+            } else if (periodicLower.contains("ammonia") || periodicLower.contains("nh3")) {
+                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "NH3");
+            } else if (periodicLower.contains("benzene") || periodicLower.contains("c6h6")) {
+                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "C6H6");
+            } else if (periodicLower.contains("ethanol") || periodicLower.contains("alcohol")) {
+                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "C2H5OH");
+            } else if (periodicLower.contains("carbon dioxide") || periodicLower.contains("co2")) {
+                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "CO2");
+            } else if (periodicLower.contains("carbon monoxide") || periodicLower.matches(".*\\bco\\b.*")) {
+                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "CO");
+            }
+
+            startActivity(chemIntent);
             return;
         }
 
@@ -4650,6 +4714,19 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        // 👁 Vision Pipeline / Graph Search (BFS & DFS) trigger
+        if (lowerInput.matches(".*(vision pipeline|pipeline|breadth first|depth first|\\bbfs\\b|\\bdfs\\b|graph search|transit graph|pcb graph|constellation graph|vision intelligence).*") ||
+            (lowerInput.contains("vision") && (lowerInput.contains("pipeline") || lowerInput.contains("search") || lowerInput.contains("graph")))) {
+            android.content.Intent pipeIntent = new android.content.Intent(this, VisionActivity.class);
+            pipeIntent.putExtra(VisionActivity.EXTRA_MODE, VisionActivity.MODE_PIPELINE);
+            startActivity(pipeIntent);
+            String reply = "[EMOTION:focused] Initializing Vision Pipeline, sir. Breadth-First and Depth-First topological search ready across transit, circuit, and star network graphs.";
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
+            saveHistory();
+            return;
+        }
+
         // [v20] Dubai transit detection — add deep-link buttons after response
         final boolean isTransit = TransitHelper.isTransitQuery(userText);
         final boolean isLegal   = UAELawHelper.isLegalQuery(userText);
@@ -4722,6 +4799,15 @@ public class MainActivity extends AppCompatActivity {
                         showFollowUpChips(followUps);
                     }
 
+                    // Cache AI response in Room database for offline-first querying
+                    ChatPersistenceRepository.getInstance(MainActivity.this).cacheAiResponse(
+                        offlineQueryText,
+                        cleanReply,
+                        emotion,
+                        offlineQueryIntent,
+                        imageUrl
+                    );
+
                     saveHistory();
                     if (btnSend != null) btnSend.setEnabled(true);
 
@@ -4735,11 +4821,19 @@ public class MainActivity extends AppCompatActivity {
                 mainHandler.post(() -> hideTyping());
 
                 new Thread(() -> {
-                    String offlineReply = HenryOfflineBrain.generateOfflineResponse(
-                        offlineQueryText, 
-                        offlineQueryIntent, 
-                        MainActivity.this
-                    );
+                    // Check Room cached AI responses first for offline-first experience
+                    AiResponseCacheEntity cached = ChatPersistenceRepository.getInstance(MainActivity.this)
+                            .lookupCachedResponseSync(offlineQueryText);
+                    String offlineReply;
+                    if (cached != null && cached.responseText != null && !cached.responseText.isEmpty()) {
+                        offlineReply = cached.responseText;
+                    } else {
+                        offlineReply = HenryOfflineBrain.generateOfflineResponse(
+                            offlineQueryText, 
+                            offlineQueryIntent, 
+                            MainActivity.this
+                        );
+                    }
 
                     String emotion = extractEmotion(offlineReply);
                     String cleanReply = stripEmotionTag(offlineReply);
@@ -5191,22 +5285,48 @@ public class MainActivity extends AppCompatActivity {
         List<HistoryItem> toSave = history.size() > 80
             ? history.subList(history.size() - 80, history.size()) : history;
         getPrefs().edit().putString(KEY_HIS, gson.toJson(toSave)).apply();
+        // Also persist to Room Database asynchronously for robust offline-first storage
+        try {
+            if (!history.isEmpty()) {
+                HistoryItem last = history.get(history.size() - 1);
+                ChatPersistenceRepository.getInstance(this).saveMessage(
+                    new Message("user".equals(last.role) ? Message.TYPE_USER : Message.TYPE_JARVIS, last.text),
+                    last.role,
+                    false
+                );
+            }
+        } catch (Exception ignored) {}
     }
     private void loadHistory() {
-        String json = getPrefs().getString(KEY_HIS, null);
-        if (json == null || json.isEmpty()) return;
-        try {
-            Type type = new TypeToken<List<HistoryItem>>(){}.getType();
-            List<HistoryItem> saved = gson.fromJson(json, type);
-            if (saved == null) return;
-            history.addAll(saved);
-            List<HistoryItem> vis = saved.size() > 20
-                ? saved.subList(saved.size() - 20, saved.size()) : saved;
-            for (HistoryItem item : vis)
-                messages.add(new Message(
-                    "user".equals(item.role) ? Message.TYPE_USER : Message.TYPE_JARVIS, item.text));
-            if (!messages.isEmpty()) { adapter.notifyDataSetChanged(); scrollToBottom(); }
-        } catch (Exception ignored) {}
+        // First try loading from Room (migrating legacy SharedPreferences if Room is uninitialized)
+        ChatPersistenceRepository.getInstance(this).loadHistory(80, (historyItems, messageList) -> {
+            if (historyItems != null && !historyItems.isEmpty()) {
+                history.clear();
+                history.addAll(historyItems);
+                messages.clear();
+                messages.addAll(messageList);
+                if (adapter != null) {
+                    adapter.notifyDataSetChanged();
+                    scrollToBottom();
+                }
+            } else {
+                // Fallback to legacy SharedPreferences if needed
+                String json = getPrefs().getString(KEY_HIS, null);
+                if (json == null || json.isEmpty()) return;
+                try {
+                    Type type = new TypeToken<List<HistoryItem>>(){}.getType();
+                    List<HistoryItem> saved = gson.fromJson(json, type);
+                    if (saved == null) return;
+                    history.addAll(saved);
+                    List<HistoryItem> vis = saved.size() > 20
+                        ? saved.subList(saved.size() - 20, saved.size()) : saved;
+                    for (HistoryItem item : vis)
+                        messages.add(new Message(
+                            "user".equals(item.role) ? Message.TYPE_USER : Message.TYPE_JARVIS, item.text));
+                    if (!messages.isEmpty() && adapter != null) { adapter.notifyDataSetChanged(); scrollToBottom(); }
+                } catch (Exception ignored) {}
+            }
+        });
     }
 
     // ── Permissions ───────────────────────────────────────────────────────────
@@ -5923,6 +6043,76 @@ public class MainActivity extends AppCompatActivity {
         try { unregisterReceiver(wakeReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(notifReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(screenRecordReceiver); } catch (Exception ignored) {}
+        if (connectivityChangeListener != null) {
+            ConnectivityManager.getInstance(this).removeListener(connectivityChangeListener);
+        }
         super.onDestroy();
+    }
+
+    private void initConnectivityMonitoring() {
+        final ConnectivityManager cm = ConnectivityManager.getInstance(this);
+        cm.startMonitoring();
+
+        connectivityChangeListener = (state, message) -> runOnUiThread(() -> updateConnectivityUI(state, message));
+        cm.addListener(connectivityChangeListener);
+    }
+
+    private void updateConnectivityUI(ConnectivityManager.ConnectionState state, String message) {
+        if (isFinishing() || isDestroyed()) return;
+
+        switch (state) {
+            case CONNECTED:
+                if (bannerNetworkStatus != null) {
+                    bannerNetworkStatus.setVisibility(View.GONE);
+                }
+                if (tvStatus != null) {
+                    tvStatus.setText("ONLINE");
+                    tvStatus.setTextColor(0xFF00FFCC);
+                }
+                break;
+
+            case API_LOST:
+                if (bannerNetworkStatus != null) {
+                    bannerNetworkStatus.setVisibility(View.VISIBLE);
+                }
+                if (ivNetworkIcon != null) {
+                    ivNetworkIcon.setImageResource(R.drawable.ic_cloud_off);
+                    ivNetworkIcon.setColorFilter(0xFFFF4757);
+                }
+                if (tvNetworkStatusText != null) {
+                    tvNetworkStatusText.setText(message != null && !message.isEmpty() ? message : getString(R.string.network_banner_gemini_lost));
+                    tvNetworkStatusText.setTextColor(0xFFFF4757);
+                }
+                if (tvStatus != null) {
+                    tvStatus.setText("API LOST");
+                    tvStatus.setTextColor(0xFFFF4757);
+                }
+                break;
+
+            case OFFLINE:
+                if (bannerNetworkStatus != null) {
+                    bannerNetworkStatus.setVisibility(View.VISIBLE);
+                }
+                if (ivNetworkIcon != null) {
+                    ivNetworkIcon.setImageResource(R.drawable.ic_wifi_off);
+                    ivNetworkIcon.setColorFilter(0xFFFF6B6B);
+                }
+                if (tvNetworkStatusText != null) {
+                    tvNetworkStatusText.setText(message != null && !message.isEmpty() ? message : getString(R.string.network_banner_offline));
+                    tvNetworkStatusText.setTextColor(0xFFFF6B6B);
+                }
+                if (tvStatus != null) {
+                    tvStatus.setText("OFFLINE");
+                    tvStatus.setTextColor(0xFFFF6B6B);
+                }
+                break;
+
+            case CHECKING:
+                if (tvStatus != null && (tvStatus.getText() == null || !tvStatus.getText().toString().equals("ONLINE"))) {
+                    tvStatus.setText("CHECKING…");
+                    tvStatus.setTextColor(0xFF00D4FF);
+                }
+                break;
+        }
     }
 }

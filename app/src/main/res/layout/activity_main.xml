@@ -137,13 +137,66 @@
         app:layout_constraintTop_toBottomOf="@id/topbar"
         app:layout_constraintStart_toStartOf="parent"/>
 
+    <!-- ── Real-Time Network & Gemini API Connectivity Visual Indicator Banner ── -->
+    <LinearLayout
+        android:id="@+id/banner_network_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_network_banner"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="7dp"
+        android:layout_marginHorizontal="10dp"
+        android:layout_marginTop="4dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/top_bar_line"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ImageView
+            android:id="@+id/iv_network_icon"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:src="@drawable/ic_cloud_off"
+            android:contentDescription="Gemini API Connection Status" />
+
+        <TextView
+            android:id="@+id/tv_network_status_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="@string/network_banner_gemini_lost"
+            android:textColor="#FF4757"
+            android:textSize="9.5sp"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.08" />
+
+        <TextView
+            android:id="@+id/btn_network_retry"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/network_retry"
+            android:textColor="#00FFCC"
+            android:textSize="8.5sp"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.1"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:background="@drawable/bg_chip"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Retry Gemini API Connection" />
+    </LinearLayout>
+
     <!-- ── Scrollable content ── -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scroll_main"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:fillViewport="true"
-        app:layout_constraintTop_toBottomOf="@id/top_bar_line"
+        app:layout_constraintTop_toBottomOf="@id/banner_network_status"
         app:layout_constraintBottom_toTopOf="@id/bottom_bar_line"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">

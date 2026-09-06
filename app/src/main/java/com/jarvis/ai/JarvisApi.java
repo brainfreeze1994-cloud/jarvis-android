@@ -103,7 +103,14 @@ public class JarvisApi {
 
                 try (Response resp = client.newCall(req).execute()) {
                     String bodyStr = resp.body() != null ? resp.body().string() : "";
-                    if (!resp.isSuccessful()) { cb.onError("Server error " + resp.code()); return; }
+                    if (!resp.isSuccessful()) {
+                        ConnectivityManager cm = ConnectivityManager.getInstance(memCtx);
+                        if (cm != null) cm.reportApiFailure(new java.io.IOException("HTTP " + resp.code()));
+                        cb.onError("Server error " + resp.code());
+                        return;
+                    }
+                    ConnectivityManager cm = ConnectivityManager.getInstance(memCtx);
+                    if (cm != null) cm.reportApiSuccess();
                     JSONObject data = new JSONObject(bodyStr);
                     String reply    = data.optString("reply", "I have no response.");
                     String imageUrl = data.optString("imageUrl", null);
@@ -135,6 +142,8 @@ public class JarvisApi {
                     cb.onSuccess(reply, imageUrl, followUps);
                 }
             } catch (Exception e) {
+                ConnectivityManager cm = ConnectivityManager.getInstance(memCtx);
+                if (cm != null) cm.reportApiFailure(e);
                 String lastUserMsg = "";
                 if (history != null && !history.isEmpty()) {
                     for (int i = history.size() - 1; i >= 0; i--) {
@@ -208,7 +217,14 @@ public class JarvisApi {
 
                 try (Response resp = client.newCall(req).execute()) {
                     String bodyStr = resp.body() != null ? resp.body().string() : "";
-                    if (!resp.isSuccessful()) { cb.onError("Server error " + resp.code()); return; }
+                    if (!resp.isSuccessful()) {
+                        ConnectivityManager cm = ConnectivityManager.getInstance(memCtx);
+                        if (cm != null) cm.reportApiFailure(new java.io.IOException("HTTP " + resp.code()));
+                        cb.onError("Server error " + resp.code());
+                        return;
+                    }
+                    ConnectivityManager cm = ConnectivityManager.getInstance(memCtx);
+                    if (cm != null) cm.reportApiSuccess();
                     JSONObject data = new JSONObject(bodyStr);
                     String reply    = data.optString("reply", "I have no response.");
                     String imageUrl = data.optString("imageUrl", null);
@@ -239,6 +255,8 @@ public class JarvisApi {
                     cb.onSuccess(reply, imageUrl, followUps);
                 }
             } catch (Exception e) {
+                ConnectivityManager cm = ConnectivityManager.getInstance(memCtx);
+                if (cm != null) cm.reportApiFailure(e);
                 String lastUserMsg = "";
                 if (history != null && !history.isEmpty()) {
                     for (int i = history.size() - 1; i >= 0; i--) {

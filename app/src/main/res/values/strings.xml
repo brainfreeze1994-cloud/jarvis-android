@@ -2,4 +2,11 @@
 <resources>
     <string name="app_name">HENRY</string>
     <string name="accessibility_service_description">Allows H.E.N.R.Y to read visible text on your screen for the Screen Reader feature.</string>
+    <string name="network_connected">ONLINE</string>
+    <string name="network_gemini_lost">GEMINI LINK LOST</string>
+    <string name="network_offline">OFFLINE</string>
+    <string name="network_checking">CHECKING...</string>
+    <string name="network_retry">RETRY</string>
+    <string name="network_banner_gemini_lost">GEMINI API DISCONNECTED • Local neural brain active</string>
+    <string name="network_banner_offline">NO INTERNET DETECTED • Local neural brain active</string>
 </resources>

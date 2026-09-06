@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#070D1A"
+    android:fitsSystemWindows="true">
+
+    <!-- ── Top Holographic Bar ── -->
+    <LinearLayout
+        android:id="@+id/topbar_diagnostic"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="10dp"
+        android:background="#0C1527">
+
+        <TextView
+            android:id="@+id/btn_diagnostic_back"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:gravity="center"
+            android:text="← BACK"
+            android:textColor="#00D4FF"
+            android:textSize="11sp"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.08"
+            android:paddingHorizontal="10dp"
+            android:background="@drawable/bg_chip"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Return to main console" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginStart="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="H.E.N.R.Y. // SYSTEM AUDIT"
+                android:textColor="#00FFCC"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.1" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CORE DIAGNOSTIC &amp; VERIFICATION REPORT"
+                android:textColor="#1A7799"
+                android:textSize="8sp"
+                android:letterSpacing="0.12" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/btn_diagnostic_export_pdf"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:gravity="center"
+            android:text="📄 PDF"
+            android:textColor="#00FFCC"
+            android:textSize="10sp"
+            android:fontFamily="sans-serif-medium"
+            android:letterSpacing="0.08"
+            android:paddingHorizontal="12dp"
+            android:background="@drawable/bg_chip"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="Export formal PDF verification report" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@drawable/bg_gradient_line" />
+
+    <!-- ── Main Scrollable Telemetry View ── -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="14dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="24dp">
+
+            <!-- ── System Health Integrity Banner ── -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_diagnostic_card"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <!-- Score Box -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:background="#1500FFCC"
+                        android:paddingHorizontal="18dp"
+                        android:paddingVertical="12dp">
+
+                        <TextView
+                            android:id="@+id/tv_health_score_num"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="100%"
+                            android:textColor="#00FFCC"
+                            android:textSize="26sp"
+                            android:fontFamily="sans-serif-medium"
+                            android:letterSpacing="0.04" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="HEALTH"
+                            android:textColor="#1A7799"
+                            android:textSize="8sp"
+                            android:letterSpacing="0.14" />
+                    </LinearLayout>
+
+                    <!-- Integrity Status Details -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="14dp">
+
+                        <TextView
+                            android:id="@+id/tv_integrity_badge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="ALPHA OPTIMAL"
+                            android:textColor="#00FFCC"
+                            android:textSize="13sp"
+                            android:fontFamily="sans-serif-medium"
+                            android:letterSpacing="0.1" />
+
+                        <TextView
+                            android:id="@+id/tv_audit_timestamp"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="Audit Status: Ready for verification scan"
+                            android:textColor="#8AB4F8"
+                            android:textSize="10sp" />
+
+                        <TextView
+                            android:id="@+id/tv_audit_duration"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Execution Latency: 0 ms • 8 Vectors"
+                            android:textColor="#1A7799"
+                            android:textSize="9.5sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Audit Progress Bar (Visible during scan) -->
+                <ProgressBar
+                    android:id="@+id/progress_audit"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="6dp"
+                    android:layout_marginTop="12dp"
+                    android:max="8"
+                    android:progress="0"
+                    android:progressTint="#00FFCC"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+
+            <!-- ── Interactive Action Controls ── -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="12dp">
+
+                <TextView
+                    android:id="@+id/btn_run_full_audit"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="⚡ RUN FULL AUDIT"
+                    android:textColor="#001B24"
+                    android:textSize="11sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.08"
+                    android:background="#00FFCC"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:contentDescription="Execute comprehensive 8-point system audit" />
+
+                <TextView
+                    android:id="@+id/btn_auto_repair"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:gravity="center"
+                    android:text="🛠️ AUTO-REPAIR"
+                    android:textColor="#FFB800"
+                    android:textSize="11sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.08"
+                    android:background="@drawable/bg_chip"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:contentDescription="Initiate automatic memory, cache and socket repairs" />
+            </LinearLayout>
+
+            <!-- ── Real-Time Holographic Terminal Stream ── -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/bg_terminal_box"
+                android:padding="10dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <View
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:background="#00FFCC" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="DIAGNOSTIC TELEMETRY LOG STREAM"
+                        android:textColor="#00FFCC"
+                        android:textSize="9.5sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:letterSpacing="0.1" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tv_terminal_logs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:maxLines="6"
+                    android:ellipsize="none"
+                    android:text="[STANDBY] Diagnostic engine loaded. Ready to inspect AI Neural Core, Vision Pipeline, Chemistry Engine, and System telemetry."
+                    android:textColor="#8AB4F8"
+                    android:textSize="9.5sp"
+                    android:fontFamily="monospace"
+                    android:lineSpacingExtra="2dp" />
+            </LinearLayout>
+
+            <!-- ── Section Header ── -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="8dp"
+                android:text="SUBSYSTEM VERIFICATION MATRIX (8 VECTORS)"
+                android:textColor="#1A7799"
+                android:textSize="9.5sp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.12" />
+
+            <!-- Subsystem Cards Container -->
+            <LinearLayout
+                android:id="@+id/container_subsystems"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</LinearLayout>

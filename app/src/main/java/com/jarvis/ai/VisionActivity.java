@@ -34,6 +34,7 @@ import com.google.mlkit.vision.objects.*;
 import com.google.mlkit.vision.objects.defaults.ObjectDetectorOptions;
 import com.google.mlkit.vision.label.*;
 import com.google.mlkit.vision.label.defaults.ImageLabelerOptions;
+import com.jarvis.ai.pipeline.*;
 import org.json.*;
 import java.io.*;
 import java.net.*;
@@ -59,6 +60,7 @@ public class VisionActivity extends AppCompatActivity implements TextToSpeech.On
     public static final int MODE_TRACK     = 3;
     public static final int MODE_FACE      = 4;
     public static final int MODE_RETRIEVE  = 5;
+    public static final int MODE_PIPELINE  = 6;
 
     private static final int REQ_GALLERY = 901;
     private static final int REQ_CAMERA  = 902;
@@ -76,6 +78,18 @@ public class VisionActivity extends AppCompatActivity implements TextToSpeech.On
     private ProgressBar    progressBar;
     private LinearLayout   menuLayout, cameraLayout;
     private ScrollView     resultScroll;
+
+    // Pipeline UI
+    private LinearLayout   pipelineContainer;
+    private VisionPipelineView pipelineView;
+    private Button         btnPipelinePlay, btnPipelineStep, btnPipelineReset, btnPipelineSpeed;
+    private TextView       chipScenarioTransit, chipScenarioPcb, chipScenarioStars, chipScenarioCells, chipScenarioCustom;
+    private Button         btnStageBfs, btnStageDfs, btnStageCompare, btnStagePreprocess, btnStageEdges;
+    private TextView       tvPipelineStepLog, tvMetricVisited, tvMetricMemory, tvMetricHops, tvPipelineHint;
+    private float          pipelineSpeedMult = 1.0f;
+    private Bitmap         currentPipelineBitmap = null;
+    private Bitmap         currentPreprocessedBitmap = null;
+    private Bitmap         currentEdgeBitmap = null;
 
     // Camera
     private ImageCapture     imageCapture;
@@ -112,6 +126,34 @@ public class VisionActivity extends AppCompatActivity implements TextToSpeech.On
         cameraLayout = findViewById(R.id.vision_camera_layout);
         resultScroll = findViewById(R.id.vision_result_scroll);
 
+        // Pipeline UI
+        pipelineContainer = findViewById(R.id.vision_pipeline_container);
+        pipelineView      = findViewById(R.id.vision_pipeline_view);
+        btnPipelinePlay   = findViewById(R.id.btn_pipeline_play);
+        btnPipelineStep   = findViewById(R.id.btn_pipeline_step);
+        btnPipelineReset  = findViewById(R.id.btn_pipeline_reset);
+        btnPipelineSpeed  = findViewById(R.id.btn_pipeline_speed);
+
+        chipScenarioTransit= findViewById(R.id.chip_scenario_transit);
+        chipScenarioPcb    = findViewById(R.id.chip_scenario_pcb);
+        chipScenarioStars  = findViewById(R.id.chip_scenario_stars);
+        chipScenarioCells  = findViewById(R.id.chip_scenario_cells);
+        chipScenarioCustom = findViewById(R.id.chip_scenario_custom);
+
+        btnStageBfs        = findViewById(R.id.btn_stage_bfs);
+        btnStageDfs        = findViewById(R.id.btn_stage_dfs);
+        btnStageCompare    = findViewById(R.id.btn_stage_compare);
+        btnStagePreprocess = findViewById(R.id.btn_stage_preprocess);
+        btnStageEdges      = findViewById(R.id.btn_stage_edges);
+
+        tvPipelineStepLog  = findViewById(R.id.tv_pipeline_step_log);
+        tvMetricVisited    = findViewById(R.id.tv_metric_visited);
+        tvMetricMemory     = findViewById(R.id.tv_metric_memory);
+        tvMetricHops       = findViewById(R.id.tv_metric_hops);
+        tvPipelineHint     = findViewById(R.id.tv_pipeline_hint);
+
+        initPipelineControls();
+
         tts           = new TextToSpeech(this, this);
         cameraExecutor= Executors.newSingleThreadExecutor();
 
@@ -126,6 +168,7 @@ public class VisionActivity extends AppCompatActivity implements TextToSpeech.On
 
         if (btnBack != null) btnBack.setOnClickListener(v -> {
             stopCamera();
+            if (pipelineView != null) pipelineView.pause();
             if (currentMode > 0) { currentMode = 0; showMenu(); }
             else finish();
         });
@@ -165,6 +208,7 @@ public class VisionActivity extends AppCompatActivity implements TextToSpeech.On
         if (menuLayout   != null) menuLayout.setVisibility(View.VISIBLE);
         if (cameraLayout != null) cameraLayout.setVisibility(View.GONE);
         if (resultScroll != null) resultScroll.setVisibility(View.GONE);
+        if (pipelineContainer != null) pipelineContainer.setVisibility(View.GONE);
         if (tvTitle      != null) tvTitle.setText("◈ VISION INTELLIGENCE");
 
         Object[][] modes = {
@@ -173,6 +217,7 @@ public class VisionActivity extends AppCompatActivity implements TextToSpeech.On
             { "🎯 Object Tracking",          MODE_TRACK,    "Live camera: track objects in real time" },
             { "👤 Facial Recognition",       MODE_FACE,     "Detect faces, expressions, and facial attributes" },
             { "🔍 Image Retrieval",          MODE_RETRIEVE, "Describe image content and find similar images online" },
+            { "◈ Vision Pipeline (DFS & BFS)", MODE_PIPELINE, "Full CV pipeline & universal DFS/BFS graph search across transit, circuit, and celestial networks" }
         };
 
         if (menuLayout == null) return;
@@ -219,10 +264,23 @@ public class VisionActivity extends AppCompatActivity implements TextToSpeech.On
         if (menuLayout != null) menuLayout.setVisibility(View.GONE);
 
         String[] labels = { "", "IMAGE CLASSIFICATION", "OBJECT DETECTION",
-                            "OBJECT TRACKING", "FACIAL RECOGNITION", "IMAGE RETRIEVAL" };
-        if (tvTitle != null && mode > 0 && mode <= labels.length - 1)
+                            "OBJECT TRACKING", "FACIAL RECOGNITION", "IMAGE RETRIEVAL",
+                            "VISION PIPELINE (DFS & BFS)" };
+        if (tvTitle != null && mode > 0 && mode < labels.length)
             tvTitle.setText("◈ " + labels[mode]);
-        if (tvMode  != null) tvMode.setText(labels[mode > 0 && mode <= labels.length - 1 ? mode : 0]);
+        if (tvMode  != null) tvMode.setText(labels[mode > 0 && mode < labels.length ? mode : 0]);
+
+        if (mode == MODE_PIPELINE) {
+            if (cameraLayout != null) cameraLayout.setVisibility(View.GONE);
+            if (resultScroll != null) resultScroll.setVisibility(View.GONE);
+            if (pipelineContainer != null) pipelineContainer.setVisibility(View.VISIBLE);
+            if (btnGallery != null) { btnGallery.setVisibility(View.VISIBLE); }
+            if (btnCamera  != null) { btnCamera.setText("📷 CAPTURE"); btnCamera.setVisibility(View.VISIBLE); }
+            speak("Vision Pipeline activated. Topological graph ready for Breadth-First and Depth-First search.");
+            return;
+        } else {
+            if (pipelineContainer != null) pipelineContainer.setVisibility(View.GONE);
+        }
 
         if (mode == MODE_TRACK) {
             // Live camera mode — no gallery option
@@ -240,6 +298,241 @@ public class VisionActivity extends AppCompatActivity implements TextToSpeech.On
             if (btnCamera    != null) { btnCamera.setText("📷 CAMERA"); }
             if (tvResult     != null) tvResult.setText("Choose an image from gallery or camera.");
         }
+    }
+
+    // ── Pipeline Controls and Listeners ───────────────────────────────────────
+    private void initPipelineControls() {
+        if (pipelineView == null) return;
+
+        pipelineView.setOnStepChangeListener((step, result, idx, total) -> {
+            if (tvPipelineStepLog != null && step != null) {
+                tvPipelineStepLog.setText(step.logMessage);
+            }
+            if (tvMetricVisited != null && step != null) {
+                tvMetricVisited.setText("Visited: " + step.visited.size() + "/" + result.totalGraphNodes);
+            }
+            if (tvMetricMemory != null && step != null) {
+                String label = "DFS".equalsIgnoreCase(result.algorithmName) ? "Stack: " : "Queue: ";
+                tvMetricMemory.setText(label + step.frontier.size() + " (Peak: " + step.peakFrontierSize + ")");
+            }
+            if (tvMetricHops != null && result != null) {
+                if (result.foundGoal && idx >= total - 1) {
+                    tvMetricHops.setText("★ Hops: " + (result.path.size() - 1) + " (Cost: " + String.format(Locale.US, "%.1f", result.pathDistance) + ")");
+                } else {
+                    tvMetricHops.setText("Hops: In Progress");
+                }
+            }
+            if (btnPipelinePlay != null) {
+                btnPipelinePlay.setText(pipelineView.isPlaying() ? "⏸ PAUSE" : "▶ PLAY");
+            }
+        });
+
+        if (btnPipelinePlay != null) {
+            btnPipelinePlay.setOnClickListener(v -> {
+                if (pipelineView.isPlaying()) {
+                    pipelineView.pause();
+                    btnPipelinePlay.setText("▶ PLAY");
+                } else {
+                    pipelineView.play();
+                    btnPipelinePlay.setText("⏸ PAUSE");
+                }
+            });
+        }
+
+        if (btnPipelineStep != null) {
+            btnPipelineStep.setOnClickListener(v -> {
+                pipelineView.stepForward();
+                if (btnPipelinePlay != null) btnPipelinePlay.setText("▶ PLAY");
+            });
+        }
+
+        if (btnPipelineReset != null) {
+            btnPipelineReset.setOnClickListener(v -> {
+                pipelineView.reset();
+                if (btnPipelinePlay != null) btnPipelinePlay.setText("▶ PLAY");
+            });
+        }
+
+        if (btnPipelineSpeed != null) {
+            btnPipelineSpeed.setOnClickListener(v -> {
+                if (pipelineSpeedMult == 1.0f) {
+                    pipelineSpeedMult = 2.0f;
+                    btnPipelineSpeed.setText("⚡ 2x");
+                } else if (pipelineSpeedMult == 2.0f) {
+                    pipelineSpeedMult = 5.0f;
+                    btnPipelineSpeed.setText("⚡ 5x");
+                } else {
+                    pipelineSpeedMult = 1.0f;
+                    btnPipelineSpeed.setText("⚡ 1x");
+                }
+                pipelineView.setSpeedMultiplier(pipelineSpeedMult);
+            });
+        }
+
+        // Scenario Chips
+        if (chipScenarioTransit != null) chipScenarioTransit.setOnClickListener(v -> selectScenario(0));
+        if (chipScenarioPcb     != null) chipScenarioPcb.setOnClickListener(v -> selectScenario(1));
+        if (chipScenarioStars   != null) chipScenarioStars.setOnClickListener(v -> selectScenario(2));
+        if (chipScenarioCells   != null) chipScenarioCells.setOnClickListener(v -> selectScenario(3));
+        if (chipScenarioCustom  != null) chipScenarioCustom.setOnClickListener(v -> {
+            highlightScenarioChip(4);
+            Toast.makeText(this, "Select or capture an image to extract custom vision graph", Toast.LENGTH_SHORT).show();
+            pickGallery();
+        });
+
+        // Stage Buttons
+        if (btnStageBfs != null) {
+            btnStageBfs.setOnClickListener(v -> {
+                pipelineView.setAlgorithm("BFS");
+                pipelineView.setDisplayMode(0);
+                Toast.makeText(this, "Breadth-First Search (Queue) selected. Guarantees shortest path.", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        if (btnStageDfs != null) {
+            btnStageDfs.setOnClickListener(v -> {
+                pipelineView.setAlgorithm("DFS");
+                pipelineView.setDisplayMode(0);
+                Toast.makeText(this, "Depth-First Search (Stack) selected. Deep branch exploration.", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        if (btnStageCompare != null) {
+            btnStageCompare.setOnClickListener(v -> showPipelineComparisonDialog());
+        }
+
+        if (btnStagePreprocess != null) {
+            btnStagePreprocess.setOnClickListener(v -> {
+                if (currentPreprocessedBitmap == null) {
+                    currentPipelineBitmap = VisionPipeline.generateScenarioCanvas("pcb", 600, 600);
+                    currentPreprocessedBitmap = VisionPipeline.preprocessGrayscale(currentPipelineBitmap);
+                    currentEdgeBitmap = VisionPipeline.extractSobelEdges(currentPreprocessedBitmap);
+                }
+                pipelineView.setBackgroundBitmap(currentPreprocessedBitmap, 2);
+                Toast.makeText(this, "Pipeline Stage 2: Grayscale & Contrast Normalized", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        if (btnStageEdges != null) {
+            btnStageEdges.setOnClickListener(v -> {
+                if (currentEdgeBitmap == null) {
+                    currentPipelineBitmap = VisionPipeline.generateScenarioCanvas("pcb", 600, 600);
+                    currentPreprocessedBitmap = VisionPipeline.preprocessGrayscale(currentPipelineBitmap);
+                    currentEdgeBitmap = VisionPipeline.extractSobelEdges(currentPreprocessedBitmap);
+                }
+                pipelineView.setBackgroundBitmap(currentEdgeBitmap, 3);
+                Toast.makeText(this, "Pipeline Stage 3: Sobel 3x3 Gradient Edge Map", Toast.LENGTH_SHORT).show();
+            });
+        }
+    }
+
+    private void selectScenario(int index) {
+        highlightScenarioChip(index);
+        switch (index) {
+            case 0:
+                pipelineView.setBackgroundBitmap(null, 0);
+                pipelineView.setGraph(VisionGraph.createSatelliteTransitNetwork());
+                Toast.makeText(this, "Scenario: Satellite Transit & Arterial Logistics Grid", Toast.LENGTH_SHORT).show();
+                break;
+            case 1:
+                Bitmap pcbBg = VisionPipeline.generateScenarioCanvas("pcb", 600, 600);
+                pipelineView.setBackgroundBitmap(pcbBg, 1);
+                pipelineView.setGraph(VisionGraph.createPcbCircuitBoardNetwork());
+                Toast.makeText(this, "Scenario: PCB Microcontroller & High-Density Circuit Traces", Toast.LENGTH_SHORT).show();
+                break;
+            case 2:
+                Bitmap starBg = VisionPipeline.generateScenarioCanvas("stars", 600, 600);
+                pipelineView.setBackgroundBitmap(starBg, 1);
+                pipelineView.setGraph(VisionGraph.createStarConstellationNetwork());
+                Toast.makeText(this, "Scenario: Celestial Constellation & Astronomical Nav Star Mesh", Toast.LENGTH_SHORT).show();
+                break;
+            case 3:
+                pipelineView.setBackgroundBitmap(null, 0);
+                pipelineView.setGraph(VisionGraph.createBiologicalCellNetwork());
+                Toast.makeText(this, "Scenario: Cortical Neuronal & Synaptic Connectivity", Toast.LENGTH_SHORT).show();
+                break;
+        }
+    }
+
+    private void highlightScenarioChip(int activeIndex) {
+        TextView[] chips = { chipScenarioTransit, chipScenarioPcb, chipScenarioStars, chipScenarioCells, chipScenarioCustom };
+        for (int i = 0; i < chips.length; i++) {
+            if (chips[i] != null) {
+                chips[i].setTextColor(i == activeIndex ? 0xFFFFFFFF : 0xFF00D4FF);
+                chips[i].setBackgroundColor(i == activeIndex ? 0xFF0A3A5A : 0x00000000);
+            }
+        }
+    }
+
+    private void showPipelineComparisonDialog() {
+        if (pipelineView == null || pipelineView.getGraph() == null) return;
+        GraphSearchEngine.ComparisonReport report = GraphSearchEngine.compare(
+                pipelineView.getGraph(),
+                pipelineView.getStartNodeId(),
+                pipelineView.getGoalNodeId()
+        );
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("◈ BFS VS DFS BENCHMARK METRICS\n\n");
+        sb.append(String.format(Locale.US, "%-20s %-14s %-14s\n", "METRIC", "BFS (QUEUE)", "DFS (STACK)"));
+        sb.append("────────────────────────────────────────────\n");
+        sb.append(String.format(Locale.US, "%-20s %-14s %-14s\n", "Goal Reached?",
+                report.bfs.foundGoal ? "YES" : "NO", report.dfs.foundGoal ? "YES" : "NO"));
+        sb.append(String.format(Locale.US, "%-20s %-14s %-14s\n", "Path Length (Hops)",
+                String.valueOf(report.bfs.path.size() - 1), String.valueOf(report.dfs.path.size() - 1)));
+        sb.append(String.format(Locale.US, "%-20s %-14.1f %-14.1f\n", "Spatial Distance",
+                report.bfs.pathDistance, report.dfs.pathDistance));
+        sb.append(String.format(Locale.US, "%-20s %-14s %-14s\n", "Nodes Visited",
+                report.bfs.nodesVisitedCount + "/" + report.bfs.totalGraphNodes,
+                report.dfs.nodesVisitedCount + "/" + report.dfs.totalGraphNodes));
+        sb.append(String.format(Locale.US, "%-20s %-14d %-14d\n", "Peak Memory Size",
+                report.bfs.peakMemory, report.dfs.peakMemory));
+        sb.append(String.format(Locale.US, "%-20s %-14s %-14s\n", "Time Complexity",
+                report.bfs.complexityTime, report.dfs.complexityTime));
+        sb.append(String.format(Locale.US, "%-20s %-14s %-14s\n", "Space Complexity",
+                report.bfs.complexitySpace, report.dfs.complexitySpace));
+        sb.append(String.format(Locale.US, "%-20s %-14s %-14s\n\n", "Guarantees Min Hops",
+                "YES", "NO"));
+
+        sb.append("★ WINNER (PATH HOPS): ").append(report.winnerPathLength).append("\n");
+        sb.append("★ WINNER (PEAK MEMORY): ").append(report.winnerMemory).append("\n\n");
+        sb.append(report.analysisText);
+
+        new AlertDialog.Builder(this)
+                .setTitle("◈ Vision Pipeline: BFS vs DFS")
+                .setMessage(sb.toString())
+                .setPositiveButton("Simulate BFS", (d, w) -> {
+                    pipelineView.setAlgorithm("BFS");
+                    pipelineView.play();
+                })
+                .setNegativeButton("Simulate DFS", (d, w) -> {
+                    pipelineView.setAlgorithm("DFS");
+                    pipelineView.play();
+                })
+                .setNeutralButton("Close", null)
+                .show();
+    }
+
+    private void runPipelineWithImage(Bitmap bmp) {
+        setLoading(true);
+        new Thread(() -> {
+            Bitmap small = Bitmap.createScaledBitmap(bmp, 480, 480, true);
+            currentPipelineBitmap = small;
+            currentPreprocessedBitmap = VisionPipeline.preprocessGrayscale(small);
+            currentEdgeBitmap = VisionPipeline.extractSobelEdges(currentPreprocessedBitmap);
+            VisionGraph graph = VisionGraph.fromImageKeypoints(small, 18);
+
+            handler.post(() -> {
+                setLoading(false);
+                if (pipelineView != null) {
+                    pipelineView.setBackgroundBitmap(currentPipelineBitmap, 1);
+                    pipelineView.setGraph(graph);
+                    highlightScenarioChip(4);
+                    Toast.makeText(this, "Extracted " + graph.getNodes().size() + " feature nodes from image", Toast.LENGTH_SHORT).show();
+                    speak("Custom image processed. Extracted " + graph.getNodes().size() + " visual feature nodes and optical proximity edges.");
+                }
+            });
+        }).start();
     }
 
     // ── Camera permission + start ─────────────────────────────────────────────
@@ -308,6 +601,7 @@ public class VisionActivity extends AppCompatActivity implements TextToSpeech.On
             case MODE_DETECT:   runObjectDetection(bmp, false); break;
             case MODE_FACE:     runFaceDetection(bmp); break;
             case MODE_RETRIEVE: runImageRetrieval(bmp); break;
+            case MODE_PIPELINE: runPipelineWithImage(bmp); break;
         }
     }
 
@@ -676,6 +970,7 @@ public class VisionActivity extends AppCompatActivity implements TextToSpeech.On
 
     @Override protected void onDestroy() {
         stopCamera();
+        if (pipelineView != null) pipelineView.pause();
         if (tts != null) { tts.stop(); tts.shutdown(); }
         super.onDestroy();
     }

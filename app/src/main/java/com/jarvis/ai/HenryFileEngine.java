@@ -139,8 +139,11 @@ public class HenryFileEngine {
             if (m.find()) {
                 String match = m.group(1).trim().replaceAll("[\"']", "");
                 match = match.replaceAll("^(?:a|an|the)\\s+", "");
+                match = match.replaceAll("(?i)\\s+(?:with|including|having)\\s+.*$", "");
+                match = match.replaceAll("(?i)\\s+(?:in\\s+(?:pdf|docx|xlsx|pptx|csv|markdown|txt)\\s+format|as\\s+(?:a|an)?\\s*(?:pdf|docx|xlsx|pptx|csv|document|file)).*$", "");
+                match = match.replaceAll("(?i)\\s+(?:please|thanks?|thank\\s+you).*$", "");
                 if (match.length() > 2) {
-                    return capitalizeWords(match);
+                    return capitalizeWords(match.trim());
                 }
             }
         }

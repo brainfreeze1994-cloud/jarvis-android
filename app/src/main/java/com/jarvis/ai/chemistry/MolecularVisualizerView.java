@@ -260,6 +260,10 @@ public class MolecularVisualizerView extends View {
         return autoRotate;
     }
 
+    public boolean isAutoRotateEnabled() {
+        return autoRotate;
+    }
+
     public void toggleLabels() {
         this.showLabels = !this.showLabels;
         invalidate();
@@ -267,6 +271,15 @@ public class MolecularVisualizerView extends View {
 
     public boolean isShowLabels() {
         return showLabels;
+    }
+
+    public boolean isShowingLabels() {
+        return showLabels;
+    }
+
+    public void setShowLabels(boolean show) {
+        this.showLabels = show;
+        invalidate();
     }
 
     public void resetCamera() {

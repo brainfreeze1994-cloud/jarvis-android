@@ -20,10 +20,6 @@ public class ChemistryAccuracyEngine {
     private static final Map<String, MolecularStructureData> COMPOUND_REGISTRY = new HashMap<>();
     public static final List<MolecularStructureData> ALL_COMPOUNDS = new ArrayList<>();
 
-    public static List<MolecularStructureData> getAllCompounds() {
-        return Collections.unmodifiableList(ALL_COMPOUNDS);
-    }
-
     static {
         registerAllCompounds();
     }

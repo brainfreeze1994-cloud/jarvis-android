@@ -316,7 +316,37 @@ public class HenryFileEngine {
         public final List<String> bulletPoints = new ArrayList<>();
         public List<String[]> tableData = null; // optional table
 
+        // Compatibility fields for diagnostics and dynamic table generation
+        public String content = null;
+        public final List<String> tableHeaders = new ArrayList<>();
+        public final List<List<String>> tableRows = new ArrayList<>();
+
         public Section(String heading) { this.heading = heading; }
+
+        public List<String> getResolvedParagraphs() {
+            List<String> list = new ArrayList<>(paragraphs);
+            if (content != null && !content.trim().isEmpty() && !list.contains(content)) {
+                list.add(0, content);
+            }
+            return list;
+        }
+
+        public List<String[]> getResolvedTableData() {
+            if (tableData != null && !tableData.isEmpty()) {
+                return tableData;
+            }
+            if (!tableHeaders.isEmpty() || !tableRows.isEmpty()) {
+                List<String[]> res = new ArrayList<>();
+                if (!tableHeaders.isEmpty()) {
+                    res.add(tableHeaders.toArray(new String[0]));
+                }
+                for (List<String> row : tableRows) {
+                    res.add(row.toArray(new String[0]));
+                }
+                return res;
+            }
+            return null;
+        }
     }
 
     public static class DocumentModel {
@@ -673,7 +703,7 @@ public class HenryFileEngine {
                         .append(escapeXml(sec.heading))
                         .append("</w:t></w:r></w:p>\n");
 
-                for (String p : sec.paragraphs) {
+                for (String p : sec.getResolvedParagraphs()) {
                     body.append("<w:p><w:r><w:t>").append(escapeXml(p)).append("</w:t></w:r></w:p>\n");
                 }
 
@@ -684,7 +714,8 @@ public class HenryFileEngine {
                 }
 
                 // Render Table if present
-                if (sec.tableData != null && !sec.tableData.isEmpty()) {
+                List<String[]> resolvedTable = sec.getResolvedTableData();
+                if (resolvedTable != null && !resolvedTable.isEmpty()) {
                     body.append("<w:tbl>\n");
                     body.append("  <w:tblPr><w:tblW w:w=\"9000\" w:type=\"dxa\"/>");
                     body.append("  <w:tblBorders><w:top w:val=\"single\" w:sz=\"4\" w:color=\"CCCCCC\"/>");
@@ -692,7 +723,7 @@ public class HenryFileEngine {
                     body.append("  <w:insideH w:val=\"single\" w:sz=\"4\" w:color=\"E5E5E5\"/></w:tblBorders></w:tblPr>\n");
 
                     boolean isHeader = true;
-                    for (String[] row : sec.tableData) {
+                    for (String[] row : resolvedTable) {
                         body.append("  <w:tr>\n");
                         for (String cell : row) {
                             body.append("    <w:tc><w:tcPr><w:tcW w:w=\"3000\" w:type=\"dxa\"/>");
@@ -1103,7 +1134,7 @@ public class HenryFileEngine {
             currentY += 24;
 
             // Paragraphs
-            for (String p : sec.paragraphs) {
+            for (String p : sec.getResolvedParagraphs()) {
                 StaticLayout pLayout = new StaticLayout(p, bodyPaint, contentWidth, Layout.Alignment.ALIGN_NORMAL, 1.25f, 0, false);
                 if (currentY + pLayout.getHeight() > pageHeight - margin) {
                     canvas.drawText("Page " + pageNumber, pageWidth / 2f - 15, pageHeight - 25, headerFooterPaint);
@@ -1143,12 +1174,13 @@ public class HenryFileEngine {
             }
 
             // Table
-            if (sec.tableData != null && !sec.tableData.isEmpty()) {
-                int colCount = sec.tableData.get(0).length;
+            List<String[]> pdfTable = sec.getResolvedTableData();
+            if (pdfTable != null && !pdfTable.isEmpty()) {
+                int colCount = pdfTable.get(0).length;
                 int colW = contentWidth / colCount;
                 int rowH = 20;
 
-                if (currentY + (sec.tableData.size() * rowH) > pageHeight - margin) {
+                if (currentY + (pdfTable.size() * rowH) > pageHeight - margin) {
                     canvas.drawText("Page " + pageNumber, pageWidth / 2f - 15, pageHeight - 25, headerFooterPaint);
                     pdfDoc.finishPage(page);
                     pageNumber++;
@@ -1159,7 +1191,7 @@ public class HenryFileEngine {
                 }
 
                 boolean isHeader = true;
-                for (String[] row : sec.tableData) {
+                for (String[] row : pdfTable) {
                     if (isHeader) {
                         canvas.drawRect(margin, currentY, margin + contentWidth, currentY + rowH, tableHeaderPaint);
                     }
@@ -1264,7 +1296,7 @@ public class HenryFileEngine {
             for (Section sec : doc.sections) {
                 pw.println("## " + sec.heading);
                 pw.println();
-                for (String p : sec.paragraphs) {
+                for (String p : sec.getResolvedParagraphs()) {
                     pw.println(p);
                     pw.println();
                 }
@@ -1273,8 +1305,9 @@ public class HenryFileEngine {
                 }
                 if (!sec.bulletPoints.isEmpty()) pw.println();
 
-                if (sec.tableData != null && !sec.tableData.isEmpty()) {
-                    String[] headers = sec.tableData.get(0);
+                List<String[]> mdTable = sec.getResolvedTableData();
+                if (mdTable != null && !mdTable.isEmpty()) {
+                    String[] headers = mdTable.get(0);
                     pw.print("|");
                     for (String h : headers) pw.print(" " + h + " |");
                     pw.println();
@@ -1282,9 +1315,9 @@ public class HenryFileEngine {
                     for (int i = 0; i < headers.length; i++) pw.print(" --- |");
                     pw.println();
 
-                    for (int r = 1; r < sec.tableData.size(); r++) {
+                    for (int r = 1; r < mdTable.size(); r++) {
                         pw.print("|");
-                        for (String c : sec.tableData.get(r)) pw.print(" " + c + " |");
+                        for (String c : mdTable.get(r)) pw.print(" " + c + " |");
                         pw.println();
                     }
                     pw.println();

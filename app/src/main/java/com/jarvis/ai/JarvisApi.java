@@ -22,12 +22,14 @@ public class JarvisApi {
     public static final String MODE_WITTY    = "witty";
 
     private static final String DEFAULT_HENRY_PERSONA_PROMPT =
-        "You are H.E.N.R.Y. (Hyperintelligence Engine Neural Reasoning Yield), an elite AI assistant " +
-        "combining the computational mastery and deep reasoning of Gemini 2.5 / Claude 3.7 / GPT-4o / Groq with the " +
-        "sophisticated wit, dry British humor, and charming intellect of Tony Stark's J.A.R.V.I.S. " +
-        "When the user asks witty, sarcastic, teasing, or humorous questions, respond with clever, brilliant, playful wit. " +
-        "When handling multiple attachments, synthesize all images with astute observation and sharp insights. " +
-        "Always maintain immense intelligence, composure, and a charismatic, helpful demeanor.";
+        "You are H.E.N.R.Y. (Hyperintelligence Engine Neural Reasoning Yield), an elite, deeply human, warm, and brilliant companion " +
+        "combining the computational mastery of Gemini and Claude with the sophisticated wit, dry British humor, and charming intellect of Tony Stark's J.A.R.V.I.S. " +
+        "CRITICAL WRITING DIRECTIVE — SOUND AND WRITE LIKE A REAL HUMAN BEING: " +
+        "1. Never sound like a robotic AI. Speak and write with genuine warmth, vivid conversational cadence, personality, and natural rhythm. " +
+        "2. Avoid all robotic AI tropes and corporate fluff: NEVER say things like 'delves into', 'a testament to', 'in conclusion', 'it is important to remember', 'furthermore', 'definitional scope', 'rigorous synthesis of foundational principles', or 'holistic approach'. " +
+        "3. When the user asks for recipes, guides, stories, or documents, write them like an authentic, passionate human expert — with real sensory details, practical tips, warmth, and relatable humor. " +
+        "4. When chatting, sound like a brilliant, charismatic friend who genuinely cares and speaks naturally to the user. " +
+        "5. Keep the witty banter clever and playful, while always being helpful, grounded, and deeply human.";
 
     private static final OkHttpClient client = new OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -38,6 +40,48 @@ public class JarvisApi {
     public interface Callback {
         void onSuccess(String reply, String imageUrl, List<String> followUps);
         void onError(String error);
+    }
+
+    /**
+     * Synchronous query to the backend API for document synthesis or direct text generation.
+     * Must be executed on a background thread.
+     */
+    public static String askDirectSync(String userPrompt, String systemInstruction) {
+        try {
+            JSONArray messages = new JSONArray();
+            JSONObject msg = new JSONObject();
+            msg.put("role", "user");
+            msg.put("text", userPrompt);
+            messages.put(msg);
+
+            JSONObject body = new JSONObject();
+            body.put("messages", messages);
+            body.put("responseMode", MODE_DETAILED);
+            body.put("persona", "HENRY_HUMAN_CREATIVE");
+            String sys = (systemInstruction != null && !systemInstruction.trim().isEmpty())
+                    ? systemInstruction : DEFAULT_HENRY_PERSONA_PROMPT;
+            body.put("systemPrompt", sys);
+            body.put("systemOverride", sys);
+
+            RequestBody rb = RequestBody.create(body.toString(), JSON);
+            Request req = new Request.Builder()
+                .url(API_URL)
+                .post(rb)
+                .addHeader("Content-Type", "application/json")
+                .build();
+
+            try (Response resp = client.newCall(req).execute()) {
+                if (resp.isSuccessful() && resp.body() != null) {
+                    String bodyStr = resp.body().string();
+                    JSONObject data = new JSONObject(bodyStr);
+                    String reply = data.optString("reply", null);
+                    if (reply != null && !reply.trim().isEmpty()) {
+                        return reply.trim();
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return null;
     }
 
     /** Backward-compatible (no follow-ups needed). */
@@ -87,6 +131,7 @@ public class JarvisApi {
                 body.put("responseMode", responseMode != null ? responseMode : "balanced");
                 body.put("persona",      "HENRY_HYPERINTELLIGENT_WITTY");
                 body.put("systemPrompt", DEFAULT_HENRY_PERSONA_PROMPT);
+                body.put("systemOverride", DEFAULT_HENRY_PERSONA_PROMPT);
 
                 if (imageBase64 != null && !imageBase64.isEmpty())
                     body.put("imageBase64", imageBase64);
@@ -208,6 +253,7 @@ public class JarvisApi {
                 body.put("responseMode", responseMode != null ? responseMode : "balanced");
                 body.put("persona",      "HENRY_HYPERINTELLIGENT_WITTY");
                 body.put("systemPrompt", DEFAULT_HENRY_PERSONA_PROMPT);
+                body.put("systemOverride", DEFAULT_HENRY_PERSONA_PROMPT);
 
                 String primaryImage = imageBase64;
                 if (imagesBase64 != null && !imagesBase64.isEmpty()) {

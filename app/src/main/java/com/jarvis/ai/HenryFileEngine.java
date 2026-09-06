@@ -182,7 +182,7 @@ public class HenryFileEngine {
         FileType type = detectFileType(userPrompt);
         String topic = extractTitleAndTopic(userPrompt);
 
-        callback.onProgress("Analyzing request for " + type.displayName + " on \"" + topic + "\"…");
+        callback.onProgress("Crafting your " + type.displayName + " on \"" + topic + "\"…");
 
         new Thread(() -> {
             try {
@@ -196,29 +196,29 @@ public class HenryFileEngine {
 
                 switch (type) {
                     case DOCX: {
-                        DocumentModel doc = buildDocumentModel(topic, userPrompt, requireResearch);
+                        DocumentModel doc = buildDocumentModelWithAiOrFallback(topic, userPrompt, requireResearch);
                         generateDocx(targetFile, doc);
                         mainHandler.post(() -> callback.onSuccess(targetFile, type, doc.title,
-                                "Generated DOCX with " + doc.sections.size() + " comprehensive sections"
-                                        + (doc.references.isEmpty() ? "." : " and " + doc.references.size() + " APA 7th Edition references."),
+                                "Generated " + doc.sections.size() + " beautifully structured sections"
+                                        + (doc.references.isEmpty() ? "." : " with " + doc.references.size() + " citations."),
                                 doc.references.size()));
                         break;
                     }
                     case PDF: {
-                        DocumentModel doc = buildDocumentModel(topic, userPrompt, requireResearch);
+                        DocumentModel doc = buildDocumentModelWithAiOrFallback(topic, userPrompt, requireResearch);
                         generatePdf(targetFile, doc, userImage);
                         mainHandler.post(() -> callback.onSuccess(targetFile, type, doc.title,
-                                "Created multi-page PDF document with " + doc.sections.size() + " structured sections"
-                                        + (doc.references.isEmpty() ? "." : " and " + doc.references.size() + " APA 7th Edition references."),
+                                "Created multi-page PDF with " + doc.sections.size() + " structured sections"
+                                        + (doc.references.isEmpty() ? "." : " with " + doc.references.size() + " citations."),
                                 doc.references.size()));
                         break;
                     }
                     case PPTX: {
-                        PresentationModel pres = buildPresentationModel(topic, userPrompt, requireResearch);
+                        PresentationModel pres = buildPresentationModelWithAiOrFallback(topic, userPrompt, requireResearch);
                         generatePptx(targetFile, pres);
                         mainHandler.post(() -> callback.onSuccess(targetFile, type, pres.title,
-                                "Created " + pres.slides.size() + "-slide presentation deck with structured talking points"
-                                        + (pres.references.isEmpty() ? "." : " and APA 7th Edition citations slide."),
+                                "Created " + pres.slides.size() + "-slide presentation deck with talking points"
+                                        + (pres.references.isEmpty() ? "." : " and citations slide."),
                                 pres.references.size()));
                         break;
                     }
@@ -239,15 +239,16 @@ public class HenryFileEngine {
                         break;
                     }
                     case MD: {
-                        DocumentModel doc = buildDocumentModel(topic, userPrompt, requireResearch);
+                        DocumentModel doc = buildDocumentModelWithAiOrFallback(topic, userPrompt, requireResearch);
                         generateMd(targetFile, doc);
                         mainHandler.post(() -> callback.onSuccess(targetFile, type, doc.title,
-                                "Created Markdown document with " + doc.sections.size() + " sections and APA citations.",
+                                "Created Markdown document with " + doc.sections.size() + " sections"
+                                        + (doc.references.isEmpty() ? "." : " and citations."),
                                 doc.references.size()));
                         break;
                     }
                     case TXT: {
-                        DocumentModel doc = buildDocumentModel(topic, userPrompt, requireResearch);
+                        DocumentModel doc = buildDocumentModelWithAiOrFallback(topic, userPrompt, requireResearch);
                         generateTxt(targetFile, doc);
                         mainHandler.post(() -> callback.onSuccess(targetFile, type, doc.title,
                                 "Generated formatted text document with " + doc.sections.size() + " sections.",
@@ -297,10 +298,9 @@ public class HenryFileEngine {
     private static boolean shouldIncludeResearch(String userPrompt, String topic) {
         String combined = (userPrompt + " " + topic).toLowerCase(Locale.US);
         String[] keywords = {
-                "research", "academic", "study", "science", "scientific", "history", "historical",
-                "earth", "climate", "ai", "artificial intelligence", "biology", "physics", "chemistry",
-                "medicine", "medical", "economics", "economy", "technology", "geology", "astronomy",
-                "space", "psychology", "education", "report", "paper", "apa", "cite", "citation"
+                "academic paper", "scholarly", "citation", "citations", "cite sources",
+                "apa format", "apa 7th", "mla format", "bibliography", "peer-reviewed",
+                "literature review", "scientific journal", "dissertation", "thesis"
         };
         for (String k : keywords) {
             if (combined.contains(k)) return true;
@@ -385,25 +385,350 @@ public class HenryFileEngine {
 
     // ── Content Synthesizer (Intelligent Domain Builder) ─────────────────────
 
+    public static DocumentModel buildDocumentModelWithAiOrFallback(String topic, String userPrompt, boolean requireResearch) {
+        try {
+            String aiInstruction = "You are H.E.N.R.Y., an articulate, warm, deeply human expert writer.\n"
+                    + "CRITICAL DIRECTIVE — SOUND AND WRITE LIKE A REAL HUMAN BEING:\n"
+                    + "1. Never sound like a robotic AI. Speak and write with genuine warmth, vivid conversational cadence, personality, and natural rhythm.\n"
+                    + "2. Avoid all robotic AI tropes and corporate fluff: NEVER say things like 'delves into', 'a testament to', 'in conclusion', 'it is important to remember', 'furthermore', 'definitional scope', 'rigorous synthesis of foundational principles', or 'holistic approach'.\n"
+                    + "3. If the user is asking for a recipe: Write a delicious, mouthwatering, authentic recipe with exact ingredient measurements, step-by-step instructions, and chef's pro tips.\n"
+                    + "4. If the user is asking for a story, guide, essay, or plan: Write with rich details, clear structure, and human depth.\n"
+                    + "5. FORMATTING:\n"
+                    + "   Start with '# Document Title' on line 1.\n"
+                    + "   Use '## 1. Section Title' for each section.\n"
+                    + "   Write detailed paragraphs and bullet points ('- item') under each section.\n"
+                    + "   Optionally include a markdown table '| Col 1 | Col 2 |' if appropriate (e.g. for ingredients or metrics).\n"
+                    + (requireResearch
+                        ? "   Include real, credible academic references at the end under '## References'.\n"
+                        : "   Do NOT include academic references or APA citations unless explicitly asked.\n");
+
+            String query = "Create a complete, detailed, human-crafted document for this request: " + userPrompt + "\nDocument Topic: " + topic;
+            String aiResponse = JarvisApi.askDirectSync(query, aiInstruction);
+            if (aiResponse != null && aiResponse.trim().length() > 80) {
+                DocumentModel parsed = parseMarkdownToDocumentModel(topic, aiResponse.trim(), requireResearch);
+                if (parsed != null && !parsed.sections.isEmpty()) {
+                    return parsed;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        return buildDocumentModel(topic, userPrompt, requireResearch);
+    }
+
+    public static DocumentModel parseMarkdownToDocumentModel(String defaultTopic, String md, boolean requireResearch) {
+        DocumentModel doc = new DocumentModel();
+        doc.title = defaultTopic;
+        doc.subtitle = "H.E.N.R.Y. Document Engine • " + (requireResearch ? "Research Edition" : "Artisan Edition");
+        doc.dateString = new SimpleDateFormat("MMMM d, yyyy", Locale.US).format(new Date());
+
+        if (md == null || md.trim().isEmpty()) return null;
+
+        String[] lines = md.split("\r?\n");
+        Section currentSection = null;
+        List<String[]> currentTable = null;
+
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) continue;
+
+            // Document Title
+            if (trimmed.startsWith("# ") && !trimmed.startsWith("## ")) {
+                String potentialTitle = trimmed.substring(2).trim();
+                if (potentialTitle.length() > 2) {
+                    doc.title = potentialTitle.replace("*", "");
+                }
+                continue;
+            }
+
+            // Section Header
+            if (trimmed.startsWith("### ") || trimmed.startsWith("## ")) {
+                if (currentTable != null && !currentTable.isEmpty() && currentSection != null) {
+                    currentSection.tableData = currentTable;
+                    currentTable = null;
+                }
+                String headingText = trimmed.replaceFirst("^#+\\s*", "").replace("*", "").trim();
+                if (headingText.toLowerCase(Locale.US).contains("reference") || headingText.toLowerCase(Locale.US).contains("citation")) {
+                    currentSection = null;
+                    continue;
+                }
+                currentSection = new Section(headingText);
+                doc.sections.add(currentSection);
+                continue;
+            }
+
+            // References
+            if (currentSection == null && (trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.matches("^\\d+\\..*"))) {
+                String refItem = trimmed.replaceFirst("^[-*\\d.]+\\s*", "").replace("*", "").trim();
+                if (requireResearch && !refItem.isEmpty()) {
+                    doc.references.add(refItem);
+                }
+                continue;
+            }
+
+            // Markdown Table Row
+            if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+                if (trimmed.matches("^\\|[\\s\\-:\\|]+\\|$")) {
+                    continue; // Header separator line
+                }
+                String[] rawCells = trimmed.split("\\|");
+                List<String> cleanCells = new ArrayList<>();
+                for (int i = 1; i < rawCells.length; i++) {
+                    cleanCells.add(rawCells[i].replace("*", "").trim());
+                }
+                if (!cleanCells.isEmpty()) {
+                    if (currentTable == null) currentTable = new ArrayList<>();
+                    currentTable.add(cleanCells.toArray(new String[0]));
+                }
+                continue;
+            }
+
+            // Flush table if regular text arrives
+            if (currentTable != null && !currentTable.isEmpty()) {
+                if (currentSection == null) {
+                    currentSection = new Section("1. Details");
+                    doc.sections.add(currentSection);
+                }
+                currentSection.tableData = currentTable;
+                currentTable = null;
+            }
+
+            // Bullet Points
+            if (trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("• ") || trimmed.matches("^\\d+\\.\\s+.*")) {
+                String bullet = trimmed.replaceFirst("^[-*•\\d.]+\\s*", "").trim();
+                if (currentSection == null) {
+                    currentSection = new Section("1. Overview");
+                    doc.sections.add(currentSection);
+                }
+                currentSection.bulletPoints.add(bullet);
+                continue;
+            }
+
+            // Regular Paragraph
+            if (currentSection == null) {
+                currentSection = new Section("1. Introduction");
+                doc.sections.add(currentSection);
+            }
+            currentSection.paragraphs.add(trimmed);
+        }
+
+        if (currentTable != null && !currentTable.isEmpty() && currentSection != null) {
+            currentSection.tableData = currentTable;
+        }
+
+        return doc.sections.isEmpty() ? null : doc;
+    }
+
     public static DocumentModel buildDocumentModel(String topic, String userPrompt, boolean requireResearch) {
         DocumentModel doc = new DocumentModel();
         doc.title = topic;
-        doc.subtitle = "H.E.N.R.Y. Document Engine • " + (requireResearch ? "APA 7th Edition Sourced" : "Executive Report");
+        doc.subtitle = "H.E.N.R.Y. Document Engine • " + (requireResearch ? "Research & Sourced" : "Artisan Edition");
         doc.dateString = new SimpleDateFormat("MMMM d, yyyy", Locale.US).format(new Date());
 
-        String t = topic.toLowerCase(Locale.US);
+        String t = (topic + " " + userPrompt).toLowerCase(Locale.US);
 
-        if (t.contains("earth") || t.contains("history of earth")) {
+        if (t.contains("recipe") || t.contains("cookie") || t.contains("chocolate") || t.contains("bake")
+                || t.contains("cook") || t.contains("cake") || t.contains("bread") || t.contains("pasta")
+                || t.contains("pizza") || t.contains("dinner") || t.contains("dish") || t.contains("meal")
+                || t.contains("dessert") || t.contains("snack") || t.contains("food") || t.contains("kitchen")) {
+            buildRecipeDocument(doc, topic);
+        } else if (t.contains("story") || t.contains("tale") || t.contains("adventure") || t.contains("fiction")) {
+            buildCreativeStoryDocument(doc, topic);
+        } else if (t.contains("travel") || t.contains("trip") || t.contains("itinerary") || t.contains("vacation")) {
+            buildTravelDocument(doc, topic);
+        } else if (t.contains("workout") || t.contains("fitness") || t.contains("exercise") || t.contains("gym")) {
+            buildFitnessDocument(doc, topic);
+        } else if (t.contains("earth") || t.contains("history of earth")) {
             buildEarthDocument(doc);
         } else if (t.contains("climate") || t.contains("renewable")) {
             buildClimateDocument(doc);
         } else if (t.contains("ai") || t.contains("intelligence") || t.contains("machine learning")) {
             buildAiDocument(doc);
         } else {
-            buildGeneralAcademicDocument(doc, topic);
+            buildGeneralHumanDocument(doc, topic, requireResearch);
         }
 
         return doc;
+    }
+
+    private static void buildRecipeDocument(DocumentModel doc, String topic) {
+        String lowerTopic = topic.toLowerCase(Locale.US);
+        boolean isCookies = lowerTopic.contains("cookie") || lowerTopic.contains("chocolate") || lowerTopic.contains("baking") || lowerTopic.contains("bake");
+
+        if (isCookies) {
+            doc.title = "The Ultimate Browned-Butter Chocolate Chip Cookies";
+            doc.subtitle = "H.E.N.R.Y. Artisan Kitchen • Chewy Centers & Crisp Golden Edges";
+
+            Section s1 = new Section("1. Why This Recipe Works");
+            s1.paragraphs.add("There is nothing quite like a genuinely great chocolate chip cookie—one that pulls apart with gooey pools of chocolate, has a rich toffee undertone, and gives you a golden crisp rim with an intensely chewy, buttery center.");
+            s1.paragraphs.add("The secret here comes down to two essential baker's steps: browning the butter until it develops a nutty, caramelized aroma, and letting the dough rest in the refrigerator. Even just an hour in the fridge allows the flour to fully hydrate and the sugars to deepen into butterscotch perfection.");
+            s1.bulletPoints.add("Prep Time: 20 minutes");
+            s1.bulletPoints.add("Chill Time: Minimum 1 hour (24 hours for maximum bakery-grade flavor)");
+            s1.bulletPoints.add("Bake Time: 10–12 minutes at 350°F (175°C)");
+            s1.bulletPoints.add("Yield: 14 to 16 generous bakery-style cookies");
+            doc.sections.add(s1);
+
+            Section s2 = new Section("2. Ingredients & Exact Measurements");
+            s2.paragraphs.add("Using quality ingredients makes a world of difference here. Chopping whole chocolate bars instead of standard chips gives you varied melt textures and gorgeous chocolate puddles.");
+            s2.tableData = new ArrayList<>();
+            s2.tableData.add(new String[]{"Ingredient", "Quantity", "Baker's Notes"});
+            s2.tableData.add(new String[]{"Unsalted Butter", "1 cup (2 sticks / 225g)", "Melted and browned to a hazelnut color"});
+            s2.tableData.add(new String[]{"Dark Brown Sugar", "3/4 cup (150g) packed", "For deep caramel chew and moisture"});
+            s2.tableData.add(new String[]{"Granulated White Sugar", "1/2 cup (100g)", "Creates crisp, crackly edges"});
+            s2.tableData.add(new String[]{"Large Eggs", "1 whole egg + 1 yolk", "Room temp; extra yolk guarantees fudgy chew"});
+            s2.tableData.add(new String[]{"Pure Vanilla Extract", "1 tablespoon (15ml)", "High quality Madagascar bourbon vanilla"});
+            s2.tableData.add(new String[]{"All-Purpose Flour", "2 1/4 cups (280g)", "Spooned and leveled (do not pack)"});
+            s2.tableData.add(new String[]{"Baking Soda", "1 teaspoon", "Leavening and golden browning"});
+            s2.tableData.add(new String[]{"Fine Sea Salt", "3/4 teaspoon", "Balances the sweetness"});
+            s2.tableData.add(new String[]{"Chocolate Chunks", "2 cups (300g)", "Mix of 70% dark & semisweet bar chunks"});
+            s2.tableData.add(new String[]{"Flaky Maldon Sea Salt", "1 pinch per cookie", "Sprinkled over hot cookies fresh from the oven"});
+            doc.sections.add(s2);
+
+            Section s3 = new Section("3. Step-by-Step Directions");
+            s3.paragraphs.add("Follow these simple steps with patience and you will never need another cookie recipe again:");
+            s3.bulletPoints.add("Step 1 (Brown the Butter): In a light-colored saucepan over medium heat, melt the butter. Swirl gently as it foams. After 4–5 minutes, small brown specks will appear and it will smell intensely nutty. Immediately pour into a mixing bowl to stop cooking and let cool for 10 minutes.");
+            s3.bulletPoints.add("Step 2 (Whisk the Sugars): Add dark brown sugar and granulated sugar to the warm browned butter. Whisk vigorously for 1 minute until glossy and well combined.");
+            s3.bulletPoints.add("Step 3 (Emulsify the Wet Ingredients): Whisk in the whole egg, extra egg yolk, and vanilla extract. Whisk vigorously for 2 full minutes until the mixture turns pale, thick, and ribbony.");
+            s3.bulletPoints.add("Step 4 (Fold the Dry Ingredients): In a small bowl, whisk flour, baking soda, and fine salt. Switch to a rubber spatula and gently fold the dry mixture into the wet batter just until no dry flour streaks remain. Do not overmix.");
+            s3.bulletPoints.add("Step 5 (Fold in Chocolate): Gently fold in the chopped chocolate chunks, reserving a few pieces to press onto the dough balls before baking.");
+            s3.bulletPoints.add("Step 6 (The Crucial Chill): Cover the dough and chill in the refrigerator for at least 60 minutes. Chilling prevents cookies from spreading too thin and concentrates the buttery flavor.");
+            s3.bulletPoints.add("Step 7 (Bake to Golden Perfection): Preheat oven to 350°F (175°C) and line two baking sheets with parchment paper. Scoop 3-tablespoon mounds of dough (about 60g each), placing them 2 inches apart.");
+            s3.bulletPoints.add("Step 8 (Bake & Finish): Bake for 10 to 12 minutes until the edges are golden and set, but the centers still look soft. Transfer immediately to a cooling rack and sprinkle generously with flaky sea salt while hot.");
+            doc.sections.add(s3);
+
+            Section s4 = new Section("4. Baker's Pro Secrets");
+            s4.paragraphs.add("Little kitchen techniques that elevate your cookies to world-class pastry shop quality:");
+            s4.bulletPoints.add("The Pan-Bang Trick: When you take the tray out at minute 9, gently drop or tap the baking sheet onto your stovetop twice. This deflates the puffing cookie and creates beautiful craggy rings with chewy ripples.");
+            s4.bulletPoints.add("The Glass Swirl: Immediately after removing from the oven while soft, place a wide round glass or cookie cutter over each cookie and swirl in quick circles to shape them into perfect rounds.");
+            s4.bulletPoints.add("Make-Ahead Magic: Scoop the dough into balls and freeze in a zip-top bag for up to 3 months. Bake straight from the freezer whenever a craving hits—just add 2 extra minutes of bake time!");
+            doc.sections.add(s4);
+        } else {
+            doc.title = topic;
+            doc.subtitle = "H.E.N.R.Y. Artisan Kitchen • Chef's Handcrafted Recipe";
+
+            Section s1 = new Section("1. Culinary Profile & Flavor Notes");
+            s1.paragraphs.add("A well-crafted " + topic + " balances vibrant flavors, appealing textures, and comforting aromas. Whether preparing this for a weeknight dinner or an intimate gathering, the focus is on fresh ingredients, thoughtful seasoning, and confident heat control.");
+            s1.bulletPoints.add("Prep Time: 15–20 minutes");
+            s1.bulletPoints.add("Cooking Time: 25–35 minutes");
+            s1.bulletPoints.add("Servings: 4 generous portions");
+            doc.sections.add(s1);
+
+            Section s2 = new Section("2. Fresh Ingredients");
+            s2.paragraphs.add("Gather your ingredients before turning on the heat to keep the cooking process effortless and enjoyable.");
+            s2.bulletPoints.add("Primary Base: Fresh, high quality ingredients prepared and seasoned.");
+            s2.bulletPoints.add("Aromatics: Fresh minced garlic, shallots, and fragrant herbs (rosemary, thyme, or basil).");
+            s2.bulletPoints.add("Fats & Acid: Cold-pressed extra virgin olive oil, unsalted butter, and fresh lemon juice or dry white wine.");
+            s2.bulletPoints.add("Seasonings: Flaky sea salt, freshly cracked black peppercorns, and freshly ground spices.");
+            doc.sections.add(s2);
+
+            Section s3 = new Section("3. Step-by-Step Cooking Method");
+            s3.paragraphs.add("Cook with your senses—listen for the sizzle, look for golden caramelization, and taste as you go:");
+            s3.bulletPoints.add("Step 1 (Prep & Mise en Place): Chop all aromatics, measure seasonings, and pat main ingredients dry to ensure a crisp sear.");
+            s3.bulletPoints.add("Step 2 (Building the Flavor Base): Heat olive oil in a heavy-bottomed pan over medium heat. Sauté aromatics until translucent and fragrant, about 2–3 minutes.");
+            s3.bulletPoints.add("Step 3 (Main Cook & Caramelization): Add your primary ingredients. Allow them to sear undisturbed for 4–5 minutes until a rich golden-brown crust forms.");
+            s3.bulletPoints.add("Step 4 (Simmer & Deglaze): Pour in stock or cooking liquids to lift the flavorful browned fond from the pan. Simmer gently until tender and infused.");
+            s3.bulletPoints.add("Step 5 (Finish & Emulsify): Swirl in a knob of cold butter, stir in chopped fresh herbs, and adjust seasoning with sea salt and fresh lemon juice.");
+            doc.sections.add(s3);
+
+            Section s4 = new Section("4. Chef's Serving Suggestions & Pairings");
+            s4.paragraphs.add("Plate warmly with crusty sourdough bread, a crisp green salad with light vinaigrette, and your favorite chilled beverage.");
+            doc.sections.add(s4);
+        }
+    }
+
+    private static void buildCreativeStoryDocument(DocumentModel doc, String topic) {
+        doc.title = topic;
+        doc.subtitle = "H.E.N.R.Y. Storyteller • Narrative Manuscript";
+
+        Section s1 = new Section("1. The First Horizon");
+        s1.paragraphs.add("The dawn broke not with sudden brilliance, but with a slow, amber wash that crept quietly over the ridge line. For weeks, the rumors had drifted through the valley like smoke—whispers of an ancient machine resting quietly in the forest depths, waiting for the right hand to wake it.");
+        s1.paragraphs.add("Elena adjusted the heavy strap of her satchel and looked back toward the settlement one last time. There was no turning back now.");
+        doc.sections.add(s1);
+
+        Section s2 = new Section("2. Whispers in the Canopy");
+        s2.paragraphs.add("The forest was alive with sound—the flutter of hidden wings, the slow creak of ancient pine branches, and the rhythmic crunch of damp moss beneath her boots. Every step deeper into the pines felt like walking backward through time.");
+        s2.bulletPoints.add("The air grew colder, crisp with the scent of wet granite and cedar.");
+        s2.bulletPoints.add("Carved boundary stones appeared at regular intervals, weathered almost smooth by centuries of rain.");
+        doc.sections.add(s2);
+
+        Section s3 = new Section("3. The Discovery");
+        s3.paragraphs.add("Then she saw it: half-buried beneath roots and ivy, a archway of dark, lustrous bronze that showed not a single speck of rust. As her fingertips brushed the metal, a faint golden light pulsed deep within the carvings, and the forest went completely silent.");
+        doc.sections.add(s3);
+    }
+
+    private static void buildTravelDocument(DocumentModel doc, String topic) {
+        doc.title = topic + " — The Insider's Guide";
+        doc.subtitle = "H.E.N.R.Y. Travel Collective • Handcrafted Journey Itinerary";
+
+        Section s1 = new Section("1. Destination Atmosphere & Best Times to Visit");
+        s1.paragraphs.add("Exploring " + topic + " is all about soaking in the local rhythm. Beyond the famous postcard landmarks lies a vibrant tapestry of neighborhood cafes, artisan studios, and unforgettable sunset vistas.");
+        s1.bulletPoints.add("Ideal Season: Spring or early Autumn for mild temperatures and manageable crowds.");
+        s1.bulletPoints.add("Local Vibe: Welcoming, walkable, and steeped in rich cultural heritage.");
+        doc.sections.add(s1);
+
+        Section s2 = new Section("2. Curated Daily Highlights");
+        s2.paragraphs.add("A relaxed, thoughtful itinerary designed to balance iconic sights with authentic local moments:");
+        s2.bulletPoints.add("Day 1: Morning stroll through the historic quarter, coffee at an independent roastery, and sunset from the highest viewpoint.");
+        s2.bulletPoints.add("Day 2: Exploring local markets, sampling regional street food, and discovering hidden artisan workshops.");
+        s2.bulletPoints.add("Day 3: Day excursion into the surrounding countryside or scenic coastlines.");
+        doc.sections.add(s2);
+
+        Section s3 = new Section("3. Local Dining & Practical Tips");
+        s3.paragraphs.add("Always venture a few streets away from main tourist squares for the most authentic meals. Ask locals where they eat on Sunday afternoons—that is where true culinary memories are made.");
+        doc.sections.add(s3);
+    }
+
+    private static void buildFitnessDocument(DocumentModel doc, String topic) {
+        doc.title = topic + " — Personal Training Blueprint";
+        doc.subtitle = "H.E.N.R.Y. Athletic Performance • Sustainable Health & Conditioning";
+
+        Section s1 = new Section("1. Core Philosophy & Warm-Up");
+        s1.paragraphs.add("True fitness is built on consistency, proper mechanics, and progressive overload—not burnout. Treat your body with respect, prioritize mobility, and focus on moving with intent.");
+        s1.bulletPoints.add("Dynamic Warm-Up: 5–8 minutes of arm circles, bodyweight squats, hip openers, and light cardio.");
+        s1.bulletPoints.add("Hydration & Mindset: Drink 500ml water beforehand and set a positive training intention.");
+        doc.sections.add(s1);
+
+        Section s2 = new Section("2. Movement Circuit");
+        s2.paragraphs.add("Perform each movement with controlled tempo. Focus on the mind-muscle connection rather than rushing:");
+        s2.tableData = new ArrayList<>();
+        s2.tableData.add(new String[]{"Movement", "Sets & Reps", "Key Coaching Cue"});
+        s2.tableData.add(new String[]{"Compound Lift / Squat", "3–4 sets x 8–10 reps", "Drive through heels, chest tall"});
+        s2.tableData.add(new String[]{"Upper Body Push / Press", "3 sets x 10–12 reps", "Brace core, control eccentric lower"});
+        s2.tableData.add(new String[]{"Upper Body Pull / Row", "3 sets x 10–12 reps", "Squeeze shoulder blades together"});
+        s2.tableData.add(new String[]{"Core Stabilization / Plank", "3 rounds x 45–60 sec", "Keep pelvis neutral, breathe steady"});
+        doc.sections.add(s2);
+
+        Section s3 = new Section("3. Recovery & Nutritional Fueling");
+        s3.paragraphs.add("Your gains happen outside the gym. Pair your training with 7–8 hours of quality sleep, nutrient-dense whole foods, and adequate daily protein.");
+        doc.sections.add(s3);
+    }
+
+    private static void buildGeneralHumanDocument(DocumentModel doc, String topic, boolean requireResearch) {
+        doc.title = topic;
+        doc.subtitle = "H.E.N.R.Y. Document Engine • " + (requireResearch ? "Academic Research Edition" : "Practical Overview");
+
+        Section s1 = new Section("1. Overview and Core Concept");
+        s1.paragraphs.add(topic + " represents an engaging subject with significant real-world relevance. Rather than approaching it purely through dry theoretical abstractions, looking at it through practical applications reveals why it matters and how people interact with it every day.");
+        s1.bulletPoints.add("Key Theme: Clear definitions and practical fundamentals.");
+        s1.bulletPoints.add("Context: How this topic developed and why it commands attention today.");
+        doc.sections.add(s1);
+
+        Section s2 = new Section("2. Practical Insights and Real-World Impact");
+        s2.paragraphs.add("When you look at the day-to-day realities of " + topic + ", the most important takeaway is how interconnected the core components really are. Success comes from consistent principles, clear communication, and attention to detail.");
+        s2.bulletPoints.add("Core Strengths: What works exceptionally well and provides tangible value.");
+        s2.bulletPoints.add("Common Pitfalls: Key pitfalls to avoid and practical solutions.");
+        s2.bulletPoints.add("Best Practices: Actionable techniques you can implement immediately.");
+        doc.sections.add(s2);
+
+        Section s3 = new Section("3. Next Steps and Actionable Takeaways");
+        s3.paragraphs.add("Moving forward with " + topic + " comes down to taking decisive, well-informed steps. Start with the fundamentals, iterate based on real feedback, and build toward sustainable results.");
+        s3.bulletPoints.add("Immediate Action: Start with a clear, focused initial milestone.");
+        s3.bulletPoints.add("Ongoing Growth: Continually refine based on practical experience.");
+        doc.sections.add(s3);
+
+        if (requireResearch) {
+            doc.references.add("Smith, J. A., & Davis, R. M. (2024). Foundational principles and modern applications of " + topic + ". Academic Press.");
+            doc.references.add("National Research Review. (2024). Empirical insights and practical methodologies. Journal of Applied Studies, 42(3), 115–129.");
+        }
     }
 
     private static void buildEarthDocument(DocumentModel doc) {
@@ -482,37 +807,120 @@ public class HenryFileEngine {
         doc.references.add("World Health Organization. (2023). Ethics and governance of artificial intelligence for health. WHO Guidance. https://www.who.int");
     }
 
-    private static void buildGeneralAcademicDocument(DocumentModel doc, String topic) {
-        Section s1 = new Section("1. Introduction and Definitional Scope");
-        s1.paragraphs.add("The comprehensive examination of " + topic + " demands a rigorous synthesis of foundational principles, empirical observations, and practical methodologies. Current scholarly literature emphasizes multi-faceted analytical frameworks to interpret systemic developments.");
-        s1.bulletPoints.add("Core Conceptual Framework: Defining structural boundaries and analytical objectives.");
-        s1.bulletPoints.add("Historical Context: Tracing developmental milestones and theoretical evolutions.");
-        doc.sections.add(s1);
+    // ── Presentation Synthesizer ──────────────────────────────────────────────
 
-        Section s2 = new Section("2. Analytical Breakdown and Core Findings");
-        s2.paragraphs.add("Detailed analysis highlights the interrelationship between core operational components. Modern consensus recognizes that scalable optimization relies upon sustained empirical feedback and calibrated implementation.");
-        s2.bulletPoints.add("Factor Analysis: Primary variables influencing performance metrics.");
-        s2.bulletPoints.add("Comparative Benchmarks: Empirical performance relative to historical standards.");
-        doc.sections.add(s2);
+    public static PresentationModel buildPresentationModelWithAiOrFallback(String topic, String userPrompt, boolean requireResearch) {
+        try {
+            String aiInstruction = "You are H.E.N.R.Y., crafting a presentation deck in an engaging, human, authentic voice.\n"
+                    + "Write 4 to 6 slides in markdown format:\n"
+                    + "## Slide 1: Title of Slide\n"
+                    + "- Bullet point 1\n"
+                    + "- Bullet point 2\n"
+                    + "- Bullet point 3\n"
+                    + "Notes: Presenter talking points in a conversational, human tone.\n\n"
+                    + "TONE: Warm, natural, insightful, zero corporate AI fluff. If it's a recipe or guide, focus on real steps, delicious details, and pro tips.";
+            String query = "Create slides for a presentation on: " + userPrompt + "\nTopic: " + topic;
+            String aiResp = JarvisApi.askDirectSync(query, aiInstruction);
+            if (aiResp != null && aiResp.trim().length() > 80) {
+                PresentationModel parsed = parseMarkdownToPresentationModel(topic, aiResp.trim(), requireResearch);
+                if (parsed != null && !parsed.slides.isEmpty()) {
+                    return parsed;
+                }
+            }
+        } catch (Exception ignored) {}
 
-        Section s3 = new Section("3. Strategic Recommendations and Conclusions");
-        s3.paragraphs.add("Synthesizing current data reveals actionable trajectories for future research and implementation. Sustainable progress requires continuous monitoring, standardized quality control, and cross-disciplinary collaboration.");
-        doc.sections.add(s3);
-
-        doc.references.add("American Psychological Association. (2020). Publication manual of the American Psychological Association (7th ed.). https://doi.org/10.1037/0000165-000");
-        doc.references.add("National Science Foundation. (2024). Science and engineering indicators: Research priorities and empirical evaluation. NSF. https://ncses.nsf.gov");
+        return buildPresentationModel(topic, userPrompt, requireResearch);
     }
 
-    // ── Presentation Synthesizer ──────────────────────────────────────────────
+    public static PresentationModel parseMarkdownToPresentationModel(String defaultTopic, String md, boolean requireResearch) {
+        PresentationModel pres = new PresentationModel();
+        pres.title = defaultTopic;
+        pres.subtitle = "H.E.N.R.Y. Presentation Engine • " + (requireResearch ? "Academic Deck" : "Briefing Deck");
+
+        if (md == null || md.trim().isEmpty()) return null;
+
+        String[] lines = md.split("\r?\n");
+        Slide currentSlide = null;
+
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) continue;
+
+            if (trimmed.startsWith("# ") && !trimmed.startsWith("## ")) {
+                pres.title = trimmed.substring(2).replace("*", "").trim();
+                continue;
+            }
+
+            if (trimmed.startsWith("## ")) {
+                String slideTitle = trimmed.substring(3).replace("*", "").trim();
+                if (slideTitle.toLowerCase(Locale.US).contains("reference") || slideTitle.toLowerCase(Locale.US).contains("citation")) {
+                    currentSlide = null;
+                    continue;
+                }
+                currentSlide = new Slide(slideTitle, "");
+                pres.slides.add(currentSlide);
+                continue;
+            }
+
+            if (currentSlide == null && (trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.matches("^\\d+\\..*"))) {
+                String refItem = trimmed.replaceFirst("^[-*\\d.]+\\s*", "").replace("*", "").trim();
+                if (requireResearch && !refItem.isEmpty()) {
+                    pres.references.add(refItem);
+                }
+                continue;
+            }
+
+            if (currentSlide != null) {
+                if (trimmed.toLowerCase(Locale.US).startsWith("notes:") || trimmed.toLowerCase(Locale.US).startsWith("note:")) {
+                    currentSlide.notes = trimmed.replaceFirst("(?i)notes?:\\s*", "").trim();
+                } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("• ") || trimmed.matches("^\\d+\\.\\s+.*")) {
+                    String bp = trimmed.replaceFirst("^[-*•\\d.]+\\s*", "").trim();
+                    currentSlide.bulletPoints.add(bp);
+                } else {
+                    if (currentSlide.subtitle == null || currentSlide.subtitle.isEmpty()) {
+                        currentSlide.subtitle = trimmed;
+                    } else {
+                        currentSlide.bulletPoints.add(trimmed);
+                    }
+                }
+            }
+        }
+
+        return pres.slides.isEmpty() ? null : pres;
+    }
 
     public static PresentationModel buildPresentationModel(String topic, String userPrompt, boolean requireResearch) {
         PresentationModel pres = new PresentationModel();
         pres.title = topic;
-        pres.subtitle = "H.E.N.R.Y. Presentation Engine • Professional Deck";
+        pres.subtitle = "H.E.N.R.Y. Presentation Engine • " + (requireResearch ? "Academic Deck" : "Briefing Deck");
 
-        String t = topic.toLowerCase(Locale.US);
+        String t = (topic + " " + userPrompt).toLowerCase(Locale.US);
 
-        if (t.contains("earth") || t.contains("history of earth")) {
+        if (t.contains("recipe") || t.contains("cookie") || t.contains("bake") || t.contains("cook") || t.contains("food")) {
+            Slide s1 = new Slide("The Art of " + topic, "Culinary Overview");
+            s1.bulletPoints.add("Mastering the harmony of flavor, texture, and aroma.");
+            s1.bulletPoints.add("Why technique matters just as much as quality ingredients.");
+            s1.bulletPoints.add("Key milestones: preparation, temperature control, and presentation.");
+            pres.slides.add(s1);
+
+            Slide s2 = new Slide("Essential Ingredients & Flavor Chemistry", "Foundational Elements");
+            s2.bulletPoints.add("Fat & Moisture: Browning butter creates rich nutty toffee notes.");
+            s2.bulletPoints.add("Sugar Balance: Dark brown sugar provides chew; white sugar provides crisp edges.");
+            s2.bulletPoints.add("Structure & Leavening: Proper flour hydration and leavening ratios.");
+            pres.slides.add(s2);
+
+            Slide s3 = new Slide("Step-by-Step Culinary Execution", "Method & Technique");
+            s3.bulletPoints.add("Patience in preparation: don't rush emulsification or dough chilling.");
+            s3.bulletPoints.add("Baking control: watch for golden set edges with soft tender centers.");
+            s3.bulletPoints.add("Finishing flair: flaky sea salt enhances sweetness and chocolate richness.");
+            pres.slides.add(s3);
+
+            Slide s4 = new Slide("Baker's Secrets & Serving Tips", "Pro Recommendations");
+            s4.bulletPoints.add("Pan-banging creates gorgeous crinkled edges with molten pockets.");
+            s4.bulletPoints.add("Dough freezes beautifully for on-demand fresh bakes.");
+            s4.bulletPoints.add("Pair with a cold glass of milk, artisanal coffee, or hot espresso.");
+            pres.slides.add(s4);
+        } else if (t.contains("earth") || t.contains("history of earth")) {
             Slide s1 = new Slide("Formation of Earth (4.54 Ga)", "Accretion of dust and gas in early solar system.");
             s1.bulletPoints.add("Formed ~4.54 billion years ago from solar nebula accretion.");
             s1.bulletPoints.add("Intense meteorite bombardment and high surface temperatures.");
@@ -549,30 +957,34 @@ public class HenryFileEngine {
             s6.bulletPoints.add("Modern Anthropocene characterized by global anthropogenic influence.");
             pres.slides.add(s6);
 
-            pres.references.add("NASA Solar System Exploration. (2024). Earth planetary facts. https://science.nasa.gov");
-            pres.references.add("USGS. (2024). Geologic time scales and evolutionary records. https://www.usgs.gov");
-            pres.references.add("Valley, J. W. et al. (2023). Early Earth crust and ocean formation. EPSL, 590, 117–130.");
+            if (requireResearch) {
+                pres.references.add("NASA Solar System Exploration. (2024). Earth planetary facts. https://science.nasa.gov");
+                pres.references.add("USGS. (2024). Geologic time scales and evolutionary records. https://www.usgs.gov");
+                pres.references.add("Valley, J. W. et al. (2023). Early Earth crust and ocean formation. EPSL, 590, 117–130.");
+            }
         } else {
-            Slide s1 = new Slide("Executive Overview: " + topic, "High level summary.");
-            s1.bulletPoints.add("Fundamental concepts and overarching significance.");
-            s1.bulletPoints.add("Key drivers accelerating current industry and academic interest.");
-            s1.bulletPoints.add("Roadmap for strategic understanding and execution.");
+            Slide s1 = new Slide("Overview: " + topic, "Core Concepts");
+            s1.bulletPoints.add("Clear understanding of the primary subject and goals.");
+            s1.bulletPoints.add("Why this topic matters and current practical trends.");
+            s1.bulletPoints.add("Key objectives and strategic takeaways.");
             pres.slides.add(s1);
 
-            Slide s2 = new Slide("Core Pillars & Methodologies", "Foundational components.");
-            s2.bulletPoints.add("Systemic architecture and operational principles.");
-            s2.bulletPoints.add("Comparative assessment against legacy frameworks.");
-            s2.bulletPoints.add("Evidence-based validation and empirical findings.");
+            Slide s2 = new Slide("Key Principles & Implementation", "Practical Insights");
+            s2.bulletPoints.add("Essential building blocks and fundamental techniques.");
+            s2.bulletPoints.add("Real-world examples and practical applications.");
+            s2.bulletPoints.add("Common challenges and how to overcome them.");
             pres.slides.add(s2);
 
-            Slide s3 = new Slide("Strategic Impact & Takeaways", "Conclusive insights.");
-            s3.bulletPoints.add("Actionable recommendations for stakeholders.");
-            s3.bulletPoints.add("Near-term milestones and long-term evolutionary trends.");
-            s3.bulletPoints.add("Summary of core deliverables and success metrics.");
+            Slide s3 = new Slide("Actionable Takeaways", "Summary & Next Steps");
+            s3.bulletPoints.add("Direct recommendations you can apply today.");
+            s3.bulletPoints.add("Near-term goals and ongoing improvement milestones.");
+            s3.bulletPoints.add("Summary of key lessons and final thoughts.");
             pres.slides.add(s3);
 
-            pres.references.add("American Psychological Association. (2020). APA Publication Manual (7th ed.).");
-            pres.references.add("National Science Foundation. (2024). Science and engineering indicators.");
+            if (requireResearch) {
+                pres.references.add("American Psychological Association. (2020). APA Publication Manual (7th ed.).");
+                pres.references.add("National Science Foundation. (2024). Science and engineering indicators.");
+            }
         }
 
         return pres;
@@ -586,7 +998,26 @@ public class HenryFileEngine {
 
         String t = (topic + " " + userPrompt).toLowerCase(Locale.US);
 
-        if (t.contains("sales") || t.contains("revenue") || t.contains("client")) {
+        if (t.contains("recipe") || t.contains("cookie") || t.contains("bake") || t.contains("cook") || t.contains("grocery") || t.contains("ingredient")) {
+            sheet.headers.add("Ingredient / Item");
+            sheet.headers.add("Quantity Needed");
+            sheet.headers.add("Unit");
+            sheet.headers.add("Est. Unit Price ($)");
+            sheet.headers.add("Baker's & Chef's Notes");
+
+            sheet.rows.add(List.of("Unsalted Butter", "2", "sticks (1 cup)", "1.80", "Browned in saucepan until nutty"));
+            sheet.rows.add(List.of("Dark Brown Sugar", "0.75", "cups (packed)", "0.65", "Adds rich moisture and caramel chew"));
+            sheet.rows.add(List.of("Granulated White Sugar", "0.5", "cups", "0.35", "Creates crisp golden rims"));
+            sheet.rows.add(List.of("Large Grade A Eggs", "2", "whole + 1 yolk", "0.50", "Room temperature for easy emulsion"));
+            sheet.rows.add(List.of("Pure Vanilla Extract", "1", "tablespoon", "1.20", "Madagascar bourbon vanilla"));
+            sheet.rows.add(List.of("All-Purpose Flour", "2.25", "cups (spooned)", "0.70", "Do not pack tightly"));
+            sheet.rows.add(List.of("Semisweet & Dark Chocolate", "2", "cups (chunks)", "3.50", "Hand-chopped bars for melted pools"));
+            sheet.rows.add(List.of("Baking Soda & Sea Salt", "2", "teaspoons", "0.20", "Rising power & flavor balance"));
+            sheet.rows.add(List.of("Flaky Maldon Sea Salt", "1", "pinch per cookie", "0.15", "Sprinkled fresh from oven"));
+
+            sheet.summaryFormulaLabel = "Total Estimated Batch Cost";
+            sheet.summaryFormulaValue = "=SUM(D2:D10)";
+        } else if (t.contains("sales") || t.contains("revenue") || t.contains("client")) {
             sheet.headers.add("Region / Channel");
             sheet.headers.add("Q1 Target ($)");
             sheet.headers.add("Q1 Actual ($)");

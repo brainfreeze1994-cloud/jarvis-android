@@ -18,7 +18,11 @@ import java.util.Set;
 public class ChemistryAccuracyEngine {
 
     private static final Map<String, MolecularStructureData> COMPOUND_REGISTRY = new HashMap<>();
-    private static final List<MolecularStructureData> ALL_COMPOUNDS = new ArrayList<>();
+    public static final List<MolecularStructureData> ALL_COMPOUNDS = new ArrayList<>();
+
+    public static List<MolecularStructureData> getAllCompounds() {
+        return Collections.unmodifiableList(ALL_COMPOUNDS);
+    }
 
     static {
         registerAllCompounds();

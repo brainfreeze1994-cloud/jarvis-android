@@ -21,6 +21,7 @@ import android.util.Base64;
 import android.view.View;
 import android.widget.*;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.*;
 import androidx.camera.lifecycle.ProcessCameraProvider;
@@ -961,6 +962,10 @@ public class VisionActivity extends AppCompatActivity implements TextToSpeech.On
         if (status == TextToSpeech.SUCCESS) {
             tts.setLanguage(Locale.US); ttsReady = true;
         }
+    }
+
+    private void speak(String text) {
+        speak(text, "normal");
     }
 
     private void speak(String text, String emotion) {

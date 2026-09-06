@@ -209,6 +209,7 @@ public class JarvisApi {
                 body.put("persona",      "HENRY_HYPERINTELLIGENT_WITTY");
                 body.put("systemPrompt", DEFAULT_HENRY_PERSONA_PROMPT);
 
+                String primaryImage = imageBase64;
                 if (imagesBase64 != null && !imagesBase64.isEmpty()) {
                     JSONArray arr = new JSONArray();
                     for (String img : imagesBase64) {
@@ -216,14 +217,14 @@ public class JarvisApi {
                     }
                     if (arr.length() > 0) {
                         body.put("imagesBase64", arr);
-                        if (imageBase64 == null || imageBase64.isEmpty()) {
-                            imageBase64 = arr.optString(0);
+                        if (primaryImage == null || primaryImage.isEmpty()) {
+                            primaryImage = arr.optString(0);
                         }
                     }
                 }
 
-                if (imageBase64 != null && !imageBase64.isEmpty())
-                    body.put("imageBase64", imageBase64);
+                if (primaryImage != null && !primaryImage.isEmpty())
+                    body.put("imageBase64", primaryImage);
                 if (profile != null && !profile.isEmpty())
                     body.put("userProfile", profile.toJson());
                 if (queryType != null && !queryType.isEmpty())

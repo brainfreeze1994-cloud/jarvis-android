@@ -1,6 +1,7 @@
 package com.jarvis.ai;
 
 import androidx.room.Entity;
+import androidx.room.Ignore;
 import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
@@ -27,6 +28,7 @@ public class AiResponseCacheEntity {
         this.hitCount = 0;
     }
 
+    @Ignore
     public AiResponseCacheEntity(String queryKey, String originalPrompt, String responseText,
                                  String emotion, String intentType, String imageUrl) {
         this.queryKey = queryKey;

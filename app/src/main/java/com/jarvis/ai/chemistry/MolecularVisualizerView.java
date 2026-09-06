@@ -99,6 +99,9 @@ public class MolecularVisualizerView extends View {
     public interface OnAtomSelectedListener {
         void onAtomSelected(Atom3D atom, MolecularStructureData molecule);
     }
+    public interface SingleAtomSelectedListener {
+        void onAtomSelected(Atom3D atom);
+    }
     private OnAtomSelectedListener atomSelectedListener;
 
     public MolecularVisualizerView(Context context) {
@@ -291,6 +294,19 @@ public class MolecularVisualizerView extends View {
         this.atomSelectedListener = listener;
     }
 
+    public void setOnAtomSelectedListener(SingleAtomSelectedListener listener) {
+        if (listener == null) {
+            this.atomSelectedListener = null;
+        } else {
+            this.atomSelectedListener = (atom, molecule) -> listener.onAtomSelected(atom);
+        }
+    }
+
+    public void clearSelection() {
+        this.selectedAtom = null;
+        postInvalidate();
+    }
+
     /**
      * Exports the rendered visual structure as a high-resolution Bitmap.
      */
@@ -301,6 +317,10 @@ public class MolecularVisualizerView extends View {
         Canvas canvas = new Canvas(bitmap);
         draw(canvas);
         return bitmap;
+    }
+
+    public Bitmap exportAsBitmap() {
+        return exportStructureBitmap();
     }
 
     // ─────────────────────────────────────────────────────────────────────────

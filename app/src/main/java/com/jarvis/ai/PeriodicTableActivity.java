@@ -928,7 +928,7 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
 
         // Atom Selection Inspector Callback
         if (molecularVisualizer != null) {
-            molecularVisualizer.setOnAtomSelectedListener(atom -> {
+            molecularVisualizer.setOnAtomSelectedListener((atom, molecule) -> {
                 if (atom == null) {
                     cardAtomInspector.setVisibility(View.GONE);
                     inspectedAtom = null;

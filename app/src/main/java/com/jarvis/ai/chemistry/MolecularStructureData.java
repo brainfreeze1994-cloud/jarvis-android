@@ -52,6 +52,7 @@ public class MolecularStructureData {
     public final String synthesisSafetyDisclaimer;
 
     // Backwards-compatible aliases
+    public final String geometry;
     public final String vseprJustification;
     public final String bondingExplanation;
     public final String polarityDescription;
@@ -112,6 +113,7 @@ public class MolecularStructureData {
         this.productSummary = productSummary;
         this.synthesisSafetyDisclaimer = synthesisSafetyDisclaimer;
 
+        this.geometry = molecularGeometry;
         this.vseprJustification = geometryExplanation;
         this.bondingExplanation = bondFormationReason;
         this.polarityDescription = polarityAnalysis != null ? polarityAnalysis : polarity;

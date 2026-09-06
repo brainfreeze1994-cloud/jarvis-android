@@ -1,6 +1,7 @@
 package com.jarvis.ai;
 
 import androidx.room.Entity;
+import androidx.room.Ignore;
 import androidx.room.PrimaryKey;
 
 /**
@@ -30,6 +31,7 @@ public class ChatMessageEntity {
         this.timestamp = System.currentTimeMillis();
     }
 
+    @Ignore
     public ChatMessageEntity(int type, String role, String text, long timestamp) {
         this.type = type;
         this.role = role;

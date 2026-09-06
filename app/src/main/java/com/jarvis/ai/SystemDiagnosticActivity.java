@@ -238,7 +238,7 @@ public class SystemDiagnosticActivity extends AppCompatActivity {
             // Offer to view / share the file
             Uri contentUri = FileProvider.getUriForFile(
                     this,
-                    getPackageName() + ".fileprovider",
+                    getPackageName() + ".provider",
                     pdfFile
             );
 

@@ -149,7 +149,7 @@ public class MainActivity extends AppCompatActivity {
     private EditText     etInput;
     private ImageButton  btnMic, btnSend, btnClear, btnAttach;
     private ImageView    ivAttachPreview;
-    private LinearLayout orbSection, chipsRow1, chipsRow2, chipsRow3;
+    private LinearLayout orbSection, chipsRow1, chipsRow2, chipsRow3, chipsRow4;
     private NestedScrollView scrollMain;
 
     private final List<Message>     messages = new ArrayList<>();
@@ -367,13 +367,33 @@ public class MainActivity extends AppCompatActivity {
         chipsRow1       = findViewById(R.id.chips_row1);
         chipsRow2       = findViewById(R.id.chips_row2);
         chipsRow3       = findViewById(R.id.chips_row3);
+        chipsRow4       = findViewById(R.id.chips_row4);
         scrollMain      = findViewById(R.id.scroll_main);
+
+        View chipAudit = findViewById(R.id.chip_system_audit);
+        if (chipAudit != null) {
+            chipAudit.setOnClickListener(v -> {
+                startActivity(new Intent(this, SystemDiagnosticActivity.class));
+            });
+        }
+
+        if (tvStatus != null) {
+            tvStatus.setOnClickListener(v -> {
+                startActivity(new Intent(this, SystemDiagnosticActivity.class));
+            });
+        }
 
         // ── Real-Time Network & Gemini API Connectivity Indicator ───────────
         bannerNetworkStatus = findViewById(R.id.banner_network_status);
         ivNetworkIcon       = findViewById(R.id.iv_network_icon);
         tvNetworkStatusText = findViewById(R.id.tv_network_status_text);
         btnNetworkRetry     = findViewById(R.id.btn_network_retry);
+
+        if (tvNetworkStatusText != null) {
+            tvNetworkStatusText.setOnClickListener(v -> {
+                startActivity(new Intent(this, SystemDiagnosticActivity.class));
+            });
+        }
 
         if (btnNetworkRetry != null) {
             btnNetworkRetry.setOnClickListener(v -> {
@@ -544,6 +564,7 @@ public class MainActivity extends AppCompatActivity {
         if (chipsRow1  != null) chipsRow1.setVisibility(View.GONE);
         if (chipsRow2  != null) chipsRow2.setVisibility(View.GONE);
         if (chipsRow3  != null) chipsRow3.setVisibility(View.GONE);
+        if (chipsRow4  != null) chipsRow4.setVisibility(View.GONE);
     }
 
     // ── Wake Word ─────────────────────────────────────────────────────────────
@@ -4657,6 +4678,15 @@ public class MainActivity extends AppCompatActivity {
             saveHistory();
             return;
         }
+        // 🛡️ System Audit, Diagnostic & Verification Report trigger
+        if (lowerInput.matches(".*(system audit|diagnostic|system report|health check|full audit|self test|diagnose henry|verification report|audit report|system verification|diagnose).*")) {
+            startActivity(new android.content.Intent(this, SystemDiagnosticActivity.class));
+            String reply = "[EMOTION:focused] Initializing H.E.N.R.Y. Full System Audit and Verification sequence, sir. Inspecting AI neural link, vision pipeline, chemistry engine, and core telemetry.";
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
+            saveHistory();
+            return;
+        }
         // 🔐 Biometrics / Facial / Iris Recognition trigger
         if (lowerInput.matches(".*(biometric|face recognition|facial recognition|iris recognition|iris scan|fingerprint|bio lock).*")) {
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
@@ -5023,6 +5053,7 @@ public class MainActivity extends AppCompatActivity {
                 if (chipsRow1  != null) chipsRow1.setVisibility(View.VISIBLE);
                 if (chipsRow2  != null) chipsRow2.setVisibility(View.VISIBLE);
                 if (chipsRow3  != null) chipsRow3.setVisibility(View.VISIBLE);
+                if (chipsRow4  != null) chipsRow4.setVisibility(View.VISIBLE);
             })
             .setNegativeButton("Cancel", null).show();
     }

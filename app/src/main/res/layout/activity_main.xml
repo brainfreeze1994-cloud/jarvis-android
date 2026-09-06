@@ -424,6 +424,33 @@
 
             </LinearLayout>
 
+            <!-- ── Chips row 4: System Audit & Diagnostic ── -->
+            <LinearLayout
+                android:id="@+id/chips_row4"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:paddingHorizontal="12dp"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="12dp">
+
+                <Button
+                    android:id="@+id/chip_system_audit"
+                    style="@android:style/Widget.Material.Button.Borderless"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:text="🛡️ System Audit &amp; Verification"
+                    android:textColor="#00FFCC"
+                    android:textSize="12sp"
+                    android:textAllCaps="false"
+                    android:background="@drawable/bg_chip"
+                    android:paddingHorizontal="16dp"
+                    android:stateListAnimator="@null"
+                    android:contentDescription="Open H.E.N.R.Y. Full System Audit and Verification Report"/>
+
+            </LinearLayout>
+
             <!-- ── Chat RecyclerView ── -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/recycler_chat"

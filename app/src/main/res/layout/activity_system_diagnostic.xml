@@ -170,19 +170,9 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
-                            android:text="Execution Latency: 0 ms • 18 Vectors"
+                            android:text="Execution Latency: 0 ms • 8 Vectors"
                             android:textColor="#1A7799"
                             android:textSize="9.5sp" />
-
-                        <TextView
-                            android:id="@+id/tv_audit_counts"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="3dp"
-                            android:text="Tests: 18 • Passed: 0 • Warnings: 0 • Failed: 0 • Not Config: 0"
-                            android:textColor="#00D4FF"
-                            android:textSize="9sp"
-                            android:fontFamily="monospace" />
                     </LinearLayout>
                 </LinearLayout>
 

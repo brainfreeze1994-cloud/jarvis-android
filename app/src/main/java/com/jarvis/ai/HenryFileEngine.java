@@ -359,12 +359,15 @@ public class HenryFileEngine {
 
     public static class Slide {
         public final String title;
+        public String subtitle;
         public final List<String> bulletPoints = new ArrayList<>();
-        public final String presenterNotes;
+        public String presenterNotes;
+        public String notes;
 
         public Slide(String title, String notes) {
             this.title = title;
             this.presenterNotes = notes;
+            this.notes = notes;
         }
     }
 
@@ -872,7 +875,9 @@ public class HenryFileEngine {
 
             if (currentSlide != null) {
                 if (trimmed.toLowerCase(Locale.US).startsWith("notes:") || trimmed.toLowerCase(Locale.US).startsWith("note:")) {
-                    currentSlide.notes = trimmed.replaceFirst("(?i)notes?:\\s*", "").trim();
+                    String parsedNotes = trimmed.replaceFirst("(?i)notes?:\\s*", "").trim();
+                    currentSlide.notes = parsedNotes;
+                    currentSlide.presenterNotes = parsedNotes;
                 } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("• ") || trimmed.matches("^\\d+\\.\\s+.*")) {
                     String bp = trimmed.replaceFirst("^[-*•\\d.]+\\s*", "").trim();
                     currentSlide.bulletPoints.add(bp);
@@ -1383,7 +1388,12 @@ public class HenryFileEngine {
 
             int currentSlide = 2;
             for (Slide s : pres.slides) {
-                writeZipEntry(zos, "ppt/slides/slide" + currentSlide + ".xml", buildPptxSlideXml(s.title, s.bulletPoints, false));
+                List<String> slideLines = new ArrayList<>();
+                if (s.subtitle != null && !s.subtitle.trim().isEmpty()) {
+                    slideLines.add(s.subtitle.trim());
+                }
+                slideLines.addAll(s.bulletPoints);
+                writeZipEntry(zos, "ppt/slides/slide" + currentSlide + ".xml", buildPptxSlideXml(s.title, slideLines, false));
                 currentSlide++;
             }
 

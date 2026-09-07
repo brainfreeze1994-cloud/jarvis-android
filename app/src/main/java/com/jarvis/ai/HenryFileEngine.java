@@ -540,6 +540,10 @@ public class HenryFileEngine {
             buildTravelDocument(doc, topic);
         } else if (t.contains("workout") || t.contains("fitness") || t.contains("exercise") || t.contains("gym")) {
             buildFitnessDocument(doc, topic);
+        } else if (t.contains("command") || t.contains("voice command") || t.contains("text command")
+                || t.contains("command manual") || t.contains("user guide") || t.contains("documentation")
+                || t.contains("cheat sheet") || t.contains("command list")) {
+            buildCommandManualDocument(doc);
         } else if (t.contains("earth") || t.contains("history of earth")) {
             buildEarthDocument(doc);
         } else if (t.contains("climate") || t.contains("renewable")) {
@@ -732,6 +736,93 @@ public class HenryFileEngine {
             doc.references.add("Smith, J. A., & Davis, R. M. (2024). Foundational principles and modern applications of " + topic + ". Academic Press.");
             doc.references.add("National Research Review. (2024). Empirical insights and practical methodologies. Journal of Applied Studies, 42(3), 115–129.");
         }
+    }
+
+    private static void buildCommandManualDocument(DocumentModel doc) {
+        doc.title = "H.E.N.R.Y. Voice & Text Commands Manual";
+        doc.subtitle = "Official Voice, Speech & Text Commands Directory • All Subsystems";
+
+        Section s1 = new Section("1. Core AI & Knowledge Intelligence");
+        s1.paragraphs.add("HENRY features advanced neural reasoning, cognitive debate synthesis, Socratic tutoring, and multi-language translation.");
+        s1.bulletPoints.add("\"Explain [concept] like I'm 5\" — Socratic simplified conceptual breakdown.");
+        s1.bulletPoints.add("\"Give me a flashcard on [topic]\" — Study flashcard with key terms and definitions.");
+        s1.bulletPoints.add("\"Quiz me on [subject]\" — Interactive multiple-choice quiz engine.");
+        s1.bulletPoints.add("\"Argue both sides of [topic]\" — Comprehensive debate and counterargument synthesis.");
+        s1.bulletPoints.add("\"Translate [text] to [language]\" — Spoken translation across 30+ supported languages.");
+        s1.bulletPoints.add("\"What can I cook with [ingredients]?\" — Dynamic recipe generator with chef timing.");
+        doc.sections.add(s1);
+
+        Section s2 = new Section("2. Autonomous Document & File Creation Engine");
+        s2.paragraphs.add("Create publication-grade files with APA 7 references, structured headings, and formatted tables directly on device.");
+        s2.tableData = new ArrayList<>();
+        s2.tableData.add(new String[]{"File Type", "Command Example", "Engine Output"});
+        s2.tableData.add(new String[]{"PDF (.pdf)", "\"Create a PDF on Climate Change\"", "Multi-page PDF with citations & tables"});
+        s2.tableData.add(new String[]{"Word (.docx)", "\"Generate a Word document on AI\"", "Standard .docx with executive summary"});
+        s2.tableData.add(new String[]{"PowerPoint (.pptx)", "\"Make a presentation on Mars\"", "Full slide deck with presenter notes"});
+        s2.tableData.add(new String[]{"Excel (.xlsx)", "\"Create an Excel sheet for budget\"", "Formatted workbook with formulas"});
+        s2.tableData.add(new String[]{"Markdown (.md)", "\"Create a Markdown doc on architecture\"", "Clean markdown with code fences"});
+        doc.sections.add(s2);
+
+        Section s3 = new Section("3. Vision Intelligence & Multi-Attachment Vision");
+        s3.paragraphs.add("Leverage on-device ML Kit and multi-image reasoning for real-time visual inspection.");
+        s3.bulletPoints.add("\"Classify image / What is this?\" — Instant image label categorization.");
+        s3.bulletPoints.add("\"Detect objects / Locate objects\" — Bounding box object detection overlay.");
+        s3.bulletPoints.add("\"Track object\" — Live real-time object tracking with camera crosshairs.");
+        s3.bulletPoints.add("\"Facial recognition\" — Facial landmarks and emotion detection.");
+        s3.bulletPoints.add("\"Animal scanner / What animal is this?\" — Wildlife species identification.");
+        s3.bulletPoints.add("Multi-Attachment Vision — Tap paperclip to upload up to 10 photos or PDFs simultaneously.");
+        doc.sections.add(s3);
+
+        Section s4 = new Section("4. System & Hardware Device Control");
+        s4.paragraphs.add("Direct voice dispatch for Android device hardware, media sessions, and system tools.");
+        s4.bulletPoints.add("\"Torch on / Flashlight off\" — Instant flashlight toggle.");
+        s4.bulletPoints.add("\"Set brightness to 70%\" — Backlight display adjustment.");
+        s4.bulletPoints.add("\"Do Not Disturb on / off\" — System DND toggle.");
+        s4.bulletPoints.add("\"Battery status / Battery report\" — Battery percentage, temperature, and charging rate.");
+        s4.bulletPoints.add("\"Record screen / Stop recording\" — HD screen recording with floating HUD control.");
+        s4.bulletPoints.add("\"Play Spotify / Pause music / Next song\" — Native Android media session controls.");
+        s4.bulletPoints.add("\"Open [App Name]\" — Launches any of 35+ supported apps (YouTube, WhatsApp, Maps, etc.).");
+        doc.sections.add(s4);
+
+        Section s5 = new Section("5. Navigation, 3D Earth Globe & Astronomy");
+        s5.paragraphs.add("Integrated geospatial intelligence, orbital telemetry, and real-time navigation.");
+        s5.bulletPoints.add("\"Open Earth map / 3D Globe\" — Interactive 3D globe with geopolitical briefings.");
+        s5.bulletPoints.add("\"Navigate to [destination]\" — Google Maps turn-by-turn routing.");
+        s5.bulletPoints.add("\"How long to [place]?\" — Fast OSRM ETA calculation.");
+        s5.bulletPoints.add("\"Where is the ISS?\" — Live Space Station orbital coordinates and altitude.");
+        s5.bulletPoints.add("\"Asteroid watch\" — NASA Near-Earth close approach asteroid radar.");
+        doc.sections.add(s5);
+
+        Section s6 = new Section("6. Finance, Crypto & Real-Time Trackers");
+        s6.paragraphs.add("Financial market telemetry, personal ledger, and real-time utility monitors.");
+        s6.bulletPoints.add("\"Bitcoin price / Ethereum price / Solana\" — Live crypto quotes via CoinGecko.");
+        s6.bulletPoints.add("\"Convert 100 USD to EUR / GBP / AED\" — 170+ currency forex rates.");
+        s6.bulletPoints.add("\"I spent $25 on lunch\" — Automated SQLite personal expense logging.");
+        s6.bulletPoints.add("\"Track flight [Number] (e.g., EK201)\" — Live flight status, radar, and ETA.");
+        s6.bulletPoints.add("\"Live sports scores / NBA\" — Live scoreboards and game summaries.");
+        s6.bulletPoints.add("\"Track package [Number]\" — Multi-courier parcel tracking (DHL, FedEx, UPS).");
+        doc.sections.add(s6);
+
+        Section s7 = new Section("7. Communication & Emergency Protocols");
+        s7.paragraphs.add("Hands-free messaging, voice calling, and emergency distress safety broadcasts.");
+        s7.bulletPoints.add("\"Call [Contact Name]\" — Cellular voice call initiation.");
+        s7.bulletPoints.add("\"Text [Name]: [Message]\" — Native SMS dispatch.");
+        s7.bulletPoints.add("\"WhatsApp [Name]: [Message]\" — Direct WhatsApp message composition.");
+        s7.bulletPoints.add("\"SOS / Emergency distress\" — Emergency SMS broadcast with live GPS coordinates.");
+        doc.sections.add(s7);
+
+        Section s8 = new Section("8. Health, Wellness & Cognitive Brain Hub");
+        s8.paragraphs.add("Neuroscience-inspired cognitive expansion tools, habit tracking, and biometric health calculators.");
+        s8.bulletPoints.add("\"Step counter / How many steps today?\" — Hardware pedometer tracking.");
+        s8.bulletPoints.add("\"My BMI / Calorie calculator\" — Clinical body mass and TDEE calculations.");
+        s8.bulletPoints.add("\"Start breathing exercise\" — 4-7-8 haptic relaxation cycle.");
+        s8.bulletPoints.add("\"Open brain / Mind map\" — Interactive 9-region neural command center.");
+        s8.bulletPoints.add("\"Guided visualization\" — 8 immersive audio relaxation journeys.");
+        s8.bulletPoints.add("\"Neural plasticity training\" — Stroop & executive function drills.");
+        doc.sections.add(s8);
+
+        doc.references.add("H.E.N.R.Y. Android Technical Manual (2026). Command Specifications and Subsystem Routing Architecture.");
+        doc.references.add("Google AI Studio & Android Open Source Project. Jetpack Compose and Material Design 3 Guidelines.");
     }
 
     private static void buildEarthDocument(DocumentModel doc) {

@@ -1698,7 +1698,8 @@ public class MainActivity extends AppCompatActivity {
 
         // 🌍 Earth Map result — country selected, ask HENRY about it
         if (req == EarthMapActivity.REQUEST_CODE && data != null) {
-            String country = data.getStringExtra(EarthMapActivity.EXTRA_COUNTRY);
+            String rawCountry = data.getStringExtra(EarthMapActivity.EXTRA_COUNTRY);
+            final String country = rawCountry != null ? rawCountry.replaceAll("\\[[^\\]]*\\]", "").trim() : null;
             if (country != null && !country.isEmpty()) {
                 String prompt = "Tell me about " + country +
                     " — history, culture, top tourist spots, traditional food, and estimated population. Be engaging.";
@@ -1710,6 +1711,23 @@ public class MainActivity extends AppCompatActivity {
                         mainHandler.post(() -> {
                             hideTyping();
                             String clean   = stripEmotionTag(reply);
+                            if (HenryWebSearch.isRefusal(clean)) {
+                                HenryWebSearch.search(country, new HenryWebSearch.SearchCallback() {
+                                    @Override public void onSearchResult(String summary, String source, java.util.List<String> sources) {
+                                        String verified = "[EMOTION:informative] " + summary;
+                                        String cleanV = stripEmotionTag(verified);
+                                        addJarvisMsg(cleanV); speak(cleanV, "informative");
+                                        history.add(new HistoryItem("model", cleanV));
+                                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                                    }
+                                    @Override public void onError(String reason) {
+                                        addJarvisMsg(clean); speak(clean, "neutral");
+                                        history.add(new HistoryItem("model", clean));
+                                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                                    }
+                                });
+                                return;
+                            }
                             String emotion = extractEmotion(reply);
                             addJarvisMsg(clean); speak(clean, emotion);
                             history.add(new HistoryItem("model", clean));
@@ -2776,16 +2794,13 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // ── Web Search ────────────────────────────────────────────────────────
-        if (lower.startsWith("search") || lower.startsWith("google ") ||
-            lower.contains("search google for") || lower.contains("search the web for") ||
-            lower.contains("look up") || lower.contains("search for ")) {
+        // ── Explicit External Web Search in Browser ─────────────────────────
+        if (lower.startsWith("open google for") || lower.startsWith("google in browser") ||
+            lower.startsWith("open browser and search")) {
             String query = userText
-                .replaceFirst("(?i)search (google )?for\\s+", "")
-                .replaceFirst("(?i)search the web for\\s+", "")
-                .replaceFirst("(?i)google\\s+", "")
-                .replaceFirst("(?i)look up\\s+", "")
-                .replaceFirst("(?i)search\\s+", "")
+                .replaceFirst("(?i)open google for\\s+", "")
+                .replaceFirst("(?i)google in browser\\s+", "")
+                .replaceFirst("(?i)open browser and search( for)?\\s+", "")
                 .trim();
             if (!query.isEmpty()) {
                 String reply = AppLauncher.webSearch(this, query);
@@ -4260,8 +4275,12 @@ public class MainActivity extends AppCompatActivity {
             speak(clean, extractEmotion(reply)); saveHistory(); return;
         }
 
-        // ── News ──────────────────────────────────────────────────────────────
-        if (lower.contains("news") || lower.contains("headlines") || lower.contains("briefing")) {
+        // ── News Briefing (General World Headlines) ───────────────────────────
+        if (lower.equals("news") || lower.equals("headlines") || lower.equals("briefing")
+            || lower.equals("read news") || lower.equals("read the news")
+            || lower.equals("morning briefing") || lower.equals("daily briefing")
+            || lower.equals("top headlines") || lower.equals("what's the news")
+            || lower.equals("give me the news")) {
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
             saveHistory();
             readNewsBriefing(); return;
@@ -4967,8 +4986,40 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onSuccess(String reply, String imageUrl, java.util.List<String> followUps) {
                 mainHandler.post(() -> {
                     hideTyping();
-                    String emotion    = extractEmotion(reply);
                     String cleanReply = stripEmotionTag(reply);
+
+                    // If model returned an unverified source refusal, run live web search directly
+                    if (HenryWebSearch.isRefusal(cleanReply)) {
+                        showTypingWithHint("search");
+                        HenryWebSearch.search(userText, new HenryWebSearch.SearchCallback() {
+                            @Override public void onSearchResult(String summary, String source, java.util.List<String> sources) {
+                                hideTyping();
+                                String verifiedAnswer = "[EMOTION:informative] " + summary;
+                                String clean = stripEmotionTag(verifiedAnswer);
+                                history.add(new HistoryItem("model", clean));
+                                addJarvisMsg(clean);
+                                speak(clean, "informative");
+                                saveHistory();
+                                if (btnSend != null) btnSend.setEnabled(true);
+                                updateMoodOrb();
+                            }
+
+                            @Override public void onError(String reason) {
+                                hideTyping();
+                                String fallback = HenryOfflineBrain.generateOfflineResponse(userText, intentType, MainActivity.this);
+                                String clean = stripEmotionTag(fallback);
+                                history.add(new HistoryItem("model", clean));
+                                addJarvisMsg(clean);
+                                speak(clean, "neutral");
+                                saveHistory();
+                                if (btnSend != null) btnSend.setEnabled(true);
+                                updateMoodOrb();
+                            }
+                        });
+                        return;
+                    }
+
+                    String emotion = extractEmotion(reply);
                     history.add(new HistoryItem("model", cleanReply));
 
                     if (imageUrl != null && !imageUrl.isEmpty()) {

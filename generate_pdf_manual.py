@@ -86,18 +86,21 @@ def build_postscript():
     # Data structure for categories and commands
     sections = [
         {
-            "cat": "1. AI Intelligence, Deep Reasoning & Learning",
-            "desc": "Conversational, cognitive reasoning, academic tutoring, and multi-language translation commands.",
+            "cat": "1. Live Web Search, Real-Time Knowledge & Deep Research",
+            "desc": "Multi-source verified web search, live news briefings, release dates, and deep research.",
             "cmds": [
+                ("Search for [topic] / Search the web for [topic]", "Voice/Text", "Live multi-source search (Wikipedia, DuckDuckGo, Google News)"),
+                ("What is the newest iPhone? / Latest [device]", "Voice/Text", "Verified current tech specs, release dates & hardware comparisons"),
+                ("Latest tech news today / News about [topic]", "Voice/Text", "Real-time news search, topic summaries & recent headlines"),
+                ("Deep research: [complex question]", "Voice/Text", "Multi-model tournament synthesis citing verified live sources"),
+                ("Who is [person] / What is [event]?", "Voice/Text", "Biographical and historical encyclopedia verification"),
+                ("Tell me about [Country / City / Landmark]", "Voice/Text", "Geographic intel, culture, demographics & tourist spots"),
                 ("Explain quantum computing like I'm 5", "Voice/Text", "Socratic breakdown adapting depth to user level"),
                 ("Give me a flashcard on cellular respiration", "Voice/Text", "Generates interactive study flashcard"),
                 ("Quiz me on world history / anatomy", "Voice/Text", "Launches interactive multiple-choice trivia quiz"),
                 ("Argue both sides of AI regulation", "Voice/Text", "Debate mode: analyzes arguments and counterarguments"),
                 ("Translate [sentence] to [language]", "Voice/Text", "Translates speech into 30+ spoken languages"),
-                ("What can I cook with eggs, tomatoes and rice?", "Voice/Text", "Artisan culinary recipe generator with timing"),
-                ("Draft a message to [person]: [details]", "Voice/Text", "Smart Compose drafting with tone customization"),
-                ("Deep research: [complex question]", "Voice/Text", "Multi-model consensus tournament & synthesized answer"),
-                ("Why do leaves change color in autumn?", "Voice/Text", "Natural science explanation with biochemical context")
+                ("What can I cook with eggs, tomatoes and rice?", "Voice/Text", "Artisan culinary recipe generator with timing")
             ]
         },
         {

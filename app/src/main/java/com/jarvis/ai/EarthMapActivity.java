@@ -178,7 +178,7 @@ public class EarthMapActivity extends AppCompatActivity {
                             okhttp3.MediaType.parse("application/json"))).build()).execute();
                     String raw1 = r1.body() != null ? r1.body().string() : "{}";
                     String country = new org.json.JSONObject(raw1).optString("reply","")
-                        .replaceAll("\\[EMOTION:[^\\]]+\\]","").trim()
+                        .replaceAll("\\[[^\\]]*\\]","").trim()
                         .split("\n")[0].replaceAll("[*_#]","").trim();
 
                     if (country.isEmpty() || country.toLowerCase().contains("ocean")) {

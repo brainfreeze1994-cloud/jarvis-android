@@ -393,7 +393,7 @@ public class JarvisApi {
             || t.contains("exchange rate") || t.matches(".*convert\\s+\\d+.*")) return "forex";
         if (t.matches(".*\\b(news|headlines|latest news|breaking|what happened)\\b.*")) return "news";
         if (t.matches(".*\\b(calculate|compute|what is \\d|sqrt|factorial|\\d+%\\s+of).*")) return "math";
-        if (t.matches(".*\\b(latest|breaking|right now|today's|current|2025|2026|score|results|trending)\\b.*")) return "search";
+        if (t.matches(".*\\b(search|look up|find out|google|who is|what is|where is|latest|newest|breaking|right now|today's|current|2025|2026|score|results|trending|release date|specs|specifications)\\b.*")) return "search";
         if (t.matches(".*\\b(why|how does|difference between|compare|pros and cons|should i|step by step)\\b.*")
             && msg.length() > 30) return "reason";
         return "chat";

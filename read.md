@@ -17,6 +17,7 @@ A complete, publication-ready PDF command cheat-sheet is included directly with 
 ## Key Capabilities (v25.0.0)
 
 - 🎙️ **Voice & Speech Intelligence**: Hands-free wake word ("HENRY"), 6 selectable TTS voices/accents (American, British, Filipino, French, Australian, Japanese), emotion detection, and voice translation across 30+ languages.
+- 🌐 **Real-Time Web Search & Live Knowledge Engine**: Autonomous multi-source real-time search across **Wikipedia**, **DuckDuckGo**, and **Google News RSS**, answering factual questions, product comparisons, tech specs, current news, and geopolitical queries without refusing.
 - 📄 **Autonomous Document Engine (`HenryFileEngine`)**: Instant on-device generation of **PDF**, **Word (.docx)**, **PowerPoint (.pptx)**, **Excel (.xlsx)**, and **Markdown (.md)** documents with APA 7 research citations, tables, and formatted headers.
 - 👁️ **Vision Intelligence & Multi-Attachment**: Live camera ML Kit analysis, object detection & real-time crosshair tracking, facial recognition, OCR text scanning, animal scanner, and simultaneous multi-image inspection (up to 10 photos or PDF documents).
 - 🎥 **HD Screen Recording Studio**: Background screen capture service with floating draggable HUD, pause/resume, and studio metadata generator for YouTube/TikTok scripts.
@@ -33,10 +34,16 @@ A complete, publication-ready PDF command cheat-sheet is included directly with 
 
 You can speak any command aloud by tapping the central animated **Orb** or the **🎤 Mic button**, or by typing it into the input bar and pressing **➤**.
 
-### 1. AI, Neural Reasoning & Knowledge Intelligence
+### 1. Live Web Search, Real-Time Knowledge & Deep Research
 
 | Command Phrase | Type | Subsystem Action |
 |---|---|---|
+| `"Search for [topic] / Search the web for [topic]"` | Voice / Text | Live multi-source web search (Wikipedia, DuckDuckGo, Google News) |
+| `"What is the newest iPhone? / Latest [device]"` | Voice / Text | Verified current tech specs, release dates & hardware comparisons |
+| `"Latest tech news today / News about [topic]"` | Voice / Text | Real-time topic news search, summaries & recent headlines |
+| `"Deep research: [question]"` | Voice / Text | Multi-model tournament synthesis citing verified live sources |
+| `"Who is [person] / What is [event]?"` | Voice / Text | Biographical and historical encyclopedia verification |
+| `"Tell me about [Country / City / Landmark]"` | Voice / Text | Geographic intel, culture, demographics & tourist spots |
 | `"Explain [concept] like I'm 5"` | Voice / Text | Socratic simplification adjusting conceptual depth |
 | `"Give me a flashcard on [topic]"` | Voice / Text | Interactive study card with definitions & key principles |
 | `"Quiz me on [history / science / anatomy]"` | Voice / Text | Interactive multiple-choice trivia and academic quiz |
@@ -44,7 +51,6 @@ You can speak any command aloud by tapping the central animated **Orb** or the *
 | `"Translate [phrase] to [language]"` | Voice / Text | Spoken voice translation across 30+ global languages |
 | `"What can I cook with [ingredients]?"` | Voice / Text | Dynamic culinary recipe generator with steps and chef timing |
 | `"Draft a message to [name] about [topic]"` | Voice / Text | Smart Compose drafting with adaptive tone adjustments |
-| `"Deep research: [question]"` | Voice / Text | Multi-model tournament synthesis for complex topics |
 | `"Fascinating fact / Tell me a science fact"` | Voice / Text | Verified science, astronomy, or biology insight |
 
 ### 2. Autonomous Document & File Generation Engine

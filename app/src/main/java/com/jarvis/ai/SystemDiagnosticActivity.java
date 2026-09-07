@@ -32,6 +32,7 @@ public class SystemDiagnosticActivity extends AppCompatActivity {
     private TextView tvIntegrityBadge;
     private TextView tvAuditTimestamp;
     private TextView tvAuditDuration;
+    private TextView tvAuditCounts;
     private ProgressBar progressAudit;
     private TextView btnRunFullAudit;
     private TextView btnAutoRepair;
@@ -60,6 +61,7 @@ public class SystemDiagnosticActivity extends AppCompatActivity {
         tvIntegrityBadge    = findViewById(R.id.tv_integrity_badge);
         tvAuditTimestamp    = findViewById(R.id.tv_audit_timestamp);
         tvAuditDuration     = findViewById(R.id.tv_audit_duration);
+        tvAuditCounts       = findViewById(R.id.tv_audit_counts);
         progressAudit       = findViewById(R.id.progress_audit);
         btnRunFullAudit     = findViewById(R.id.btn_run_full_audit);
         btnAutoRepair       = findViewById(R.id.btn_auto_repair);
@@ -143,6 +145,11 @@ public class SystemDiagnosticActivity extends AppCompatActivity {
                 tvAuditTimestamp.setText("Audit Verified: " + dateStr);
                 tvAuditDuration.setText(String.format(Locale.US, "Execution Latency: %d ms • %d Subsystems Audited",
                         report.totalAuditDurationMs, report.subsystems.size()));
+                if (tvAuditCounts != null) {
+                    tvAuditCounts.setText(String.format(Locale.US,
+                            "Tests: %d • Passed: %d • Warnings: %d • Failed: %d • Not Config: %d",
+                            report.totalTests, report.passedCount, report.warningCount, report.failedCount, report.notConfiguredCount));
+                }
             }
 
             @Override
@@ -163,15 +170,45 @@ public class SystemDiagnosticActivity extends AppCompatActivity {
 
         TextView tvName = card.findViewById(R.id.tv_subsystem_name);
         TextView tvBadge = card.findViewById(R.id.tv_subsystem_badge);
+        TextView tvTest = card.findViewById(R.id.tv_subsystem_test);
         TextView tvSummary = card.findViewById(R.id.tv_subsystem_summary);
+        TextView tvError = card.findViewById(R.id.tv_subsystem_error);
+        TextView tvFix = card.findViewById(R.id.tv_subsystem_fix);
         TextView tvLatency = card.findViewById(R.id.tv_subsystem_latency);
+        TextView tvDeps = card.findViewById(R.id.tv_subsystem_deps);
         LinearLayout detailsLayout = card.findViewById(R.id.layout_telemetry_details);
 
         tvName.setText(result.name);
         tvBadge.setText(result.statusBadge);
         tvBadge.setTextColor(result.statusColor);
+        if (tvTest != null) tvTest.setText("Test: " + result.testName);
         tvSummary.setText(result.summary);
-        tvLatency.setText(String.format(Locale.US, "⏱️ Execution: %d ms • %s", result.latencyMs, result.category));
+
+        if (tvError != null) {
+            if (result.errorMessage != null && !result.errorMessage.isEmpty()) {
+                tvError.setVisibility(View.VISIBLE);
+                tvError.setText("⚠ Reason: " + result.errorMessage);
+            } else {
+                tvError.setVisibility(View.GONE);
+            }
+        }
+
+        if (tvFix != null) {
+            if (result.recommendedFix != null && !result.recommendedFix.isEmpty()) {
+                tvFix.setVisibility(View.VISIBLE);
+                tvFix.setText("Suggested action: " + result.recommendedFix);
+            } else {
+                tvFix.setVisibility(View.GONE);
+            }
+        }
+
+        if (tvLatency != null) {
+            tvLatency.setText(String.format(Locale.US, "⏱️ %d ms • %s", result.latencyMs, result.category));
+        }
+
+        if (tvDeps != null && result.dependencyStatus != null) {
+            tvDeps.setText("Deps: " + result.dependencyStatus);
+        }
 
         if (result.telemetryDetails != null && !result.telemetryDetails.isEmpty()) {
             detailsLayout.removeAllViews();

@@ -28,14 +28,14 @@ public class HenryBrainView extends View {
 
     // {id, label, cx%, cy%, rx%, ry%, ARGB color}
     private static final Object[][] REGIONS = {
-        {"mental_imagery",       "Mental\nImagery",      0.50f, 0.18f, 0.18f, 0.10f, 0xFF00D4FF},
-        {"neural_plasticity",    "Neural\nPlasticity",   0.25f, 0.30f, 0.14f, 0.10f, 0xFF00FF99},
-        {"default_mode",         "Default\nMode",        0.75f, 0.30f, 0.14f, 0.10f, 0xFFCC88FF},
-        {"sensory_substitution", "Sensory\nSub.",        0.20f, 0.50f, 0.13f, 0.09f, 0xFFFF9944},
-        {"memory",               "Memory\nBanks",        0.80f, 0.50f, 0.13f, 0.09f, 0xFFFFDD00},
-        {"google_docs",          "Google\nDocs",         0.30f, 0.70f, 0.12f, 0.09f, 0xFF4CAF50},
-        {"google_sheets",        "Google\nSheets",       0.50f, 0.77f, 0.12f, 0.09f, 0xFF0AB56E},
-        {"google_slides",        "Google\nSlides",       0.70f, 0.70f, 0.12f, 0.09f, 0xFFFF7043},
+        {"mental_imagery",          "Mental\nImagery",      0.50f, 0.17f, 0.16f, 0.085f, 0xFF00D4FF},
+        {"reasoning_core",          "Reasoning\nCore",      0.24f, 0.33f, 0.15f, 0.085f, 0xFFFFB800},
+        {"web_intelligence",        "Web\nIntel",          0.76f, 0.33f, 0.15f, 0.085f, 0xFF00A2FF},
+        {"vision_perception",       "Vision &\nPercept.",   0.21f, 0.52f, 0.15f, 0.085f, 0xFFCC88FF},
+        {"memory_banks",            "Memory\nBanks",        0.79f, 0.52f, 0.15f, 0.085f, 0xFF00FF99},
+        {"autonomous_action",       "Autonomous\nAction",   0.25f, 0.71f, 0.15f, 0.085f, 0xFFFF7043},
+        {"security_guardian",       "Security\nGuardian",   0.75f, 0.71f, 0.15f, 0.085f, 0xFFFF3366},
+        {"scientific_intelligence", "Scientific\nIntel",    0.50f, 0.86f, 0.16f, 0.085f, 0xFF00FFCC},
     };
 
     private String hoveredRegion = null;
@@ -87,6 +87,22 @@ public class HenryBrainView extends View {
 
         // Sulci (decorative wrinkle lines)
         drawSulci(canvas, cx, cy, rx, ry);
+
+        // Synaptic connection links
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(1.5f);
+        paint.setColor(0x3300D4FF);
+        int[][] links = {
+            {0, 1}, {0, 2}, {1, 3}, {2, 4}, {3, 5}, {4, 6}, {5, 7}, {6, 7},
+            {1, 2}, {3, 4}, {5, 6}, {1, 4}, {2, 3}
+        };
+        for (int[] link : links) {
+            float x1 = w * (float) REGIONS[link[0]][2];
+            float y1 = h * (float) REGIONS[link[0]][3];
+            float x2 = w * (float) REGIONS[link[1]][2];
+            float y2 = h * (float) REGIONS[link[1]][3];
+            canvas.drawLine(x1, y1, x2, y2, paint);
+        }
 
         // Draw each region
         for (Object[] r : REGIONS) {

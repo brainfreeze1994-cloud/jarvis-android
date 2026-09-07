@@ -149,6 +149,9 @@ public class MainActivity extends AppCompatActivity {
     private EditText     etInput;
     private ImageButton  btnMic, btnSend, btnClear, btnAttach;
     private ImageView    ivAttachPreview;
+    private View         layoutAttachPreviewContainer;
+    private TextView     tvAttachCountBadge, tvRemoveAttach, tvAttachLabel, tvAttachSublabel;
+    private View         layoutAttachInfo;
     private LinearLayout orbSection, chipsRow1, chipsRow2, chipsRow3, chipsRow4;
     private NestedScrollView scrollMain;
 
@@ -363,8 +366,14 @@ public class MainActivity extends AppCompatActivity {
         btnMic          = findViewById(R.id.btn_mic);
         btnSend         = findViewById(R.id.btn_send);
         btnClear        = findViewById(R.id.btn_clear);
-        btnAttach       = findViewById(R.id.btn_attach);
-        ivAttachPreview = findViewById(R.id.iv_attach_preview);
+        btnAttach                    = findViewById(R.id.btn_attach);
+        ivAttachPreview              = findViewById(R.id.iv_attach_preview);
+        layoutAttachPreviewContainer = findViewById(R.id.layout_attach_preview_container);
+        tvAttachCountBadge           = findViewById(R.id.tv_attach_count_badge);
+        tvRemoveAttach               = findViewById(R.id.tv_remove_attach);
+        tvAttachLabel                = findViewById(R.id.tv_attach_label);
+        tvAttachSublabel             = findViewById(R.id.tv_attach_sublabel);
+        layoutAttachInfo             = findViewById(R.id.layout_attach_info);
         orbSection      = findViewById(R.id.orb_section);
         chipsRow1       = findViewById(R.id.chips_row1);
         chipsRow2       = findViewById(R.id.chips_row2);
@@ -478,7 +487,9 @@ public class MainActivity extends AppCompatActivity {
         // via voice/text command (e.g. "storm tracker", "periodic table",
         // "open space command", "flight tracker", "animal scanner", etc.),
         // which is why removing the buttons doesn't remove functionality.
-        if (ivAttachPreview != null) ivAttachPreview.setOnClickListener(v -> clearAttachment());
+        if (ivAttachPreview != null) ivAttachPreview.setOnClickListener(v -> showAttachDialog());
+        if (layoutAttachInfo != null) layoutAttachInfo.setOnClickListener(v -> showAttachDialog());
+        if (tvRemoveAttach != null) tvRemoveAttach.setOnClickListener(v -> clearAttachment());
         if (etInput != null) {
             etInput.setOnEditorActionListener((v, id, e) -> {
                 if (id == EditorInfo.IME_ACTION_SEND) { sendText(); return true; }
@@ -1575,13 +1586,38 @@ public class MainActivity extends AppCompatActivity {
 
     // ── Attachment ────────────────────────────────────────────────────────────
     private void showAttachDialog() {
+        int count = pendingImagesUris.size();
+        String title = count > 0 ? "Attachments (" + count + " active)" : "Attach";
+        List<String> options = new ArrayList<>();
+        options.add("Take photo" + (count > 0 ? " [Add to attachments]" : ""));
+        options.add("Choose image(s) [Multiple / Add]");
+        options.add("Read PDF");
+        if (count > 0 || pendingPdfText != null) {
+            options.add("Clear all attachments");
+        }
+
         new AlertDialog.Builder(this)
+            .setTitle(title)
+            .setItems(options.toArray(new String[0]), (d, which) -> {
+                if (which == 0)      openCamera();
+                else if (which == 1) openGallery();
+                else if (which == 2) openPdf();
+                else if (which == 3) {
+                    clearAttachment();
+                    Toast.makeText(this, "Attachments cleared", Toast.LENGTH_SHORT).show();
+                }
+            }).show();
+    }
+
+    private void _oldShowAttachDialog_() {
+        /*
             .setTitle("Attach")
             .setItems(new String[]{"📷 Take photo", "🖼 Choose image(s) [Multiple]", "📄 Read PDF"}, (d, which) -> {
                 if (which == 0)      openCamera();
                 else if (which == 1) openGallery();
                 else                 openPdf();
             }).show();
+        */
     }
 
     private void openCamera() {
@@ -1798,7 +1834,7 @@ public class MainActivity extends AppCompatActivity {
                 galleryUris.add(data.getData());
             }
             if (!galleryUris.isEmpty()) {
-                encodeImagesAsync(galleryUris);
+                appendImagesAsync(galleryUris, true);
                 return;
             }
         }
@@ -1848,7 +1884,7 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 List<Uri> camUris = new ArrayList<>();
                 camUris.add(uri);
-                encodeImagesAsync(camUris);
+                appendImagesAsync(camUris, true);
             }
         }
     }
@@ -1966,19 +2002,71 @@ public class MainActivity extends AppCompatActivity {
         pendingPdfText     = null;
         if (ivAttachPreview != null) {
             ivAttachPreview.setImageDrawable(null);
-            ivAttachPreview.setVisibility(View.GONE);
+        }
+        if (layoutAttachPreviewContainer != null) {
+            layoutAttachPreviewContainer.setVisibility(View.GONE);
         }
         if (etInput != null) etInput.setHint("Command HENRY…");
+    }
+
+    private void updateAttachmentPreviewUi() {
+        if (layoutAttachPreviewContainer == null) return;
+        if (pendingImagesUris.isEmpty() && pendingPdfText == null) {
+            layoutAttachPreviewContainer.setVisibility(View.GONE);
+            if (etInput != null) etInput.setHint("Command HENRY…");
+            return;
+        }
+
+        layoutAttachPreviewContainer.setVisibility(View.VISIBLE);
+        int count = pendingImagesUris.size();
+        if (count > 0) {
+            if (ivAttachPreview != null) {
+                ivAttachPreview.setImageURI(pendingImagesUris.get(0));
+            }
+            if (tvAttachCountBadge != null) {
+                if (count > 1) {
+                    tvAttachCountBadge.setVisibility(View.VISIBLE);
+                    tvAttachCountBadge.setText("+" + (count - 1));
+                } else {
+                    tvAttachCountBadge.setVisibility(View.GONE);
+                }
+            }
+            if (tvAttachLabel != null) {
+                tvAttachLabel.setText(count == 1 ? "1 image attached" : count + " images attached");
+            }
+            if (tvAttachSublabel != null) {
+                tvAttachSublabel.setText("Tap to add more photos or PDF");
+            }
+            if (etInput != null) {
+                if (count > 1) {
+                    etInput.setHint("Ask about these " + count + " attachments…");
+                } else {
+                    etInput.setHint("Ask about this image…");
+                }
+            }
+        } else if (pendingPdfText != null) {
+            if (ivAttachPreview != null) {
+                ivAttachPreview.setImageResource(android.R.drawable.ic_menu_agenda);
+            }
+            if (tvAttachCountBadge != null) tvAttachCountBadge.setVisibility(View.GONE);
+            if (tvAttachLabel != null) tvAttachLabel.setText("PDF Document attached");
+            if (tvAttachSublabel != null) tvAttachSublabel.setText("Tap to manage or add attachments");
+            if (etInput != null) etInput.setHint("Ask about the PDF…");
+        }
     }
 
     // ── Image encoding ────────────────────────────────────────────────────────
     private void encodeImageAsync(Uri uri) {
         List<Uri> list = new ArrayList<>();
         if (uri != null) list.add(uri);
-        encodeImagesAsync(list);
+        appendImagesAsync(list, false);
     }
 
     private void encodeImagesAsync(List<Uri> uris) {
+        appendImagesAsync(uris, false);
+    }
+
+    private void appendImagesAsync(List<Uri> uris, boolean append) {
         if (uris == null || uris.isEmpty()) return;
         new Thread(() -> {
             List<String> b64List = new ArrayList<>();
@@ -2010,27 +2098,28 @@ public class MainActivity extends AppCompatActivity {
             }
 
             mainHandler.post(() -> {
-                pendingImagesBase64.clear();
-                pendingImagesBase64.addAll(b64List);
-                pendingImagesUris.clear();
-                pendingImagesUris.addAll(validUris);
-
-                pendingImageBase64 = b64List.get(0);
-                pendingImageUriStr = validUris.get(0).toString();
-                pendingPdfText     = null;
-
-                if (ivAttachPreview != null) {
-                    ivAttachPreview.setImageURI(validUris.get(0));
-                    ivAttachPreview.setVisibility(View.VISIBLE);
+                if (!append) {
+                    pendingImagesBase64.clear();
+                    pendingImagesUris.clear();
                 }
-                if (etInput != null) {
-                    if (b64List.size() > 1) {
-                        etInput.setHint("Ask about these " + b64List.size() + " attachments…");
-                        Toast.makeText(this, b64List.size() + " images attached. Ready for multi-attachment analysis.", Toast.LENGTH_SHORT).show();
-                    } else {
-                        etInput.setHint("Ask about the image…");
-                        Toast.makeText(this, "Image attached", Toast.LENGTH_SHORT).show();
-                    }
+                for (int i = 0; i < b64List.size() && pendingImagesBase64.size() < 10; i++) {
+                    pendingImagesBase64.add(b64List.get(i));
+                    pendingImagesUris.add(validUris.get(i));
+                }
+
+                if (!pendingImagesBase64.isEmpty()) {
+                    pendingImageBase64 = pendingImagesBase64.get(0);
+                    pendingImageUriStr = pendingImagesUris.get(0).toString();
+                }
+                pendingPdfText = null;
+
+                updateAttachmentPreviewUi();
+
+                int totalCount = pendingImagesBase64.size();
+                if (totalCount > 1) {
+                    Toast.makeText(this, totalCount + " attachments ready for multi-attachment analysis.", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this, "Image attached.", Toast.LENGTH_SHORT).show();
                 }
             });
         }).start();
@@ -5179,16 +5268,20 @@ public class MainActivity extends AppCompatActivity {
     private void showTypingWithHint(String intentType) {
         String hint;
         switch (intentType != null ? intentType : "chat") {
-            case "search":  hint = "Searching the web…";        break;
-            case "news":    hint = "Fetching latest news…";     break;
-            case "crypto":  hint = "Checking live prices…";     break;
-            case "forex":   hint = "Getting exchange rates…";   break;
-            case "math":    hint = "Calculating…";              break;
-            case "vision":  hint = "Analysing image…";          break;
-            case "reason":  hint = "Thinking step by step…";    break;
-            case "transit": hint = "Planning your route…";      break;
-            case "legal":   hint = "Checking UAE law…";         break;
-            default:        hint = "Thinking…";                 break;
+            case "search":        hint = "Searching the web…";                  break;
+            case "news":          hint = "Fetching latest news…";               break;
+            case "crypto":        hint = "Checking live prices…";               break;
+            case "forex":         hint = "Getting exchange rates…";             break;
+            case "math":          hint = "Calculating…";                        break;
+            case "vision":        hint = "Analysing image…";                    break;
+            case "multi_vision":  hint = "Synthesizing multiple attachments…";  break;
+            case "cybersecurity": hint = "Analyzing security architecture…";    break;
+            case "finance":       hint = "Modeling financial metrics…";         break;
+            case "medical":       hint = "Reviewing clinical literature…";      break;
+            case "reason":        hint = "Thinking step by step…";              break;
+            case "transit":       hint = "Planning your route…";                break;
+            case "legal":         hint = "Checking UAE law…";                   break;
+            default:              hint = "Thinking…";                           break;
         }
         if (tvOrbHint != null) tvOrbHint.setText(hint.toUpperCase());
         showTyping();

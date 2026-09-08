@@ -38,4 +38,15 @@
         android:paddingBottom="9dp"
         android:autoLink="web"/>
 
+    <com.jarvis.ai.HenryLottieAnimationView
+        android:id="@+id/lottie_typing"
+        android:layout_width="70dp"
+        android:layout_height="34dp"
+        android:background="@drawable/bg_bubble_jarvis"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:visibility="gone"/>
+
 </LinearLayout>

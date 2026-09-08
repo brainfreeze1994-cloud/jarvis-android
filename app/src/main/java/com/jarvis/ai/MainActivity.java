@@ -144,6 +144,7 @@ public class MainActivity extends AppCompatActivity {
 
     // UI
     private OrbView      orbView;
+    private HenryLottieAnimationView lottieHudWave;
     private TextView     tvStatus, tvOrbHint, btnVoice;
     private RecyclerView recycler;
     private EditText     etInput;
@@ -359,6 +360,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         orbView         = findViewById(R.id.orb_view);
+        lottieHudWave   = findViewById(R.id.lottie_hud_wave);
         tvStatus        = findViewById(R.id.tv_status);
         tvOrbHint       = findViewById(R.id.tv_orb_hint);
         btnVoice        = findViewById(R.id.btn_voice);
@@ -4340,6 +4342,17 @@ public class MainActivity extends AppCompatActivity {
             setState(OrbView.OrbState.IDLE); saveHistory(); return;
         }
 
+        // ── [v28] Lottie Vector Animation Component & Showcase ────────────────
+        if (lower.contains("lottie") || (lower.contains("animation") && (lower.contains("show") || lower.contains("test") || lower.contains("demo") || lower.contains("open") || lower.contains("view") || lower.contains("component")))) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply = "[EMOTION:proud] Opening the **Henry Lottie Animation Engine**, sir! Displaying lightweight, hardware-accelerated 60fps vector animations (Neural Pulse, Thinking Dots, Voice Wave, and Cyber Loader).";
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak("Opening Lottie animation engine now, sir.", "proud");
+            HenryLottieDialog.show(this);
+            saveHistory(); return;
+        }
+
         // ── [v17] Meeting Recorder ────────────────────────────────────────────
         if (MeetingRecorder.isRecordingCommand(userText)) {
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
@@ -5572,6 +5585,21 @@ public class MainActivity extends AppCompatActivity {
             // Blue accent when active
             tvStatus.setTextColor(state == OrbView.OrbState.IDLE
                 ? 0xFF004466 : 0xFF00BEFF);
+        }
+        if (lottieHudWave != null) {
+            if (state == OrbView.OrbState.SPEAKING) {
+                lottieHudWave.setVisibility(View.VISIBLE);
+                lottieHudWave.playVoiceWave();
+            } else if (state == OrbView.OrbState.THINKING) {
+                lottieHudWave.setVisibility(View.VISIBLE);
+                lottieHudWave.playNeuralPulse();
+            } else if (state == OrbView.OrbState.LISTENING) {
+                lottieHudWave.setVisibility(View.VISIBLE);
+                lottieHudWave.playVoiceWave();
+            } else {
+                lottieHudWave.stopAndReset();
+                lottieHudWave.setVisibility(View.GONE);
+            }
         }
     }
     private String capitalize(String s) {

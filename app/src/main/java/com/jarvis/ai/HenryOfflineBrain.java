@@ -57,6 +57,10 @@ public class HenryOfflineBrain {
             return "[EMOTION:proud] Everything in HENRY is **100% Free and Unlimited Forever**, sir! There are no token deductions, no subscriptions, no daily limits, and no paywalls. All tools—coding, document generation, image synthesis, video animations, and deep research—are completely unmetered.";
         }
 
+        if (lower.contains("lottie") || (lower.contains("animation") && (lower.contains("how") || lower.contains("what") || lower.contains("support")))) {
+            return "[EMOTION:proud] The **Lottie Animation Engine** is fully integrated, sir! It utilizes hardware acceleration for silky smooth 60fps vector animations (neural pulse, voice waveforms, typing dots, and cybernetic loaders) with minimal CPU and battery usage.";
+        }
+
         // 3. Time & Date
         if (lower.contains("what time") || lower.contains("current time") || lower.contains("what is the time")) {
             String time = new SimpleDateFormat("hh:mm a", Locale.US).format(new Date());

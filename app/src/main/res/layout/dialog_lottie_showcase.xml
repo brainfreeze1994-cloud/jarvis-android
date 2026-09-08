@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bg_dialog_tech"
+    android:padding="20dp">
+
+    <!-- Header bar -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp">
+
+        <TextView
+            android:id="@+id/tv_dialog_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="LOTTIE ANIMATION ENGINE"
+            android:textColor="#00D4FF"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.14" />
+
+        <TextView
+            android:id="@+id/tv_dialog_close"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_alignParentEnd="true"
+            android:gravity="center"
+            android:text="✕"
+            android:textColor="#1A7799"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:clickable="true"
+            android:focusable="true" />
+    </RelativeLayout>
+
+    <!-- Subtitle / Tech Telemetry -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="HARDWARE ACCELERATED • 60 FPS • ZERO RASTERIZATION"
+        android:textColor="#1A7799"
+        android:textSize="10sp"
+        android:letterSpacing="0.1"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- Lottie Animation Container -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="160dp"
+        android:background="#031024"
+        android:layout_gravity="center"
+        android:padding="16dp">
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#06203A"
+            android:layout_gravity="center"/>
+
+        <!-- High-Performance Lottie Animation Component -->
+        <com.jarvis.ai.HenryLottieAnimationView
+            android:id="@+id/lottie_showcase_view"
+            android:layout_width="140dp"
+            android:layout_height="140dp"
+            android:layout_gravity="center" />
+
+    </FrameLayout>
+
+    <!-- Current Animation Name Badge -->
+    <TextView
+        android:id="@+id/tv_current_animation_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="16dp"
+        android:text="PRESET: NEURAL PULSE"
+        android:textColor="#00E5FF"
+        android:textSize="12sp"
+        android:letterSpacing="0.12"
+        android:textStyle="bold"/>
+
+    <!-- Preset Selection Buttons Grid/Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:weightSum="4"
+        android:layout_marginBottom="12dp">
+
+        <Button
+            android:id="@+id/btn_preset_pulse"
+            style="@android:style/Widget.Material.Button.Borderless"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="PULSE"
+            android:textColor="#00D4FF"
+            android:textSize="11sp"
+            android:background="@drawable/bg_chip"
+            android:layout_marginEnd="4dp"
+            android:stateListAnimator="@null"/>
+
+        <Button
+            android:id="@+id/btn_preset_dots"
+            style="@android:style/Widget.Material.Button.Borderless"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="DOTS"
+            android:textColor="#1A7799"
+            android:textSize="11sp"
+            android:background="@drawable/bg_chip"
+            android:layout_marginEnd="4dp"
+            android:stateListAnimator="@null"/>
+
+        <Button
+            android:id="@+id/btn_preset_wave"
+            style="@android:style/Widget.Material.Button.Borderless"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="VOICE"
+            android:textColor="#1A7799"
+            android:textSize="11sp"
+            android:background="@drawable/bg_chip"
+            android:layout_marginEnd="4dp"
+            android:stateListAnimator="@null"/>
+
+        <Button
+            android:id="@+id/btn_preset_loader"
+            style="@android:style/Widget.Material.Button.Borderless"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:text="LOADER"
+            android:textColor="#1A7799"
+            android:textSize="11sp"
+            android:background="@drawable/bg_chip"
+            android:stateListAnimator="@null"/>
+    </LinearLayout>
+
+    <!-- Speed & Playback Controls Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="8dp">
+
+        <Button
+            android:id="@+id/btn_toggle_play"
+            style="@android:style/Widget.Material.Button.Borderless"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="⏸ PAUSE"
+            android:textColor="#00D4FF"
+            android:textSize="11sp"
+            android:background="@drawable/bg_chip"
+            android:paddingHorizontal="12dp"
+            android:layout_marginEnd="8dp"
+            android:stateListAnimator="@null"/>
+
+        <Button
+            android:id="@+id/btn_speed_half"
+            style="@android:style/Widget.Material.Button.Borderless"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="0.5x"
+            android:textColor="#1A7799"
+            android:textSize="11sp"
+            android:background="@drawable/bg_chip"
+            android:paddingHorizontal="10dp"
+            android:layout_marginEnd="4dp"
+            android:stateListAnimator="@null"/>
+
+        <Button
+            android:id="@+id/btn_speed_1x"
+            style="@android:style/Widget.Material.Button.Borderless"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="1.0x"
+            android:textColor="#00D4FF"
+            android:textSize="11sp"
+            android:background="@drawable/bg_chip"
+            android:paddingHorizontal="10dp"
+            android:layout_marginEnd="4dp"
+            android:stateListAnimator="@null"/>
+
+        <Button
+            android:id="@+id/btn_speed_2x"
+            style="@android:style/Widget.Material.Button.Borderless"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="2.0x"
+            android:textColor="#1A7799"
+            android:textSize="11sp"
+            android:background="@drawable/bg_chip"
+            android:paddingHorizontal="10dp"
+            android:stateListAnimator="@null"/>
+    </LinearLayout>
+
+</LinearLayout>

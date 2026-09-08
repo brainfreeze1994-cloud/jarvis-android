@@ -72,8 +72,20 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
         Message m = items.get(pos);
 
         if (m.type == Message.TYPE_TYPING) {
-            if (h.tvMsg != null) h.tvMsg.setText("● ● ●");
+            if (h.tvMsg != null) h.tvMsg.setVisibility(View.GONE);
+            if (h.lottieTyping != null) {
+                h.lottieTyping.setVisibility(View.VISIBLE);
+                h.lottieTyping.playThinkingDots();
+            } else if (h.tvMsg != null) {
+                h.tvMsg.setVisibility(View.VISIBLE);
+                h.tvMsg.setText("● ● ●");
+            }
             return;
+        } else {
+            if (h.lottieTyping != null) {
+                h.lottieTyping.stopAndReset();
+                h.lottieTyping.setVisibility(View.GONE);
+            }
         }
 
         if (m.type == Message.TYPE_USER) {
@@ -330,6 +342,7 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
 
     static class MsgVH extends RecyclerView.ViewHolder {
         TextView    tvMsg, tvAvatar;
+        HenryLottieAnimationView lottieTyping;
         ImageView   ivImage;
         ProgressBar progressBar;
         View        scrollUserImages;
@@ -343,6 +356,7 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
             super(v);
             tvMsg       = v.findViewById(R.id.tv_message);
             tvAvatar    = v.findViewById(R.id.tv_avatar);
+            lottieTyping = v.findViewById(R.id.lottie_typing);
             ivImage     = v.findViewById(R.id.iv_image);
             progressBar = v.findViewById(R.id.pb_loading);
             scrollUserImages    = v.findViewById(R.id.scroll_user_images);

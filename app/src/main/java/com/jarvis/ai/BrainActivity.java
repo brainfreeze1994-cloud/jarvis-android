@@ -42,51 +42,19 @@ public class BrainActivity extends AppCompatActivity {
                         startActivity(new Intent(this, SmartMemoryActivity.class));
                         break;
                     case "hacking_skills":
-                        showSkillsDialog("Cybersecurity & Ethical Hacking Intelligence",
-                            new String[]{
-                                "Perform an OWASP Top 10 vulnerability audit for my web app",
-                                "Explain binary exploitation, ROP chains, and memory defenses",
-                                "Network security audit: packet analysis & Wireshark triage",
-                                "Cryptographic implementation review: AES-GCM and ECC keys"
-                            });
+                        HenryStudioManager.showHackingStudio(this, this::launchPrompt);
                         break;
                     case "finance_skills":
-                        showSkillsDialog("Business Strategy & Financial Acumen",
-                            new String[]{
-                                "Build a Discounted Cash Flow (DCF) model and valuation",
-                                "Analyze SaaS unit economics: CAC, LTV, Rule of 40, and Burn",
-                                "Conduct forensic 3-statement financial analysis",
-                                "Create a venture capital cap table and dilution scenario"
-                            });
+                        HenryStudioManager.showBusinessStudio(this, this::launchPrompt);
                         break;
                     case "medical_skills":
-                        showSkillsDialog("Clinical Medicine & Healthcare Intelligence",
-                            new String[]{
-                                "Provide a structured differential diagnosis framework",
-                                "Check clinical pharmacology and CYP450 drug interactions",
-                                "Interpret complex laboratory panels (CBC, CMP, ABG, Cardiac)",
-                                "Evidence-based clinical triage and pathophysiology overview"
-                            });
+                        HenryStudioManager.showMedicalStudio(this, this::launchPrompt);
                         break;
                     case "programming_studio":
-                        showSkillsDialog("Programming Studio & Coding Mentor",
-                            new String[]{
-                                "Build mode: Create an Android Jetpack Compose clean architecture app",
-                                "Debug mode: Diagnose and fix a NullPointerException with stack trace",
-                                "Learn mode: Teach Kotlin Coroutines and StateFlow step-by-step",
-                                "Review mode: Audit Python FastAPI service for security and performance",
-                                "Translate mode: Convert Java networking code to Kotlin Coroutines",
-                                "Test mode: Write unit tests and edge cases for an API client"
-                            });
+                        HenryStudioManager.showProgrammingStudio(this, this::launchPrompt);
                         break;
                     case "artifact_studio":
-                        showSkillsDialog("Artifact Creation Studio (Docs, Slides, Sheets)",
-                            new String[]{
-                                "Generate a polished executive project proposal PDF",
-                                "Create a comprehensive multi-tab financial forecast spreadsheet",
-                                "Draft a high-impact pitch deck slide outline with speaker notes",
-                                "Build a clean technical architecture specification document"
-                            });
+                        HenryStudioManager.showArtifactStudio(this, this::launchPrompt);
                         break;
                 }
             });
@@ -94,6 +62,15 @@ public class BrainActivity extends AppCompatActivity {
 
         TextView tvBack = findViewById(R.id.brain_back);
         if (tvBack != null) tvBack.setOnClickListener(v -> finish());
+    }
+
+    private void launchPrompt(String prompt) {
+        if (prompt == null || prompt.isEmpty()) return;
+        android.content.Intent intent = new android.content.Intent(this, MainActivity.class);
+        intent.putExtra("launch_prompt", prompt);
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
+        finish();
     }
 
     private void showSkillsDialog(String title, String[] prompts) {

@@ -23,12 +23,25 @@ public class SportsTracker {
     private static final String SPORTSDB = "https://www.thesportsdb.com/api/v1/json/3";
 
     public static boolean isSportsQuery(String input) {
-        String t = input.toLowerCase();
-        return t.contains("score") || t.contains("match") || t.contains("game")
-            || t.contains("football") || t.contains("soccer") || t.contains("basketball")
+        if (input == null) return false;
+        String t = input.toLowerCase().trim();
+        // Never hijack coding, creation, gaming, or app logic
+        if (t.contains("create") || t.contains("build") || t.contains("make") || t.contains("code")
+            || t.contains("program") || t.contains("play") || t.contains("develop") || t.contains("write")
+            || t.contains("tic tac toe") || t.contains("snake") || t.contains("flappy") || t.contains("chess")
+            || t.contains("riddle") || t.contains("trivia") || t.contains("quiz") || t.contains("design")) {
+            return false;
+        }
+        // Match specific sports entities or live scores
+        if (t.contains("football") || t.contains("soccer") || t.contains("basketball")
             || t.contains("nba") || t.contains("premier league") || t.contains("champions league")
-            || t.contains("cricket") || t.contains("standing") || t.contains("fixtures")
-            || t.contains("sports") || t.contains("result");
+            || t.contains("cricket") || t.contains("sports") || t.contains("standings") || t.contains("fixtures")) {
+            return true;
+        }
+        if (t.contains("live score") || t.contains("match result") || t.contains("game score") || t.contains("sports score")) {
+            return true;
+        }
+        return false;
     }
 
     public static void getLiveScores(String sport, Callback cb) {

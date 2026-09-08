@@ -328,6 +328,13 @@ public class MainActivity extends AppCompatActivity {
         } else if (VoiceShortcutWidget.ACTION_MIC.equals(intent.getAction())) {
             mainHandler.postDelayed(this::startListening, 600);
         }
+        // Handle launch_prompt from BrainActivity (Programming Studio, Business, Hacking, Medical, Artifact Studio)
+        String launchPrompt = intent.getStringExtra("launch_prompt");
+        if (launchPrompt != null && !launchPrompt.isEmpty()) {
+            hideWelcome();
+            final String prompt = launchPrompt;
+            mainHandler.postDelayed(() -> askHenry(prompt), 500);
+        }
         // Handle shared content from ShareReceiver
         String sharedText  = intent.getStringExtra("shared_text");
         String sharedImage = intent.getStringExtra("shared_image");
@@ -530,6 +537,15 @@ public class MainActivity extends AppCompatActivity {
         // If launched from widget mic button
         if (getIntent() != null && getIntent().getBooleanExtra("start_listening", false)) {
             mainHandler.postDelayed(this::startListening, 800);
+        }
+
+        // Handle launch_prompt from BrainActivity if newly created
+        if (getIntent() != null && getIntent().getStringExtra("launch_prompt") != null) {
+            String prompt = getIntent().getStringExtra("launch_prompt");
+            if (!prompt.isEmpty()) {
+                hideWelcome();
+                mainHandler.postDelayed(() -> askHenry(prompt), 800);
+            }
         }
     }
 
@@ -3430,6 +3446,54 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        // ── Direct Game & Code Generation (Snake, Tic Tac Toe, etc.) ─────────
+        if (HenryStudioManager.isDirectGameQuery(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String instantGame = HenryStudioManager.getInstantGameCode(userText);
+            if (instantGame != null) {
+                String clean = stripEmotionTag(instantGame);
+                history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+                speak("I have generated the complete code and engine for you, sir.", extractEmotion(instantGame));
+                saveHistory();
+                setState(OrbView.OrbState.IDLE);
+                return;
+            }
+        }
+
+        // ── Specialized Studios (Programming, Business, Hacking, Medical, Artifact) ─
+        if (HenryStudioManager.isStudioTrigger(userText)) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String stLower = userText.toLowerCase(Locale.US);
+            if (stLower.contains("programming") || stLower.contains("coding") || stLower.contains("code") || stLower.contains("developer")) {
+                String reply = "[EMOTION:focused] Opening Programming Studio & Coding Mentor, sir.";
+                addJarvisMsg(stripEmotionTag(reply)); speak(reply, "focused");
+                HenryStudioManager.showProgrammingStudio(this, prompt -> askHenry(prompt));
+            } else if (stLower.contains("business") || stLower.contains("finance") || stLower.contains("financial") || stLower.contains("strategy")) {
+                String reply = "[EMOTION:focused] Opening Business Strategy & Financial Acumen Studio, sir.";
+                addJarvisMsg(stripEmotionTag(reply)); speak(reply, "focused");
+                HenryStudioManager.showBusinessStudio(this, prompt -> askHenry(prompt));
+            } else if (stLower.contains("hacking") || stLower.contains("cybersecurity") || stLower.contains("security") || stLower.contains("pentest")) {
+                String reply = "[EMOTION:focused] Opening Ethical Hacking & Cybersecurity Intelligence Studio, sir.";
+                addJarvisMsg(stripEmotionTag(reply)); speak(reply, "focused");
+                HenryStudioManager.showHackingStudio(this, prompt -> askHenry(prompt));
+            } else if (stLower.contains("medical") || stLower.contains("clinical") || stLower.contains("healthcare") || stLower.contains("health")) {
+                String reply = "[EMOTION:focused] Opening Clinical Medicine & Healthcare Intelligence Studio, sir.";
+                addJarvisMsg(stripEmotionTag(reply)); speak(reply, "focused");
+                HenryStudioManager.showMedicalStudio(this, prompt -> askHenry(prompt));
+            } else if (stLower.contains("artifact") || stLower.contains("document") || stLower.contains("deck") || stLower.contains("sheet")) {
+                String reply = "[EMOTION:focused] Opening Artifact Creation Studio, sir.";
+                addJarvisMsg(stripEmotionTag(reply)); speak(reply, "focused");
+                HenryStudioManager.showArtifactStudio(this, prompt -> askHenry(prompt));
+            } else {
+                String reply = "[EMOTION:excited] Opening HENRY Specialization Studios Hub, sir.";
+                addJarvisMsg(stripEmotionTag(reply)); speak(reply, "excited");
+                HenryStudioManager.showStudioHub(this, prompt -> askHenry(prompt));
+            }
+            saveHistory();
+            setState(OrbView.OrbState.IDLE);
+            return;
+        }
+
         // ── Periodic Table / Element Mixer / Molecular Visualizer ────────────
         String periodicLower = userText.toLowerCase(Locale.US);
         boolean isChemical = periodicLower.contains("periodic table") || periodicLower.contains("element mixer") ||
@@ -3547,18 +3611,17 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // ── [v13] In-App Map (open map / show map) ────────────────────────────
-        if (lower.startsWith("open map") || lower.startsWith("show map") ||
+        // ── Google Maps integration ───────────────────────────────────────────
+        if (lower.contains("google map") || lower.contains("google maps") ||
+            lower.startsWith("open map") || lower.startsWith("show map") ||
             lower.startsWith("show me the map") || lower.equals("map") ||
             lower.startsWith("map of ") || lower.startsWith("find on map")) {
             String mapQuery = userText
-                .replaceAll("(?i)^(open|show|find on)\\s+map(\\s+of)?\\s*", "").trim();
+                .replaceAll("(?i)^(open|show|find on)?\\s*(google)?\\s*maps?(\\s+of)?\\s*", "").trim();
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            String reply = "[EMOTION:excited] Opening map, sir.";
+            String reply = "[EMOTION:excited] Launching Google Maps, sir.";
             addJarvisMsg(stripEmotionTag(reply)); speak(reply, "excited");
-            Intent mapI = new Intent(this, MapActivity.class);
-            if (!mapQuery.isEmpty()) mapI.putExtra(MapActivity.EXTRA_QUERY, mapQuery);
-            startActivity(mapI);
+            GoogleMapHelper.openGoogleMaps(this, mapQuery);
             saveHistory(); return;
         }
 

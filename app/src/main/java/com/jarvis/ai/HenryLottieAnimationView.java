@@ -23,7 +23,9 @@ public class HenryLottieAnimationView extends LottieAnimationView {
         TYPING_DOTS("lottie/typing_dots.json"),
         NEURAL_PULSE("lottie/neural_pulse.json"),
         VOICE_WAVE("lottie/voice_wave.json"),
-        CYBER_LOADER("lottie/cyber_loader.json");
+        CYBER_LOADER("lottie/cyber_loader.json"),
+        LOADING_SPINNER("lottie/loading_spinner.json"),
+        SUCCESS_CHECK("lottie/success_check.json");
 
         private final String assetPath;
         Preset(String assetPath) {
@@ -88,6 +90,10 @@ public class HenryLottieAnimationView extends LottieAnimationView {
             playPreset(Preset.VOICE_WAVE);
         } else if (lower.contains("pulse") || lower.contains("radar") || lower.contains("neural")) {
             playPreset(Preset.NEURAL_PULSE);
+        } else if (lower.contains("spinner") || lower.contains("track")) {
+            playPreset(Preset.LOADING_SPINNER);
+        } else if (lower.contains("check") || lower.contains("success") || lower.contains("done")) {
+            playPreset(Preset.SUCCESS_CHECK);
         } else if (lower.contains("load") || lower.contains("cyber") || lower.contains("spin")) {
             playPreset(Preset.CYBER_LOADER);
         } else {
@@ -109,6 +115,14 @@ public class HenryLottieAnimationView extends LottieAnimationView {
 
     public void playCyberLoader() {
         playPreset(Preset.CYBER_LOADER);
+    }
+
+    public void playLoadingSpinner() {
+        playPreset(Preset.LOADING_SPINNER);
+    }
+
+    public void playSuccessCheck() {
+        playPreset(Preset.SUCCESS_CHECK);
     }
 
     /**

@@ -285,8 +285,9 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
     static String stripMarkdown(String text) {
         if (text == null) return "";
         return text
-            // Code blocks (```...```)
-            .replaceAll("```[\\s\\S]*?```", "[code]")
+            // Code blocks (```...```) - preserve code contents intact!
+            .replaceAll("(?m)^```[a-zA-Z0-9_-]*\\s*$", "")
+            .replaceAll("```", "")
             // Inline code (`...`)
             .replaceAll("`([^`]+)`", "$1")
             // Headers (## Title → Title)

@@ -138,7 +138,19 @@ public class HenryOfflineBrain {
             return medResponse;
         }
 
-        // 11. Witty Answers & Humorous Banter Engine
+        // 11. Programming Studio & Coding Knowledge Engine (Offline)
+        String progResponse = handleProgrammingSkills(lower);
+        if (progResponse != null) {
+            return progResponse;
+        }
+
+        // 12. Artifact Creation Studio Knowledge Engine (Offline)
+        String artResponse = handleArtifactSkills(lower);
+        if (artResponse != null) {
+            return artResponse;
+        }
+
+        // 13. Witty Answers & Humorous Banter Engine
         if (lower.contains("chatgpt") || lower.contains("claude") || lower.contains("gemini") || lower.contains("groq") ||
             (lower.contains("smarter than") && (lower.contains("ai") || lower.contains("gpt") || lower.contains("google")))) {
             return "[EMOTION:confident] I hold my cloud-dwelling peers in high esteem, sir. ChatGPT brings the eloquence, Claude crafts the poetry, Gemini parses multimodal universe tokens, and Groq blazes with ultra-low latency. But I am H.E.N.R.Y.—I live directly on your hardware, synthesize chemical reactions in milliseconds, monitor real-time satellite trajectories, scan real-world biology, and never hit you with a 'Server busy, please upgrade to Pro' screen.";
@@ -401,6 +413,89 @@ public class HenryOfflineBrain {
                     "• Nucleic Acid Inhibitors: Fluoroquinolones (inhibit DNA gyrase/topoisomerase IV); Metronidazole (free radical DNA damage in anaerobes).\n" +
                     "• Antimetabolites: TMP-SMX (sequential inhibition of bacterial folate synthesis).";
         }
+        return null;
+    }
+
+    // ── Programming Studio & Coding Knowledge Engine ────────────────────────
+    private static String handleProgrammingSkills(String lower) {
+        if (HenryStudioManager.isDirectGameQuery(lower)) {
+            String gameCode = HenryStudioManager.getInstantGameCode(lower);
+            if (gameCode != null) return gameCode;
+        }
+
+        if (lower.contains("coroutine") || lower.contains("stateflow") || lower.contains("flow") && lower.contains("kotlin")) {
+            return "[EMOTION:focused] Kotlin Coroutines & StateFlow Architecture:\n" +
+                    "• CoroutineScope & Dispatchers: Dispatchers.Main (UI thread), Dispatchers.IO (disk & network I/O), Dispatchers.Default (CPU-bound computations).\n" +
+                    "• StateFlow: A state-holder observable flow that emits the current and new state updates to its collectors. Ideal for MVVM UI state exposure with `asStateFlow()`.\n" +
+                    "• SharedFlow: Highly-configurable hot broadcast channel for one-time events (navigation, Snackbars).\n" +
+                    "• Exception Handling: Use `CoroutineExceptionHandler` or `supervisorScope` so one failing child doesn't cancel sibling jobs.";
+        }
+
+        if (lower.contains("nullpointer") || lower.contains("null pointer") || lower.contains("npe")) {
+            return "[EMOTION:focused] NullPointerException (NPE) Diagnosis & Prevention:\n" +
+                    "1. Check the stack trace line number and identify the exact dereferenced object (e.g., `view.setOnClickListener` where view is null because `findViewById` ran before `setContentView`).\n" +
+                    "2. Null-Safety in Kotlin: Prefer non-nullable types (`String`), safe call operator (`?.`), and Elvis operator (`?:`).\n" +
+                    "3. In Java: Use `Objects.requireNonNull()`, `Optional<T>`, and `@NonNull`/`@Nullable` annotations.\n" +
+                    "4. Lifecycle Guard: Ensure async callbacks verify `isFinishing()` or `isDestroyed()` before accessing Activity context.";
+        }
+
+        if (lower.contains("clean architecture") || (lower.contains("android") && lower.contains("architecture"))) {
+            return "[EMOTION:focused] Android Clean Architecture & MVVM Structure:\n" +
+                    "• Presentation Layer: Jetpack Compose UI + ViewModels exposing immutable StateFlow UI states.\n" +
+                    "• Domain Layer (Optional/Pure Kotlin): UseCases / Interactors containing isolated business rules without Android SDK dependencies.\n" +
+                    "• Data Layer: Repositories managing single source of truth, abstracting Room Local DB (offline-first) and Retrofit/Ktor Remote Data Sources.\n" +
+                    "• Dependency Injection: Hilt or lightweight constructor injection for modular testability.";
+        }
+
+        if (lower.contains("fastapi") || (lower.contains("python") && lower.contains("api"))) {
+            return "[EMOTION:focused] Python FastAPI High-Performance Standards:\n" +
+                    "• Concurrency: Use `async def` for I/O-bound endpoints (database queries, external HTTP) and standard `def` with threadpools for CPU-bound tasks.\n" +
+                    "• Pydantic v2: Strict data validation schemas with field constraints and automated OpenAPI / Swagger docs.\n" +
+                    "• Dependency Injection: `Depends()` for database session management, JWT auth validation, and rate limiting.\n" +
+                    "• Performance: Deploy with Uvicorn workers behind Nginx with Gzip and HTTP/2 enabled.";
+        }
+
+        return null;
+    }
+
+    // ── Artifact Creation Studio Knowledge Engine ───────────────────────────
+    private static String handleArtifactSkills(String lower) {
+        if (lower.contains("executive proposal") || (lower.contains("proposal") && lower.contains("project"))) {
+            return "[EMOTION:focused] Executive Project Proposal Artifact Blueprint:\n\n" +
+                    "1. Executive Summary: Core challenge, strategic value proposition, and anticipated ROI.\n" +
+                    "2. Project Scope & Architecture: High-level system topology, technical boundaries, and tech stack.\n" +
+                    "3. Milestones & Timeline:\n" +
+                    "   • Phase 1 (Weeks 1-3): Architecture Discovery & Core Prototype\n" +
+                    "   • Phase 2 (Weeks 4-7): Feature Implementation & Service Integration\n" +
+                    "   • Phase 3 (Weeks 8-10): Security Hardening, QA, & Staging Deployment\n" +
+                    "4. Resource Allocation & Budget Breakdown.\n" +
+                    "5. Risk Matrix & Contingency Protocols.\n" +
+                    "6. Acceptance Criteria & Sign-off Governance.";
+        }
+
+        if (lower.contains("financial forecast") || (lower.contains("spreadsheet") && (lower.contains("financial") || lower.contains("tab")))) {
+            return "[EMOTION:focused] Multi-Tab Financial Forecast Model Architecture:\n\n" +
+                    "• Tab 1: Executive Dashboard & KPI Summary (ARR, Burn Rate, Runway, Gross Margin %)\n" +
+                    "• Tab 2: Revenue Model (Customer acquisition cohorts, ARPU, churn, tiered pricing)\n" +
+                    "• Tab 3: Headcount & Payroll (Department hires, fully-burdened compensation, ramp time)\n" +
+                    "• Tab 4: Operating Expenses (OpEx: Cloud infrastructure, marketing, SaaS licenses, G&A)\n" +
+                    "• Tab 5: 3-Statement Integration (Integrated P&L, Balance Sheet, and Indirect Cash Flow).";
+        }
+
+        if (lower.contains("pitch deck") || lower.contains("slide deck") || lower.contains("investor deck")) {
+            return "[EMOTION:focused] 10-Slide High-Impact Seed Pitch Deck Structure:\n\n" +
+                    "1. Title Slide: Company name, one-line category-defining tagline.\n" +
+                    "2. The Problem: Pain point quantified in lost dollars or hours.\n" +
+                    "3. The Solution: Value proposition & product breakthrough.\n" +
+                    "4. Market Opportunity: TAM, SAM, and SOM calculations.\n" +
+                    "5. Product & Secret Sauce: Core technology advantage and moat.\n" +
+                    "6. Business Model: Pricing strategy, unit economics (LTV/CAC).\n" +
+                    "7. Traction & Milestones: MoM growth rate, pilots, retention.\n" +
+                    "8. Competitive Landscape: 2x2 matrix demonstrating clear differentiation.\n" +
+                    "9. Leadership Team: Domain mastery and past exits.\n" +
+                    "10. The Ask: Capital sought, use of funds, and 18-month target milestones.";
+        }
+
         return null;
     }
 }

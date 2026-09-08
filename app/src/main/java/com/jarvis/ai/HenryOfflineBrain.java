@@ -16,6 +16,14 @@ import java.util.regex.Pattern;
 public class HenryOfflineBrain {
 
     public static String generateOfflineResponse(String input, String intentType, Context context) {
+        String resp = internalGenerateOfflineResponse(input, intentType, context);
+        if (resp == null) return null;
+        return resp.replaceAll("(?i)\\[emotion:[^\\]]*\\]\\s*", "")
+                   .replaceAll("(?i)\\[emotion[^\\]]*\\]\\s*", "")
+                   .trim();
+    }
+
+    private static String internalGenerateOfflineResponse(String input, String intentType, Context context) {
         if (input == null || input.trim().isEmpty()) {
             return "[EMOTION:calm] I am here and listening, sir. Operating in offline tactical mode.";
         }

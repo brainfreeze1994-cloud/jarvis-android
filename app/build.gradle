@@ -83,5 +83,8 @@ dependencies {
 
     // Lottie Animation
     implementation 'com.airbnb.android:lottie:6.4.0'
+
+    // Google Maps SDK
+    implementation 'com.google.android.gms:play-services-maps:18.2.0'
 }
 

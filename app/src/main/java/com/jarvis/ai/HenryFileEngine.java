@@ -39,6 +39,13 @@ import java.util.zip.ZipOutputStream;
  */
 public class HenryFileEngine {
 
+    public static String cleanEmotionTags(String text) {
+        if (text == null) return "";
+        return text.replaceAll("(?i)\\[emotion:[^\\]]*\\]\\s*", "")
+                   .replaceAll("(?i)\\[emotion[^\\]]*\\]\\s*", "")
+                   .trim();
+    }
+
     public enum FileType {
         DOCX("Word Document", ".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "📄"),
         XLSX("Excel Spreadsheet", ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "📊"),
@@ -178,9 +185,10 @@ public class HenryFileEngine {
     // ── Generation Dispatcher ─────────────────────────────────────────────────
 
     public static void processCreationRequest(Context context, String userPrompt, Bitmap userImage, GenerationCallback callback) {
+        userPrompt = cleanEmotionTags(userPrompt);
         Handler mainHandler = new Handler(Looper.getMainLooper());
         FileType type = detectFileType(userPrompt);
-        String topic = extractTitleAndTopic(userPrompt);
+        String topic = cleanEmotionTags(extractTitleAndTopic(userPrompt));
 
         callback.onProgress("Crafting your " + type.displayName + " on \"" + topic + "\"…");
 
@@ -419,6 +427,8 @@ public class HenryFileEngine {
     }
 
     public static DocumentModel parseMarkdownToDocumentModel(String defaultTopic, String md, boolean requireResearch) {
+        defaultTopic = cleanEmotionTags(defaultTopic);
+        md = cleanEmotionTags(md);
         DocumentModel doc = new DocumentModel();
         doc.title = defaultTopic;
         doc.subtitle = "H.E.N.R.Y. Document Engine • " + (requireResearch ? "Research Edition" : "Artisan Edition");
@@ -927,6 +937,8 @@ public class HenryFileEngine {
     }
 
     public static PresentationModel parseMarkdownToPresentationModel(String defaultTopic, String md, boolean requireResearch) {
+        defaultTopic = cleanEmotionTags(defaultTopic);
+        md = cleanEmotionTags(md);
         PresentationModel pres = new PresentationModel();
         pres.title = defaultTopic;
         pres.subtitle = "H.E.N.R.Y. Presentation Engine • " + (requireResearch ? "Academic Deck" : "Briefing Deck");

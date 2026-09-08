@@ -20,10 +20,17 @@ public class Message {
     public final String fileIcon;
     public final java.util.List<String> imageUris;
 
+    public static String stripEmotion(String text) {
+        if (text == null) return "";
+        return text.replaceAll("(?i)\\[emotion:[^\\]]*\\]\\s*", "")
+                   .replaceAll("(?i)\\[emotion[^\\]]*\\]\\s*", "")
+                   .trim();
+    }
+
     // Text message
     public Message(int type, String text) {
         this.type         = type;
-        this.text         = text;
+        this.text         = stripEmotion(text);
         this.imageUri     = null;
         this.imageUrl     = null;
         this.filePath     = null;
@@ -38,7 +45,7 @@ public class Message {
     // Local image message
     public Message(int type, String text, String imageUri) {
         this.type         = type;
-        this.text         = text;
+        this.text         = stripEmotion(text);
         this.imageUri     = imageUri;
         this.imageUrl     = null;
         this.filePath     = null;
@@ -53,7 +60,7 @@ public class Message {
     // Multi-attachment image message (User message with images)
     public Message(int type, String text, java.util.List<String> imageUris) {
         this.type         = type;
-        this.text         = text;
+        this.text         = stripEmotion(text);
         this.imageUri     = (imageUris != null && !imageUris.isEmpty()) ? imageUris.get(0) : null;
         this.imageUrl     = null;
         this.filePath     = null;
@@ -68,7 +75,7 @@ public class Message {
     // URL image message (AI generated)
     public Message(int type, String text, String imageUri, String imageUrl) {
         this.type         = type;
-        this.text         = text;
+        this.text         = stripEmotion(text);
         this.imageUri     = imageUri;
         this.imageUrl     = imageUrl;
         this.filePath     = null;
@@ -84,14 +91,14 @@ public class Message {
     public Message(int type, String text, String filePath, String fileMimeType,
                    String fileTitle, String fileDetails, String fileBadge, String fileIcon) {
         this.type         = type;
-        this.text         = text;
+        this.text         = stripEmotion(text);
         this.imageUri     = null;
         this.imageUrl     = null;
         this.filePath     = filePath;
         this.fileMimeType = fileMimeType;
-        this.fileTitle    = fileTitle;
-        this.fileDetails  = fileDetails;
-        this.fileBadge    = fileBadge;
+        this.fileTitle    = stripEmotion(fileTitle);
+        this.fileDetails  = stripEmotion(fileDetails);
+        this.fileBadge    = stripEmotion(fileBadge);
         this.fileIcon     = fileIcon;
         this.imageUris    = java.util.Collections.emptyList();
     }

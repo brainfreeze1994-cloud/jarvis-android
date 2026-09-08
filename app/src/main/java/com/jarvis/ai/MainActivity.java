@@ -1500,13 +1500,16 @@ public class MainActivity extends AppCompatActivity {
 
     private String stripEmotionTag(String text) {
         if (text == null) return "";
-        return text.replaceAll("\\[EMOTION:\\w+\\]\\s*", "").trim();
+        return text.replaceAll("(?i)\\[emotion:[^\\]]*\\]\\s*", "")
+                   .replaceAll("(?i)\\[emotion[^\\]]*\\]\\s*", "")
+                   .trim();
     }
 
     private String cleanForTts(String text) {
         if (text == null) return "";
         return text
-            .replaceAll("\\[EMOTION:\\w+\\]", "")
+            .replaceAll("(?i)\\[emotion:[^\\]]*\\]\\s*", "")
+            .replaceAll("(?i)\\[emotion[^\\]]*\\]\\s*", "")
             .replaceAll("```[\\s\\S]*?```", "")
             .replaceAll("`([^`]+)`", "$1")
             .replaceAll("\\*\\*(.*?)\\*\\*", "$1")
@@ -5399,21 +5402,23 @@ public class MainActivity extends AppCompatActivity {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     private void addUserMsg(String text) {
+        text = stripEmotionTag(text);
         messages.add(new Message(Message.TYPE_USER, text));
         adapter.notifyItemInserted(messages.size() - 1); scrollToBottom();
     }
     private void addJarvisMsg(String text) {
+        text = stripEmotionTag(text);
         if (text == null || text.trim().isEmpty()) return;
         messages.add(new Message(Message.TYPE_JARVIS, text));
         int pos = messages.size() - 1;
         adapter.notifyItemInserted(pos);
         scrollToBottom();
         // [v18] Long-press any HENRY message to copy it
+        final String copyText = text;
         mainHandler.post(() -> {
             android.view.View v = recycler.findViewHolderForAdapterPosition(pos) != null
                 ? recycler.findViewHolderForAdapterPosition(pos).itemView : null;
             if (v != null) {
-                final String copyText = text;
                 v.setOnLongClickListener(lv -> {
                     android.content.ClipboardManager cm =
                         (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);

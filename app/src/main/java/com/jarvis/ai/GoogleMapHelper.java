@@ -99,4 +99,72 @@ public class GoogleMapHelper {
             context.startActivity(inApp);
         }
     }
+
+    /**
+     * Open Google Maps turn-by-turn navigation / directions.
+     */
+    public static void openGoogleMapsDirections(Context context, String destination) {
+        if (context == null || destination == null) return;
+        Uri uri = Uri.parse("google.navigation:q=" + Uri.encode(destination.trim()));
+        Intent mapIntent = new Intent(Intent.ACTION_VIEW, uri);
+        mapIntent.setPackage(GOOGLE_MAPS_PKG);
+        try {
+            if (mapIntent.resolveActivity(context.getPackageManager()) != null) {
+                context.startActivity(mapIntent);
+                return;
+            }
+        } catch (Exception ignored) {}
+
+        // Web directions fallback
+        String webUrl = "https://www.google.com/maps/dir/?api=1&destination=" + Uri.encode(destination.trim());
+        try {
+            context.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(webUrl)));
+        } catch (Exception e) {
+            openGoogleMaps(context, destination);
+        }
+    }
+
+    /**
+     * Open Google Maps Street View for given coordinates.
+     */
+    public static void openGoogleMapsStreetView(Context context, double lat, double lon) {
+        if (context == null) return;
+        Uri uri = Uri.parse("google.streetview:cbll=" + lat + "," + lon);
+        Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+        intent.setPackage(GOOGLE_MAPS_PKG);
+        try {
+            if (intent.resolveActivity(context.getPackageManager()) != null) {
+                context.startActivity(intent);
+                return;
+            }
+        } catch (Exception ignored) {}
+        openGoogleMapsCoords(context, lat, lon, "Street View");
+    }
+
+    /**
+     * Open Google Maps Satellite view.
+     */
+    public static void openGoogleMapsSatellite(Context context, double lat, double lon) {
+        if (context == null) return;
+        String webUrl = "https://www.google.com/maps/@" + lat + "," + lon + ",18z/data=!3m1!1e3";
+        try {
+            context.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(webUrl)));
+        } catch (Exception e) {
+            openGoogleMapsCoords(context, lat, lon, "Satellite");
+        }
+    }
+
+    /**
+     * Retrieve configured Google Maps API key / Secret key if set.
+     */
+    public static String getGoogleMapsApiKey(Context context) {
+        if (context == null) return "";
+        try {
+            int resId = context.getResources().getIdentifier("google_maps_key", "string", context.getPackageName());
+            if (resId != 0) {
+                return context.getString(resId);
+            }
+        } catch (Exception ignored) {}
+        return "";
+    }
 }

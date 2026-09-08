@@ -268,7 +268,8 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
 
         // Normal JARVIS or USER message — strip markdown for clean display
         if (h.tvMsg != null) {
-            String displayText = (m.type == Message.TYPE_USER) ? m.text : stripMarkdown(m.text);
+            String text = Message.stripEmotion(m.text);
+            String displayText = (m.type == Message.TYPE_USER) ? text : stripMarkdown(text);
             h.tvMsg.setText(displayText);
         }
         if (h.tvAvatar != null) {
@@ -285,6 +286,9 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
     static String stripMarkdown(String text) {
         if (text == null) return "";
         return text
+            // Strip emotion tags
+            .replaceAll("(?i)\\[emotion:[^\\]]*\\]\\s*", "")
+            .replaceAll("(?i)\\[emotion[^\\]]*\\]\\s*", "")
             // Code blocks (```...```) - preserve code contents intact!
             .replaceAll("(?m)^```[a-zA-Z0-9_-]*\\s*$", "")
             .replaceAll("```", "")

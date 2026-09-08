@@ -3,38 +3,58 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
-    android:paddingStart="4dp"
-    android:paddingEnd="4dp"
-    android:paddingTop="3dp"
-    android:paddingBottom="3dp">
+    android:gravity="top|end"
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:layout_weight="1"/>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="end"
+        android:layout_marginEnd="8dp">
+
+        <ImageView
+            android:id="@+id/iv_image"
+            android:layout_width="220dp"
+            android:layout_height="180dp"
+            android:scaleType="centerCrop"
+            android:background="@drawable/bg_bubble_user"
+            android:clipToOutline="true"
+            android:layout_marginBottom="4dp"/>
+
+        <TextView
+            android:id="@+id/tv_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxWidth="260dp"
+            android:background="@drawable/bg_bubble_user"
+            android:textColor="#80DFFF"
+            android:textSize="15sp"
+            android:lineSpacingMultiplier="1.4"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:visibility="gone"/>
+    </LinearLayout>
 
     <TextView
         android:id="@+id/tv_avatar"
         android:layout_width="28dp"
         android:layout_height="28dp"
         android:gravity="center"
-        android:text="HNR"
-        android:textColor="#c9a84c"
-        android:textSize="6sp"
-        android:letterSpacing="0.05"
+        android:text="YOU"
+        android:textColor="#004466"
+        android:textSize="8sp"
         android:fontFamily="sans-serif-medium"
-        android:background="@drawable/bg_avatar"
-        android:layout_marginTop="4dp"
-        android:layout_marginEnd="8dp"/>
-
-    <TextView
-        android:id="@+id/tv_message"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:layout_marginEnd="40dp"
-        android:background="@drawable/bg_bubble_jarvis"
-        android:textColor="#c9a84c"
-        android:textSize="14sp"
-        android:lineSpacingMultiplier="1.5"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp"
-        android:paddingTop="10dp"
-        android:paddingBottom="10dp"/>
+        android:background="@drawable/bg_avatar_user"/>
 
 </LinearLayout>

@@ -18,6 +18,7 @@ public class Message {
     public final String fileDetails;
     public final String fileBadge;
     public final String fileIcon;
+    public final java.util.List<String> imageUris;
 
     // Text message
     public Message(int type, String text) {
@@ -31,6 +32,7 @@ public class Message {
         this.fileDetails  = null;
         this.fileBadge    = null;
         this.fileIcon     = null;
+        this.imageUris    = java.util.Collections.emptyList();
     }
 
     // Local image message
@@ -45,6 +47,22 @@ public class Message {
         this.fileDetails  = null;
         this.fileBadge    = null;
         this.fileIcon     = null;
+        this.imageUris    = (imageUri != null) ? java.util.Collections.singletonList(imageUri) : java.util.Collections.emptyList();
+    }
+
+    // Multi-attachment image message (User message with images)
+    public Message(int type, String text, java.util.List<String> imageUris) {
+        this.type         = type;
+        this.text         = text;
+        this.imageUri     = (imageUris != null && !imageUris.isEmpty()) ? imageUris.get(0) : null;
+        this.imageUrl     = null;
+        this.filePath     = null;
+        this.fileMimeType = null;
+        this.fileTitle    = null;
+        this.fileDetails  = null;
+        this.fileBadge    = null;
+        this.fileIcon     = null;
+        this.imageUris    = (imageUris != null) ? new java.util.ArrayList<>(imageUris) : java.util.Collections.emptyList();
     }
 
     // URL image message (AI generated)
@@ -59,6 +77,7 @@ public class Message {
         this.fileDetails  = null;
         this.fileBadge    = null;
         this.fileIcon     = null;
+        this.imageUris    = (imageUri != null) ? java.util.Collections.singletonList(imageUri) : java.util.Collections.emptyList();
     }
 
     // File card message
@@ -74,5 +93,6 @@ public class Message {
         this.fileDetails  = fileDetails;
         this.fileBadge    = fileBadge;
         this.fileIcon     = fileIcon;
+        this.imageUris    = java.util.Collections.emptyList();
     }
 }

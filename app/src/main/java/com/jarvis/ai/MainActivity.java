@@ -165,6 +165,7 @@ public class MainActivity extends AppCompatActivity {
     private String pendingImageUriStr;
     private final List<String> pendingImagesBase64 = new ArrayList<>();
     private final List<Uri>    pendingImagesUris   = new ArrayList<>();
+    private final List<String> lastAnalyzedImagesBase64 = new ArrayList<>();
     private String pendingPdfText;      // PDF text waiting to be sent
     private String pendingDocScanQuestion; // question asked when scan launched
 
@@ -4811,12 +4812,21 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // ── Default: send to AI backend ────────────────────────────────────────
+        List<String> attachedUris = new ArrayList<>();
+        for (Uri u : pendingImagesUris) {
+            if (u != null) attachedUris.add(u.toString());
+        }
+        if (attachedUris.isEmpty() && pendingImageUriStr != null) {
+            attachedUris.add(pendingImageUriStr);
+        }
+
         history.add(new HistoryItem("user", userText));
-        addUserMsg(userText);
-        if (pendingImageUriStr != null) {
-            messages.add(new Message(Message.TYPE_IMAGE, null, pendingImageUriStr));
+        if (!attachedUris.isEmpty()) {
+            messages.add(new Message(Message.TYPE_USER, userText, attachedUris));
             adapter.notifyItemInserted(messages.size() - 1);
             scrollToBottom();
+        } else {
+            addUserMsg(userText);
         }
         saveHistory();
         setState(OrbView.OrbState.THINKING);
@@ -4960,6 +4970,22 @@ public class MainActivity extends AppCompatActivity {
         List<String> imagesB64 = new ArrayList<>(pendingImagesBase64);
         clearAttachment();
 
+        if (!imagesB64.isEmpty()) {
+            lastAnalyzedImagesBase64.clear();
+            lastAnalyzedImagesBase64.addAll(imagesB64);
+        } else if (imageB64 != null && !imageB64.isEmpty()) {
+            lastAnalyzedImagesBase64.clear();
+            lastAnalyzedImagesBase64.add(imageB64);
+        } else if (!lastAnalyzedImagesBase64.isEmpty()) {
+            // Check if user is asking a follow-up about previously analyzed images (e.g., 'Sino ang pipiliin mo sa tatlo?')
+            String low = userText.toLowerCase(java.util.Locale.US);
+            if (low.matches(".*(sino|pipiliin|which one|tatlo|three|first|second|third|picture|photo|image|suit|jacket|wall|guy|man|girl|compare|them|both|these|who|alin|pili|kanila|ano masasabi).*")) {
+                imagesB64 = new ArrayList<>(lastAnalyzedImagesBase64);
+                if (imageB64 == null && !imagesB64.isEmpty()) imageB64 = imagesB64.get(0);
+                intentType = "vision";
+            }
+        }
+
         // Build history for API call
         List<HistoryItem> apiHistory = new ArrayList<>(history);
         if (!effectiveUserText.equals(userText) && !apiHistory.isEmpty()) {
@@ -5028,8 +5054,11 @@ public class MainActivity extends AppCompatActivity {
                         scrollToBottom();
                         speak("Here is your generated image, sir.", "proud");
                     } else {
-                        addJarvisMsg(cleanReply);
-                        speak(cleanReply, emotion);
+                        String toShow = (cleanReply != null && !cleanReply.trim().isEmpty())
+                                ? cleanReply
+                                : "I am right here, sir. How may I assist you?";
+                        addJarvisMsg(toShow);
+                        speak(toShow, emotion);
                     }
 
                     // [v20] Transit action buttons
@@ -5282,6 +5311,7 @@ public class MainActivity extends AppCompatActivity {
         adapter.notifyItemInserted(messages.size() - 1); scrollToBottom();
     }
     private void addJarvisMsg(String text) {
+        if (text == null || text.trim().isEmpty()) return;
         messages.add(new Message(Message.TYPE_JARVIS, text));
         int pos = messages.size() - 1;
         adapter.notifyItemInserted(pos);

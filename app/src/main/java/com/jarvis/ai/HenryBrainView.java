@@ -33,9 +33,11 @@ public class HenryBrainView extends View {
         {"default_mode",         "Default\nMode",        0.75f, 0.30f, 0.14f, 0.10f, 0xFFCC88FF},
         {"sensory_substitution", "Sensory\nSub.",        0.20f, 0.50f, 0.13f, 0.09f, 0xFFFF9944},
         {"memory",               "Memory\nBanks",        0.80f, 0.50f, 0.13f, 0.09f, 0xFFFFDD00},
-        {"google_docs",          "Google\nDocs",         0.30f, 0.70f, 0.12f, 0.09f, 0xFF4CAF50},
-        {"google_sheets",        "Google\nSheets",       0.50f, 0.77f, 0.12f, 0.09f, 0xFF0AB56E},
-        {"google_slides",        "Google\nSlides",       0.70f, 0.70f, 0.12f, 0.09f, 0xFFFF7043},
+        {"hacking_skills",       "Hacking &\nCyber",     0.30f, 0.69f, 0.12f, 0.08f, 0xFFFF2A6D},
+        {"finance_skills",       "Business\n& Finance",  0.50f, 0.74f, 0.12f, 0.08f, 0xFF00E676},
+        {"medical_skills",       "Medical\n& Health",    0.70f, 0.69f, 0.12f, 0.08f, 0xFF00D4FF},
+        {"programming_studio",   "Coding\nStudio",       0.28f, 0.85f, 0.13f, 0.07f, 0xFFFFD700},
+        {"artifact_studio",      "Artifact\nStudio",     0.72f, 0.85f, 0.13f, 0.07f, 0xFF00E5FF},
     };
 
     private String hoveredRegion = null;

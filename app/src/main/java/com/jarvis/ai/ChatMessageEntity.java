@@ -45,7 +45,16 @@ public class ChatMessageEntity {
         entity.type = m.type;
         entity.role = role != null ? role : (m.type == Message.TYPE_USER ? "user" : "model");
         entity.text = m.text;
-        entity.imageUri = m.imageUri;
+        if (m.imageUris != null && !m.imageUris.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < m.imageUris.size(); i++) {
+                if (i > 0) sb.append("||");
+                sb.append(m.imageUris.get(i));
+            }
+            entity.imageUri = sb.toString();
+        } else {
+            entity.imageUri = m.imageUri;
+        }
         entity.imageUrl = m.imageUrl;
         entity.filePath = m.filePath;
         entity.fileMimeType = m.fileMimeType;
@@ -59,6 +68,21 @@ public class ChatMessageEntity {
     }
 
     public Message toMessage() {
+        if (imageUri != null && !imageUri.trim().isEmpty()) {
+            java.util.List<String> uris = new java.util.ArrayList<>();
+            if (imageUri.contains("||")) {
+                for (String p : imageUri.split("\\|\\|")) {
+                    if (!p.trim().isEmpty()) uris.add(p.trim());
+                }
+            } else {
+                uris.add(imageUri.trim());
+            }
+            if (type == Message.TYPE_USER) {
+                return new Message(type, text, uris);
+            } else if (type == Message.TYPE_IMAGE) {
+                return new Message(type, text, uris);
+            }
+        }
         switch (type) {
             case Message.TYPE_IMAGE:
                 return new Message(type, text, imageUri);

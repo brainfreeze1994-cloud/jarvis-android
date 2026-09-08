@@ -66,9 +66,67 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
             return;
         }
 
+        if (m.type == Message.TYPE_USER) {
+            if (h.tvMsg != null) {
+                if (m.text != null && !m.text.isEmpty()) {
+                    h.tvMsg.setText(m.text);
+                    h.tvMsg.setVisibility(View.VISIBLE);
+                } else {
+                    h.tvMsg.setVisibility(View.GONE);
+                }
+            }
+            if (h.containerUserImages != null && h.scrollUserImages != null) {
+                h.containerUserImages.removeAllViews();
+                List<String> uris = m.imageUris;
+                if (uris != null && !uris.isEmpty()) {
+                    h.scrollUserImages.setVisibility(View.VISIBLE);
+                    int densityDp = (int) Math.max(1, h.itemView.getResources().getDisplayMetrics().density);
+                    for (String uStr : uris) {
+                        if (uStr == null || uStr.trim().isEmpty()) continue;
+                        ImageView iv = new ImageView(h.itemView.getContext());
+                        int sizeW = uris.size() == 1 ? (int)(220 * densityDp) : (int)(150 * densityDp);
+                        int sizeH = uris.size() == 1 ? (int)(180 * densityDp) : (int)(120 * densityDp);
+                        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(sizeW, sizeH);
+                        lp.setMarginEnd(8 * densityDp);
+                        iv.setLayoutParams(lp);
+                        iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                        iv.setBackgroundResource(R.drawable.bg_bubble_user);
+                        iv.setClipToOutline(true);
+                        try {
+                            if (uStr.startsWith("data:image")) {
+                                String b64 = uStr.substring(uStr.indexOf(',') + 1);
+                                byte[] bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+                                Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                                iv.setImageBitmap(bmp);
+                            } else {
+                                iv.setImageURI(Uri.parse(uStr));
+                            }
+                        } catch (Exception ignored) {}
+                        final String clickUri = uStr;
+                        iv.setOnClickListener(v -> showFullScreenImage(h.itemView.getContext(), clickUri));
+                        h.containerUserImages.addView(iv);
+                    }
+                } else {
+                    h.scrollUserImages.setVisibility(View.GONE);
+                }
+            }
+            return;
+        }
+
         if (m.type == Message.TYPE_IMAGE) {
             if (h.ivImage != null && m.imageUri != null) {
-                h.ivImage.setImageURI(Uri.parse(m.imageUri));
+                try {
+                    if (m.imageUri.startsWith("data:image")) {
+                        String b64 = m.imageUri.substring(m.imageUri.indexOf(',') + 1);
+                        byte[] bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+                        Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                        h.ivImage.setImageBitmap(bmp);
+                    } else {
+                        h.ivImage.setImageURI(Uri.parse(m.imageUri));
+                    }
+                } catch (Exception ignored) {}
+                final String clickUri = m.imageUri;
+                h.ivImage.setOnClickListener(v -> showFullScreenImage(h.itemView.getContext(), clickUri));
             }
             if (h.tvMsg != null && m.text != null && !m.text.isEmpty()) {
                 h.tvMsg.setText(stripMarkdown(m.text));
@@ -238,10 +296,33 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
             .trim();
     }
 
+    private void showFullScreenImage(android.content.Context ctx, String uriStr) {
+        if (ctx == null || uriStr == null) return;
+        try {
+            android.app.Dialog d = new android.app.Dialog(ctx, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+            android.widget.ImageView iv = new android.widget.ImageView(ctx);
+            iv.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            if (uriStr.startsWith("data:image")) {
+                String b64 = uriStr.substring(uriStr.indexOf(',') + 1);
+                byte[] bytes = android.util.Base64.decode(b64, android.util.Base64.DEFAULT);
+                Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                iv.setImageBitmap(bmp);
+            } else {
+                iv.setImageURI(Uri.parse(uriStr));
+            }
+            iv.setOnClickListener(v -> d.dismiss());
+            d.setContentView(iv);
+            d.show();
+        } catch (Exception ignored) {}
+    }
+
     static class MsgVH extends RecyclerView.ViewHolder {
         TextView    tvMsg, tvAvatar;
         ImageView   ivImage;
         ProgressBar progressBar;
+        View        scrollUserImages;
+        ViewGroup   containerUserImages;
 
         // File Card Views
         TextView    tvFileIcon, tvFileTitle, tvFileBadge, tvFileDetails;
@@ -253,6 +334,8 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
             tvAvatar    = v.findViewById(R.id.tv_avatar);
             ivImage     = v.findViewById(R.id.iv_image);
             progressBar = v.findViewById(R.id.pb_loading);
+            scrollUserImages    = v.findViewById(R.id.scroll_user_images);
+            containerUserImages = v.findViewById(R.id.container_user_images);
 
             tvFileIcon    = v.findViewById(R.id.tv_file_icon);
             tvFileTitle   = v.findViewById(R.id.tv_file_title);

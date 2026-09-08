@@ -14,20 +14,45 @@
         android:layout_height="1dp"
         android:layout_weight="1"/>
 
-    <TextView
-        android:id="@+id/tv_message"
+    <LinearLayout
+        android:id="@+id/layout_user_bubble"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:maxWidth="290dp"
-        android:background="@drawable/bg_bubble_user"
-        android:textColor="#80DFFF"
-        android:textSize="16sp"
-        android:lineSpacingMultiplier="1.45"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
-        android:paddingTop="9dp"
-        android:paddingBottom="9dp"
-        android:layout_marginEnd="8dp"/>
+        android:orientation="vertical"
+        android:gravity="end"
+        android:layout_marginEnd="8dp">
+
+        <!-- Attached Images Scroll Container (Multi-attachment preview) -->
+        <HorizontalScrollView
+            android:id="@+id/scroll_user_images"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:overScrollMode="never"
+            android:scrollbars="none"
+            android:visibility="gone">
+            <LinearLayout
+                android:id="@+id/container_user_images"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"/>
+        </HorizontalScrollView>
+
+        <TextView
+            android:id="@+id/tv_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxWidth="290dp"
+            android:background="@drawable/bg_bubble_user"
+            android:textColor="#80DFFF"
+            android:textSize="16sp"
+            android:lineSpacingMultiplier="1.45"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="9dp"
+            android:paddingBottom="9dp"/>
+    </LinearLayout>
 
     <TextView
         android:id="@+id/tv_avatar"

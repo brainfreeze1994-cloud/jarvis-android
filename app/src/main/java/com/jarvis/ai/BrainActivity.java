@@ -41,14 +41,52 @@ public class BrainActivity extends AppCompatActivity {
                     case "memory":
                         startActivity(new Intent(this, SmartMemoryActivity.class));
                         break;
-                    case "google_docs":
-                        Toast.makeText(this, "Say: \"Create a Google Doc about…\"", Toast.LENGTH_LONG).show();
+                    case "hacking_skills":
+                        showSkillsDialog("Cybersecurity & Ethical Hacking Intelligence",
+                            new String[]{
+                                "Perform an OWASP Top 10 vulnerability audit for my web app",
+                                "Explain binary exploitation, ROP chains, and memory defenses",
+                                "Network security audit: packet analysis & Wireshark triage",
+                                "Cryptographic implementation review: AES-GCM and ECC keys"
+                            });
                         break;
-                    case "google_sheets":
-                        Toast.makeText(this, "Say: \"Create a Google Sheet for…\"", Toast.LENGTH_LONG).show();
+                    case "finance_skills":
+                        showSkillsDialog("Business Strategy & Financial Acumen",
+                            new String[]{
+                                "Build a Discounted Cash Flow (DCF) model and valuation",
+                                "Analyze SaaS unit economics: CAC, LTV, Rule of 40, and Burn",
+                                "Conduct forensic 3-statement financial analysis",
+                                "Create a venture capital cap table and dilution scenario"
+                            });
                         break;
-                    case "google_slides":
-                        Toast.makeText(this, "Say: \"Create a Google Slides about…\"", Toast.LENGTH_LONG).show();
+                    case "medical_skills":
+                        showSkillsDialog("Clinical Medicine & Healthcare Intelligence",
+                            new String[]{
+                                "Provide a structured differential diagnosis framework",
+                                "Check clinical pharmacology and CYP450 drug interactions",
+                                "Interpret complex laboratory panels (CBC, CMP, ABG, Cardiac)",
+                                "Evidence-based clinical triage and pathophysiology overview"
+                            });
+                        break;
+                    case "programming_studio":
+                        showSkillsDialog("Programming Studio & Coding Mentor",
+                            new String[]{
+                                "Build mode: Create an Android Jetpack Compose clean architecture app",
+                                "Debug mode: Diagnose and fix a NullPointerException with stack trace",
+                                "Learn mode: Teach Kotlin Coroutines and StateFlow step-by-step",
+                                "Review mode: Audit Python FastAPI service for security and performance",
+                                "Translate mode: Convert Java networking code to Kotlin Coroutines",
+                                "Test mode: Write unit tests and edge cases for an API client"
+                            });
+                        break;
+                    case "artifact_studio":
+                        showSkillsDialog("Artifact Creation Studio (Docs, Slides, Sheets)",
+                            new String[]{
+                                "Generate a polished executive project proposal PDF",
+                                "Create a comprehensive multi-tab financial forecast spreadsheet",
+                                "Draft a high-impact pitch deck slide outline with speaker notes",
+                                "Build a clean technical architecture specification document"
+                            });
                         break;
                 }
             });
@@ -56,5 +94,20 @@ public class BrainActivity extends AppCompatActivity {
 
         TextView tvBack = findViewById(R.id.brain_back);
         if (tvBack != null) tvBack.setOnClickListener(v -> finish());
+    }
+
+    private void showSkillsDialog(String title, String[] prompts) {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(title)
+            .setItems(prompts, (dialog, which) -> {
+                String selected = prompts[which];
+                android.content.Intent intent = new android.content.Intent(this, MainActivity.class);
+                intent.putExtra("launch_prompt", selected);
+                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                startActivity(intent);
+                finish();
+            })
+            .setNegativeButton("Close", null)
+            .show();
     }
 }

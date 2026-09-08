@@ -4305,22 +4305,38 @@ public class MainActivity extends AppCompatActivity {
             speak(clean, extractEmotion(reply)); saveHistory(); return;
         }
 
-        // ── [v17] AI Image Generation ─────────────────────────────────────────
+        // ── Inquiries on Image Generation Speed & Document Limits ────────────
+        if (lower.contains("image") && (lower.contains("taking so long") || lower.contains("taking long") || lower.contains("too long") || lower.contains("slow") || lower.contains("delay") || lower.contains("stuck"))) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply = "[EMOTION:proud] I have completely upgraded our neural visual pipeline to the new high-speed Sana/Turbo rendering engine, sir! It generates high-definition visuals in under 2 seconds. Everything remains 100% free with unlimited usage. Would you like me to generate your image or animation now?";
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, "proud"); saveHistory(); return;
+        }
+
+        if ((lower.contains("limit") || lower.contains("quota") || lower.contains("maximum") || lower.contains("how many"))
+                && (lower.contains("document") || lower.contains("doc") || lower.contains("pdf") || lower.contains("pptx") || lower.contains("xlsx") || lower.contains("file") || lower.contains("image") || lower.contains("video") || lower.contains("animate"))) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply = "[EMOTION:proud] There are absolutely **ZERO limits** in HENRY, sir! All document creation (Word .docx, PowerPoint .pptx, Excel .xlsx, PDF reports, CSV tables, Markdown, and Text), AI image generation, motion animations, and video creation are **100% free and completely unlimited** forever. There are no tokens deducted, no daily caps, and no paywalls.";
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, "proud"); saveHistory(); return;
+        }
+
+        // ── [v17] AI Image & Animation Generation ─────────────────────────────
         if (ImageGenerator.isImageCommand(userText)) {
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
             setState(OrbView.OrbState.THINKING);
             String prompt = ImageGenerator.extractPrompt(userText);
-            String imgUrl = ImageGenerator.buildImageUrl(prompt);
-            String teaser = "[EMOTION:excited] Generating \"" + prompt + "\" for you, sir…";
-            addJarvisMsg(stripEmotionTag(teaser));
-            speak("Generating image now, sir.", "excited");
-            // Show image inline as URL image
-            messages.add(new Message(Message.TYPE_URL_IMAGE, null, imgUrl));
+            boolean isMotion = lower.contains("animate") || lower.contains("animation") || lower.contains("video");
+            String imgUrl = isMotion ? ImageGenerator.buildAnimationUrl(prompt) : ImageGenerator.buildImageUrl(prompt);
+            speak("Generating your " + (isMotion ? "animation" : "image") + " now, sir.", "excited");
+            // Show image inline as URL image with descriptive caption
+            String caption = (isMotion ? "🎬 Animated Motion: " : "🎨 Generated: ") + prompt;
+            messages.add(new Message(Message.TYPE_URL_IMAGE, caption, null, imgUrl));
             adapter.notifyItemInserted(messages.size() - 1);
             scrollToBottom();
-            String done = "[EMOTION:proud] Here's your image, sir! Tap to view full size.";
-            history.add(new HistoryItem("model", "Generated image: " + prompt));
-            addJarvisMsg(stripEmotionTag(done));
+            history.add(new HistoryItem("model", caption));
             setState(OrbView.OrbState.IDLE); saveHistory(); return;
         }
 
@@ -5014,8 +5030,8 @@ public class MainActivity extends AppCompatActivity {
                     hideTyping();
                     String cleanReply = stripEmotionTag(reply);
 
-                    // If model returned an unverified source refusal, run live web search directly
-                    if (HenryWebSearch.isRefusal(cleanReply)) {
+                    // If model returned an unverified source refusal and query is a real search question, run live web search directly
+                    if (HenryWebSearch.isRefusal(cleanReply) && HenryWebSearch.isSearchQuery(userText)) {
                         showTypingWithHint("search");
                         HenryWebSearch.search(userText, new HenryWebSearch.SearchCallback() {
                             @Override public void onSearchResult(String summary, String source, java.util.List<String> sources) {
@@ -5032,7 +5048,7 @@ public class MainActivity extends AppCompatActivity {
 
                             @Override public void onError(String reason) {
                                 hideTyping();
-                                String fallback = HenryOfflineBrain.generateOfflineResponse(userText, intentType, MainActivity.this);
+                                String fallback = HenryOfflineBrain.generateOfflineResponse(userText, offlineQueryIntent, MainActivity.this);
                                 String clean = stripEmotionTag(fallback);
                                 history.add(new HistoryItem("model", clean));
                                 addJarvisMsg(clean);

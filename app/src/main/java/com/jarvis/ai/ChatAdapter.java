@@ -10,6 +10,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
@@ -23,8 +24,8 @@ import java.util.regex.Pattern;
 public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
 
     private static final okhttp3.OkHttpClient IMAGE_CLIENT = new okhttp3.OkHttpClient.Builder()
-            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+            .connectTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(18, java.util.concurrent.TimeUnit.SECONDS)
             .followRedirects(true)
             .build();
 
@@ -33,10 +34,19 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
 
     private static String sanitizeImageUrl(String rawUrl) {
         if (rawUrl == null) return "";
-        return rawUrl.replace("model=flux", "model=turbo")
-                     .replace("&enhance=true", "")
-                     .replace("?enhance=true&", "?")
-                     .replace("?enhance=true", "");
+        String s = rawUrl;
+        // Replace slow flux or broken turbo with active fast sana model
+        s = s.replace("model=flux", "model=sana")
+             .replace("model=turbo", "model=sana");
+        if (!s.contains("model=")) {
+            s += (s.contains("?") ? "&" : "?") + "model=sana";
+        }
+        if (!s.contains("width=")) {
+            s += "&width=512&height=512";
+        }
+        return s.replace("&enhance=true", "")
+                .replace("?enhance=true&", "?")
+                .replace("?enhance=true", "");
     }
 
     public ChatAdapter(List<Message> items) { this.items = items; }
@@ -165,8 +175,9 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
                         } else {
                             for (int attempt = 0; attempt < 2 && bmp == null; attempt++) {
                                 try {
+                                    String targetFetchUrl = (attempt == 0) ? url : url.replace("model=sana", "").replace("&&", "&");
                                     okhttp3.Request req = new okhttp3.Request.Builder()
-                                            .url(url)
+                                            .url(targetFetchUrl)
                                             .header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
                                             .header("Accept", "image/jpeg,image/png,image/webp,image/*;q=0.8")
                                             .build();
@@ -179,7 +190,7 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
                                         }
                                     }
                                 } catch (Exception ex) {
-                                    Thread.sleep(800);
+                                    Thread.sleep(400);
                                 }
                             }
                         }

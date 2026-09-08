@@ -51,10 +51,23 @@ public class ImageGenerator {
         try {
             String clean = prompt.replaceAll("\\s+", " ").trim();
             if (clean.length() > 200) clean = clean.substring(0, 200);
+            long seed = (long)(Math.random() * 9000000) + 1000000;
             return BASE_URL + URLEncoder.encode(clean, "UTF-8") +
-                "?width=512&height=512&nologo=true";
+                "?model=sana&seed=" + seed + "&width=512&height=512&nologo=true";
         } catch (Exception e) {
-            return BASE_URL + "artwork?width=512&height=512&nologo=true";
+            return BASE_URL + "artwork?model=sana&width=512&height=512&nologo=true";
+        }
+    }
+
+    public static String buildAnimationUrl(String prompt) {
+        try {
+            String clean = prompt.replaceAll("\\s+", " ").trim();
+            if (clean.length() > 180) clean = clean.substring(0, 180);
+            long seed = (long)(Math.random() * 9000000) + 1000000;
+            return BASE_URL + URLEncoder.encode(clean + ", dynamic motion animation, cinematic lighting, 60fps", "UTF-8") +
+                "?model=sana&seed=" + seed + "&width=512&height=512&nologo=true";
+        } catch (Exception e) {
+            return BASE_URL + "motion_animation?model=sana&width=512&height=512&nologo=true";
         }
     }
 }

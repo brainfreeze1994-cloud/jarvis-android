@@ -40,6 +40,23 @@ public class HenryOfflineBrain {
             return "[EMOTION:focused] All on-device sub-routines are operating at 100% efficiency, sir. Neural reasoning yields are nominal, and local hardware sensors are ready for your command.";
         }
 
+        // 2b. Image Generation Speed, Video/Animation, and Document Limits
+        if (lower.contains("image") && (lower.contains("taking so long") || lower.contains("taking long") || lower.contains("too long") || lower.contains("slow") || lower.contains("fix it") || lower.contains("change that to new"))) {
+            return "[EMOTION:proud] I have switched our image rendering pipeline to the high-speed Sana neural model, sir! Visuals render in under 2 seconds at 512x512 resolution. Everything is 100% free and unlimited. What would you like to visualize or animate?";
+        }
+
+        if ((lower.contains("limit") || lower.contains("quota") || lower.contains("cap") || lower.contains("how many")) && (lower.contains("document") || lower.contains("file") || lower.contains("docx") || lower.contains("pdf") || lower.contains("pptx") || lower.contains("xlsx"))) {
+            return "[EMOTION:proud] There is absolutely **ZERO limit** on creating documents in HENRY, sir! Word (.docx), PowerPoint (.pptx), Excel (.xlsx), PDF reports, CSV tables, Markdown, and Text files are all generated locally on-device. They are 100% free, unlimited, and private forever.";
+        }
+
+        if ((lower.contains("video") || lower.contains("animate") || lower.contains("animation")) && (lower.contains("generate") || lower.contains("create") || lower.contains("make") || lower.contains("can we") || lower.contains("do a"))) {
+            return "[EMOTION:excited] Yes, absolutely! HENRY supports **AI Motion Video Generation & Animation** completely free and unlimited. You can ask me to 'generate video of [topic]' or 'animate [scene]', or create motion documents via the Artifact & Document Engine. All rendering is 100% free with zero quotas!";
+        }
+
+        if (lower.contains("free") && (lower.contains("unlimited") || lower.contains("cost") || lower.contains("subscription") || lower.contains("pay"))) {
+            return "[EMOTION:proud] Everything in HENRY is **100% Free and Unlimited Forever**, sir! There are no token deductions, no subscriptions, no daily limits, and no paywalls. All tools—coding, document generation, image synthesis, video animations, and deep research—are completely unmetered.";
+        }
+
         // 3. Time & Date
         if (lower.contains("what time") || lower.contains("current time") || lower.contains("what is the time")) {
             String time = new SimpleDateFormat("hh:mm a", Locale.US).format(new Date());

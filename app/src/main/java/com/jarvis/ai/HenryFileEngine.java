@@ -1481,10 +1481,10 @@ public class HenryFileEngine {
             pres.title = "H.E.N.R.Y. Presentation";
         }
         if (pres.slides == null) {
-            pres.slides = new ArrayList<>();
+            pres.slides.clear();
         }
         if (pres.references == null) {
-            pres.references = new ArrayList<>();
+            pres.references.clear;
         }
 
         try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(outFile))) {
@@ -1722,11 +1722,9 @@ public class HenryFileEngine {
         if (doc.sections == null || doc.sections.isEmpty()) {
             Section defaultSec = new Section("Overview");
             defaultSec.paragraphs.add("This document was prepared by the H.E.N.R.Y. Document Engine.");
-            if (doc.sections == null) doc.sections = new ArrayList<>();
-            doc.sections.add(defaultSec);
-        }
-        if (doc.references == null) {
-            doc.references = new ArrayList<>();
+           if (doc.sections != null) doc.sections.clear();
+...
+doc.references.clear();
         }
 
         int pageWidth = 612; // 8.5 x 11 inches at 72 dpi (Letter)

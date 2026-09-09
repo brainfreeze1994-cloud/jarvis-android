@@ -184,8 +184,8 @@ public class HenryFileEngine {
 
     // ── Generation Dispatcher ─────────────────────────────────────────────────
 
-    public static void processCreationRequest(Context context, String userPrompt, Bitmap userImage, GenerationCallback callback) {
-        userPrompt = cleanEmotionTags(userPrompt);
+    public static void processCreationRequest(Context context, String rawPrompt, Bitmap userImage, GenerationCallback callback) {
+        final String userPrompt = cleanEmotionTags(rawPrompt);
         Handler mainHandler = new Handler(Looper.getMainLooper());
         FileType type = detectFileType(userPrompt);
         String topic = cleanEmotionTags(extractTitleAndTopic(userPrompt));
@@ -1120,6 +1120,10 @@ public class HenryFileEngine {
                 pres.references.add("American Psychological Association. (2020). APA Publication Manual (7th ed.).");
                 pres.references.add("National Science Foundation. (2024). Science and engineering indicators.");
             }
+        }
+
+        if (!requireResearch) {
+            pres.references.clear();
         }
 
         return pres;

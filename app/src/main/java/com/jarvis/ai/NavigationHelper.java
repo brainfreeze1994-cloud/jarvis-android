@@ -38,7 +38,7 @@ public class NavigationHelper {
 
     public static String navigate(Context ctx, String destination, boolean preferWaze) {
         if (destination.isEmpty())
-            return "[EMOTION:neutral] Where would you like to go, sir?";
+            return "Where would you like to go, sir?";
 
         String encodedDest = Uri.encode(destination);
 
@@ -48,7 +48,7 @@ public class NavigationHelper {
             Intent waze = new Intent(Intent.ACTION_VIEW, Uri.parse(wazeUrl));
             waze.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             ctx.startActivity(waze);
-            return "[EMOTION:excited] Waze is guiding you to **" + destination + "**, sir.";
+            return "Waze is guiding you to **" + destination + "**, sir.";
         }
 
         // Google Maps navigation
@@ -59,15 +59,12 @@ public class NavigationHelper {
 
         if (maps.resolveActivity(ctx.getPackageManager()) != null) {
             ctx.startActivity(maps);
-            return "[EMOTION:excited] Google Maps is navigating to **" + destination + "**, sir.";
+            return "Google Maps is navigating to **" + destination + "**, sir.";
         }
 
-        // Fallback: browser maps
-        Intent browser = new Intent(Intent.ACTION_VIEW,
-            Uri.parse("https://www.google.com/maps/dir/?api=1&destination=" + encodedDest));
-        browser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        ctx.startActivity(browser);
-        return "[EMOTION:excited] Opening directions to **" + destination + "**, sir.";
+        // Fallback: GoogleMapHelper navigation or in-app map
+        GoogleMapHelper.openGoogleMapsDirections(ctx, destination);
+        return "Opening directions to **" + destination + "**, sir.";
     }
 
     // Open maps for search (not navigation)
@@ -79,10 +76,11 @@ public class NavigationHelper {
         maps.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         if (maps.resolveActivity(ctx.getPackageManager()) != null) {
             ctx.startActivity(maps);
-            return "[EMOTION:excited] Opening map for **" + query + "**, sir.";
+            return "Opening map for **" + query + "**, sir.";
         }
-        // Fallback to in-app map
-        return null; // caller will open MapActivity
+        // Fallback to in-app Google Maps activity
+        GoogleMapHelper.openInAppMap(ctx, query);
+        return "Opening interactive map for **" + query + "**, sir.";
     }
 
     private static boolean isAppInstalled(Context ctx, String pkg) {

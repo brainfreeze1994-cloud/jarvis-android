@@ -15,6 +15,34 @@ public class GoogleMapHelper {
     private static final String GOOGLE_MAPS_PKG = "com.google.android.apps.maps";
 
     /**
+     * Launch in-app Google Maps activity.
+     */
+    public static void openInAppMap(Context context, String query) {
+        if (context == null) return;
+        Intent inApp = new Intent(context, MapActivity.class);
+        if (query != null && !query.trim().isEmpty()) {
+            inApp.putExtra(MapActivity.EXTRA_QUERY, query.trim());
+        }
+        inApp.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        context.startActivity(inApp);
+    }
+
+    /**
+     * Launch in-app Google Maps activity at specific coordinates.
+     */
+    public static void openInAppMap(Context context, double lat, double lon, String label) {
+        if (context == null) return;
+        Intent inApp = new Intent(context, MapActivity.class);
+        inApp.putExtra(MapActivity.EXTRA_LAT, lat);
+        inApp.putExtra(MapActivity.EXTRA_LON, lon);
+        if (label != null && !label.trim().isEmpty()) {
+            inApp.putExtra(MapActivity.EXTRA_LABEL, label.trim());
+        }
+        inApp.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        context.startActivity(inApp);
+    }
+
+    /**
      * Open Google Maps for a specific search query (e.g. "restaurants near me", "Dubai Mall", "Tokyo").
      */
     public static void openGoogleMaps(Context context, String query) {

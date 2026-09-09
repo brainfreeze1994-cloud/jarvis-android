@@ -1,6 +1,6 @@
 package com.jarvis.ai;
 
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -224,7 +224,7 @@ public class HenryStudioManager {
             "📄 Artifact Creation Studio (Docs, Sheets, Decks)"
         };
 
-        new AlertDialog.Builder(context, R.style.Theme_Jarvis_Dialog)
+        createDialogBuilder(context)
             .setTitle("⚙ HENRY Specialization Studios")
             .setItems(studios, (dialog, which) -> {
                 switch (which) {
@@ -239,6 +239,14 @@ public class HenryStudioManager {
             .show();
     }
 
+    private static AlertDialog.Builder createDialogBuilder(Context context) {
+        try {
+            return new AlertDialog.Builder(context, R.style.Theme_Jarvis_Dialog);
+        } catch (Throwable t) {
+            return new AlertDialog.Builder(context);
+        }
+    }
+
     public static void showProgrammingStudio(Context context, StudioActionCallback callback) {
         String[] options = {
             "🐍 Create Classic Snake Game (Complete Code)",
@@ -250,7 +258,7 @@ public class HenryStudioManager {
             "⚙ Run Code in Sandbox (Piston Multi-language Engine)"
         };
 
-        new AlertDialog.Builder(context, R.style.Theme_Jarvis_Dialog)
+        createDialogBuilder(context)
             .setTitle("💻 Programming Studio & Coding Mentor")
             .setItems(options, (dialog, which) -> {
                 switch (which) {
@@ -276,7 +284,7 @@ public class HenryStudioManager {
             "🚀 10-Slide Seed Pitch Deck Architecture"
         };
 
-        new AlertDialog.Builder(context, R.style.Theme_Jarvis_Dialog)
+        createDialogBuilder(context)
             .setTitle("📈 Business Strategy & Financial Acumen")
             .setItems(options, (dialog, which) -> {
                 switch (which) {
@@ -301,7 +309,7 @@ public class HenryStudioManager {
             "🔐 Cryptographic Security Audit (AES-256-GCM, ECC, RSA)"
         };
 
-        new AlertDialog.Builder(context, R.style.Theme_Jarvis_Dialog)
+        createDialogBuilder(context)
             .setTitle("🛡 Ethical Hacking & Cybersecurity Intelligence")
             .setItems(options, (dialog, which) -> {
                 switch (which) {
@@ -326,7 +334,7 @@ public class HenryStudioManager {
             "🦠 Antimicrobial Spectrum of Activity & Stewardship"
         };
 
-        new AlertDialog.Builder(context, R.style.Theme_Jarvis_Dialog)
+        createDialogBuilder(context)
             .setTitle("🩺 Clinical Medicine & Healthcare Intelligence")
             .setItems(options, (dialog, which) -> {
                 switch (which) {
@@ -349,7 +357,7 @@ public class HenryStudioManager {
             "📐 Cloud Architecture Specification & Data Flow Diagram"
         };
 
-        new AlertDialog.Builder(context, R.style.Theme_Jarvis_Dialog)
+        createDialogBuilder(context)
             .setTitle("📄 Artifact Creation Studio")
             .setItems(options, (dialog, which) -> {
                 switch (which) {

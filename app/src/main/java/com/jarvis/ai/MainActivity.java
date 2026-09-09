@@ -3622,9 +3622,9 @@ public class MainActivity extends AppCompatActivity {
             String mapQuery = userText
                 .replaceAll("(?i)^(open|show|find on)?\\s*(google)?\\s*maps?(\\s+of)?\\s*", "").trim();
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            String reply = "[EMOTION:excited] Launching Google Maps, sir.";
-            addJarvisMsg(stripEmotionTag(reply)); speak(reply, "excited");
-            GoogleMapHelper.openGoogleMaps(this, mapQuery);
+            String reply = "Launching Google Maps, sir.";
+            addJarvisMsg(reply); speak(reply, "excited");
+            GoogleMapHelper.openInAppMap(this, mapQuery);
             saveHistory(); return;
         }
 

@@ -54,6 +54,40 @@
     <!-- SOS emergency call -->
     <uses-permission android:name="android.permission.CALL_PRIVILEGED" />
 
+    <!-- Package visibility for AppLauncher & external viewers (Android 11+) -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesCondition" />
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="*/*" />
+        </intent>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.spotify.music" />
+        <package android:name="com.instagram.android" />
+        <package android:name="com.facebook.katana" />
+        <package android:name="com.twitter.android" />
+        <package android:name="org.telegram.messenger" />
+        <package android:name="com.google.android.gm" />
+        <package android:name="com.google.android.apps.maps" />
+        <package android:name="com.google.android.apps.photos" />
+        <package android:name="com.android.chrome" />
+        <package android:name="com.android.settings" />
+        <package android:name="com.netflix.mediaclient" />
+        <package android:name="com.ubercab" />
+        <package android:name="com.linkedin.android" />
+        <package android:name="com.snapchat.android" />
+        <package android:name="com.discord" />
+        <package android:name="us.zoom.videomeetings" />
+        <package android:name="com.microsoft.teams" />
+    </queries>
+
     <uses-feature android:name="android.hardware.microphone" android:required="false"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
@@ -108,6 +142,10 @@
 
         <!-- 🌀 Storm Tracker Activity -->
         <activity android:name=".StormActivity" android:exported="false"
+            android:screenOrientation="portrait" android:theme="@style/Theme.Jarvis"/>
+
+        <!-- 📄 Native PDF & Slide Presentation Viewer Activity -->
+        <activity android:name=".DocumentViewerActivity" android:exported="false"
             android:screenOrientation="portrait" android:theme="@style/Theme.Jarvis"/>
 
         <!-- ⚛ Periodic Table Activity -->

@@ -95,12 +95,47 @@ public class AppLauncher {
 
         PackageManager pm = ctx.getPackageManager();
         Intent launch = pm.getLaunchIntentForPackage(pkg);
+
+        // Fallback for WhatsApp Business
+        if (launch == null && "com.whatsapp".equals(pkg)) {
+            launch = pm.getLaunchIntentForPackage("com.whatsapp.w4b");
+        }
+
+        // Fallback: search launcher activities for matched name
+        if (launch == null) {
+            try {
+                Intent mainIntent = new Intent(Intent.ACTION_MAIN, null);
+                mainIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+                java.util.List<android.content.pm.ResolveInfo> pkgAppsList =
+                        pm.queryIntentActivities(mainIntent, 0);
+                for (android.content.pm.ResolveInfo ri : pkgAppsList) {
+                    if (ri.activityInfo != null && ri.activityInfo.packageName != null) {
+                        String currentPkg = ri.activityInfo.packageName.toLowerCase();
+                        CharSequence label = ri.loadLabel(pm);
+                        String labelStr = label != null ? label.toString().toLowerCase() : "";
+                        if (currentPkg.contains(matchedName) || labelStr.contains(matchedName) ||
+                            (matchedName.equals("whatsapp") && currentPkg.contains("whatsapp"))) {
+                            launch = pm.getLaunchIntentForPackage(ri.activityInfo.packageName);
+                            if (launch != null) break;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
         if (launch == null) {
             // App not installed — open Play Store
             Intent store = new Intent(Intent.ACTION_VIEW,
                 Uri.parse("market://details?id=" + pkg));
             store.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            ctx.startActivity(store);
+            try {
+                ctx.startActivity(store);
+            } catch (Exception e) {
+                Intent webStore = new Intent(Intent.ACTION_VIEW,
+                    Uri.parse("https://play.google.com/store/apps/details?id=" + pkg));
+                webStore.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(webStore);
+            }
             return "[EMOTION:concerned] " + capitalize(matchedName) +
                    " is not installed, sir. Opening Play Store.";
         }

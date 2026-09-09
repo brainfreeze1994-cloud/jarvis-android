@@ -276,6 +276,16 @@ public class HenryFileEngine {
     // ── Open & Share Utilities ────────────────────────────────────────────────
 
     public static void openFile(Context context, File file, String mimeType) {
+        if (file == null || !file.exists()) {
+            android.widget.Toast.makeText(context, "File not found.", android.widget.Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String lowerName = file.getName().toLowerCase();
+        if (lowerName.endsWith(".pdf") || (mimeType != null && mimeType.contains("pdf"))
+            || lowerName.endsWith(".pptx") || (mimeType != null && mimeType.contains("presentation"))) {
+            DocumentViewerActivity.start(context, file, mimeType, file.getName());
+            return;
+        }
         try {
             Uri contentUri = FileProvider.getUriForFile(context, context.getPackageName() + ".provider", file);
             Intent intent = new Intent(Intent.ACTION_VIEW);
@@ -295,7 +305,11 @@ public class HenryFileEngine {
             chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             context.startActivity(chooser);
         } catch (Exception e) {
-            android.widget.Toast.makeText(context, "No app available to open this file.", android.widget.Toast.LENGTH_SHORT).show();
+            try {
+                DocumentViewerActivity.start(context, file, mimeType, file.getName());
+            } catch (Exception ex) {
+                android.widget.Toast.makeText(context, "No app available to open this file.", android.widget.Toast.LENGTH_SHORT).show();
+            }
         }
     }
 

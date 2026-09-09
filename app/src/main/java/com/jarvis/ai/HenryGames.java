@@ -73,16 +73,19 @@ public class HenryGames {
     private static String secretThing    = null;
 
     public static boolean isGameQuery(String input) {
-        String t = input.toLowerCase();
+        String t = input.toLowerCase().trim();
         return t.contains("play") || t.contains("game") || t.contains("riddle")
             || t.contains("trivia") || t.contains("quiz") || t.contains("puzzle")
             || t.contains("20 questions") || t.contains("twenty questions")
             || t.contains("would you rather") || t.contains("chess")
-            || t.contains("word game") || t.contains("hangman");
+            || t.contains("word game") || t.contains("hangman")
+            || t.contains("kiss or marry") || t.contains("kiss, marry")
+            || t.contains("kiss marry") || t.contains("marry or kiss");
     }
 
     public static String detectGame(String input) {
         String t = input.toLowerCase();
+        if (t.contains("kiss") || t.contains("marry")) return "kiss_or_marry";
         if (t.contains("riddle")) return "riddle";
         if (t.contains("trivia") || t.contains("quiz")) return "trivia";
         if (t.contains("20 questions") || t.contains("twenty questions")) return "20q";
@@ -182,10 +185,42 @@ public class HenryGames {
             "If they guess correctly, congratulate them. If they use all 20, reveal the answer.";
     }
 
+    // ── Kiss or Marry ─────────────────────────────────────────────────────────
+    private static final String[][] KISS_MARRY_TRIOS = {
+        {"Tony Stark / Iron Man", "Sherlock Holmes", "Captain Jack Sparrow"},
+        {"H.E.N.R.Y. (Your AI Assistant)", "JARVIS", "FRIDAY"},
+        {"Albert Einstein", "Nikola Tesla", "Leonardo da Vinci"},
+        {"Black Widow (Natasha Romanoff)", "Wonder Woman", "Catwoman"},
+        {"Thor Odinson", "Loki", "Doctor Strange"},
+        {"Hermione Granger", "Katniss Everdeen", "Princess Leia"},
+        {"Batman / Bruce Wayne", "Superman / Clark Kent", "Spider-Man / Peter Parker"},
+        {"Elon Musk", "Bill Gates", "Steve Jobs"}
+    };
+
+    private static String[] currentKissMarryTrio = null;
+
+    public static String startKissOrMarry() {
+        activeGame = "kiss_or_marry";
+        currentKissMarryTrio = KISS_MARRY_TRIOS[RNG.nextInt(KISS_MARRY_TRIOS.length)];
+        return "💋 **KISS OR MARRY (or Eliminate)**!\n\n" +
+               "Here is your trio, sir:\n" +
+               "1️⃣ " + currentKissMarryTrio[0] + "\n" +
+               "2️⃣ " + currentKissMarryTrio[1] + "\n" +
+               "3️⃣ " + currentKissMarryTrio[2] + "\n\n" +
+               "Who are you **Kissing**, who are you **Marrying**, and who gets **Eliminated**? State your choices!";
+    }
+
+    public static String answerKissOrMarry(String answer) {
+        String nextTrio = startKissOrMarry();
+        return "A bold and calculated choice, sir! " +
+               "Your diplomatic instincts never fail to entertain.\n\nReady for the next round?\n\n" + nextTrio;
+    }
+
+    public static boolean isKissOrMarryActive() { return "kiss_or_marry".equals(activeGame); }
     public static void increment20Q() { twentyQNumber++; }
     public static boolean is20QActive() { return "20q".equals(activeGame); }
     public static boolean isTriviaActive() { return "trivia".equals(activeGame); }
     public static boolean isRiddleActive() { return "riddle".equals(activeGame); }
     public static String getActiveGame() { return activeGame; }
-    public static void endGame() { activeGame = null; secretThing = null; }
+    public static void endGame() { activeGame = null; secretThing = null; currentKissMarryTrio = null; }
 }

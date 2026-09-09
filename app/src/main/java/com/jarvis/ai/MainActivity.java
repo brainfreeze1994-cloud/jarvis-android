@@ -2608,6 +2608,18 @@ public class MainActivity extends AppCompatActivity {
                     saveHistory(); return;
                 }
             }
+            if (HenryGames.isKissOrMarryActive()) {
+                String bl4 = userText.toLowerCase(java.util.Locale.US).trim();
+                if (bl4.startsWith("next") || bl4.contains("another") || bl4.contains("again")) {
+                    String r = HenryGames.startKissOrMarry();
+                    history.add(new HistoryItem("model", r)); addJarvisMsg(r); speak("Next round of Kiss or Marry!", "excited");
+                } else {
+                    String r = HenryGames.answerKissOrMarry(userText);
+                    history.add(new HistoryItem("model", r)); addJarvisMsg(r);
+                    speak(stripEmotionTag(r), "amused");
+                }
+                saveHistory(); return;
+            }
             if (HenryGames.isTriviaActive()) {
                 String r = HenryGames.checkTriviaAnswer(userText);
                 history.add(new HistoryItem("model", r)); addJarvisMsg(r);
@@ -2634,6 +2646,7 @@ public class MainActivity extends AppCompatActivity {
             String game = HenryGames.detectGame(userText);
             String r;
             switch (game) {
+                case "kiss_or_marry": r = HenryGames.startKissOrMarry(); speak("Let's play Kiss or Marry!", "excited"); break;
                 case "riddle":   r = HenryGames.startRiddle(); speak("Riddle time!", "excited"); break;
                 case "trivia":   r = HenryGames.startTrivia(); speak("Trivia tournament starts now!", "excited"); break;
                 case "20q":      r = HenryGames.start20Questions(); speak("Twenty Questions — I'm thinking of something.", "amused"); break;
@@ -4987,7 +5000,8 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         // 🚀 Space Command / Asteroid Watch voice trigger
-        if (lowerInput.matches(".*\\b(space station|iss|nasa|asteroid|asteroid watch|eyes on asteroids|open space|space command|track iss|where is (the )?iss)\\b.*")) {
+        if (!lowerInput.contains("kiss") && !lowerInput.contains("marry") && !lowerInput.contains("game")
+            && lowerInput.matches(".*\\b(space station|nasa|asteroid|asteroid watch|eyes on asteroids|open space|space command|track iss|where is (the )?iss|international space station)\\b.*")) {
             startActivity(new android.content.Intent(this, SpaceActivity.class));
             String reply = "[EMOTION:focused] Accessing Deep Space Orbital Monitor and NEO defense radar, sir.";
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
@@ -5005,7 +5019,8 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         // 🌐 Earth Radar voice trigger
-        if (lowerInput.matches(".*(earthquake|seismic|earth radar|global weather|open radar).*")) {
+        if (!lowerInput.contains("kiss") && !lowerInput.contains("marry") && !lowerInput.contains("game")
+            && lowerInput.matches(".*(earthquake|seismic|earth radar|global weather|open radar).*")) {
             startActivity(new android.content.Intent(this, EarthRadarActivity.class));
             String reply = "[EMOTION:focused] Opening global Earth Radar and seismic telemetry, sir.";
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);

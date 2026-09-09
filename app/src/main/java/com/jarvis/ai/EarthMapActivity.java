@@ -271,6 +271,11 @@ public class EarthMapActivity extends AppCompatActivity {
             "padding:7px 10px;font-size:12px;outline:none;border-radius:2px;}" +
             "#ask-btn{background:#00D4FF;color:#000;border:none;padding:7px 12px;" +
             "font-size:11px;font-weight:bold;cursor:pointer;border-radius:2px;}" +
+            "#labels-layer{position:absolute;inset:0;pointer-events:none;overflow:hidden;}" +
+            ".map-label{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;white-space:nowrap;user-select:none;display:none;}" +
+            ".map-country{font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#00E5FF;text-shadow:0 0 5px rgba(0,229,255,0.8),0 1px 3px #000;background:rgba(2,12,27,0.75);border:1px solid rgba(0,212,255,0.4);padding:2px 6px;border-radius:3px;}" +
+            ".map-city{font-size:10px;font-weight:600;color:#FFD54F;text-shadow:0 0 4px rgba(255,213,79,0.8),0 1px 2px #000;background:rgba(4,16,32,0.8);border:1px solid rgba(255,213,79,0.4);padding:1px 5px;border-radius:2px;}" +
+            ".map-label:active{background:#00D4FF;color:#000;}" +
             "@media(max-width:500px){#info-panel{display:none;}}" +
             "</style></head><body>" +
             "<div id='app'>" +
@@ -283,7 +288,8 @@ public class EarthMapActivity extends AppCompatActivity {
             "<div id='body'>" +
             "<div id='globe-wrap'>" +
             "<div id='globe-loading'>LOADING EARTH…</div>" +
-            "<div id='hint'>DRAG TO ROTATE · PINCH TO ZOOM · TAP COUNTRY</div>" +
+            "<div id='labels-layer'></div>" +
+            "<div id='hint'>DRAG TO ROTATE · PINCH TO ZOOM · TAP COUNTRY / CITY</div>" +
             "</div>" +
             "<div id='info-panel'>" +
             "<div id='panel-hdr'>◈ COUNTRY INTEL</div>" +
@@ -451,7 +457,7 @@ public class EarthMapActivity extends AppCompatActivity {
         "    var ring=new THREE.Line(geo2,new THREE.LineBasicMaterial({color:0x00aaff,opacity:r[1],transparent:true}));" +
         "    ring.rotation.x=0.3; scene.add(ring);" +
         "  });" +
-
+        "  initLabels();" +
         "  flyToLatLon(25.2,55.3);" + // Start at UAE
         "}" +
 
@@ -641,6 +647,103 @@ public class EarthMapActivity extends AppCompatActivity {
         "    renderer.setSize(w.clientWidth,w.clientHeight);});" +
         "}" +
 
+        // Places and labels
+        "var labelNodes=[];" +
+        "var MAP_PLACES=[" +
+        "  {t:'c',n:'UNITED STATES',c:'United States',la:38.0,lo:-97.0}," +
+        "  {t:'c',n:'CANADA',c:'Canada',la:56.0,lo:-106.0}," +
+        "  {t:'c',n:'MEXICO',c:'Mexico',la:23.6,lo:-102.5}," +
+        "  {t:'c',n:'BRAZIL',c:'Brazil',la:-14.2,lo:-51.9}," +
+        "  {t:'c',n:'ARGENTINA',c:'Argentina',la:-38.4,lo:-63.6}," +
+        "  {t:'c',n:'UNITED KINGDOM',c:'United Kingdom',la:55.3,lo:-3.4}," +
+        "  {t:'c',n:'FRANCE',c:'France',la:46.2,lo:2.2}," +
+        "  {t:'c',n:'GERMANY',c:'Germany',la:51.1,lo:10.4}," +
+        "  {t:'c',n:'ITALY',c:'Italy',la:41.8,lo:12.5}," +
+        "  {t:'c',n:'SPAIN',c:'Spain',la:40.4,lo:-3.7}," +
+        "  {t:'c',n:'RUSSIA',c:'Russia',la:61.5,lo:105.3}," +
+        "  {t:'c',n:'CHINA',c:'China',la:35.8,lo:104.1}," +
+        "  {t:'c',n:'INDIA',c:'India',la:20.5,lo:78.9}," +
+        "  {t:'c',n:'JAPAN',c:'Japan',la:36.2,lo:138.2}," +
+        "  {t:'c',n:'PHILIPPINES',c:'Philippines',la:12.8,lo:121.7}," +
+        "  {t:'c',n:'AUSTRALIA',c:'Australia',la:-25.2,lo:133.7}," +
+        "  {t:'c',n:'SAUDI ARABIA',c:'Saudi Arabia',la:23.8,lo:45.0}," +
+        "  {t:'c',n:'UAE',c:'UAE',la:23.4,lo:53.8}," +
+        "  {t:'c',n:'EGYPT',c:'Egypt',la:26.8,lo:30.8}," +
+        "  {t:'c',n:'SOUTH AFRICA',c:'South Africa',la:-30.5,lo:22.9}," +
+        "  {t:'c',n:'NIGERIA',c:'Nigeria',la:9.0,lo:8.6}," +
+        "  {t:'c',n:'TURKEY',c:'Turkey',la:38.9,lo:35.2}," +
+        "  {t:'c',n:'INDONESIA',c:'Indonesia',la:-0.7,lo:113.9}," +
+        "  {t:'c',n:'SOUTH KOREA',c:'South Korea',la:35.9,lo:127.7}," +
+        "  {t:'city',n:'• New York',c:'United States',la:40.7,lo:-74.0}," +
+        "  {t:'city',n:'• Los Angeles',c:'United States',la:34.0,lo:-118.2}," +
+        "  {t:'city',n:'• London',c:'United Kingdom',la:51.5,lo:-0.1}," +
+        "  {t:'city',n:'• Paris',c:'France',la:48.8,lo:2.3}," +
+        "  {t:'city',n:'• Berlin',c:'Germany',la:52.5,lo:13.4}," +
+        "  {t:'city',n:'• Rome',c:'Italy',la:41.9,lo:12.5}," +
+        "  {t:'city',n:'• Tokyo',c:'Japan',la:35.6,lo:139.6}," +
+        "  {t:'city',n:'• Beijing',c:'China',la:39.9,lo:116.4}," +
+        "  {t:'city',n:'• Shanghai',c:'China',la:31.2,lo:121.4}," +
+        "  {t:'city',n:'• Manila',c:'Philippines',la:14.6,lo:120.9}," +
+        "  {t:'city',n:'• Singapore',c:'Singapore',la:1.35,lo:103.8}," +
+        "  {t:'city',n:'• Sydney',c:'Australia',la:-33.8,lo:151.2}," +
+        "  {t:'city',n:'• Dubai',c:'UAE',la:25.2,lo:55.2}," +
+        "  {t:'city',n:'• Cairo',c:'Egypt',la:30.0,lo:31.2}," +
+        "  {t:'city',n:'• Mumbai',c:'India',la:19.0,lo:72.8}," +
+        "  {t:'city',n:'• Seoul',c:'South Korea',la:37.5,lo:126.9}," +
+        "  {t:'city',n:'• Toronto',c:'Canada',la:43.6,lo:-79.3}," +
+        "  {t:'city',n:'• Rio de Janeiro',c:'Brazil',la:-22.9,lo:-43.1}," +
+        "  {t:'city',n:'• Moscow',c:'Russia',la:55.7,lo:37.6}," +
+        "  {t:'city',n:'• Bangkok',c:'Thailand',la:13.7,lo:100.5}," +
+        "  {t:'city',n:'• Madrid',c:'Spain',la:40.4,lo:-3.7}," +
+        "  {t:'city',n:'• Buenos Aires',c:'Argentina',la:-34.6,lo:-58.3}" +
+        "];" +
+
+        "function initLabels(){" +
+        "  var layer=document.getElementById('labels-layer');" +
+        "  if(!layer) return; layer.innerHTML='';" +
+        "  labelNodes=[];" +
+        "  var r=1.012;" +
+        "  MAP_PLACES.forEach(function(p){" +
+        "    var phi=(90-p.la)*(Math.PI/180);" +
+        "    var theta=(p.lo+180)*(Math.PI/180);" +
+        "    var x=-(r*Math.sin(phi)*Math.cos(theta));" +
+        "    var z=(r*Math.sin(phi)*Math.sin(theta));" +
+        "    var y=(r*Math.cos(phi));" +
+        "    var pos=new THREE.Vector3(x,y,z);" +
+        "    var el=document.createElement('div');" +
+        "    el.className='map-label '+(p.t==='c'?'map-country':'map-city');" +
+        "    el.textContent=p.n;" +
+        "    el.addEventListener('click',function(ev){" +
+        "      ev.stopPropagation();" +
+        "      flyToCountry(p.c);" +
+        "    });" +
+        "    layer.appendChild(el);" +
+        "    labelNodes.push({el:el,pos:pos,c:p.c});" +
+        "  });" +
+        "}" +
+
+        "function updateLabels(){" +
+        "  if(!globe||!labelNodes.length) return;" +
+        "  var wrap=document.getElementById('globe-wrap');" +
+        "  var W=wrap.clientWidth, H=wrap.clientHeight;" +
+        "  var camPos=camera.position;" +
+        "  var v=new THREE.Vector3();" +
+        "  for(var i=0;i<labelNodes.length;i++){" +
+        "    var item=labelNodes[i];" +
+        "    v.copy(item.pos).applyMatrix4(globe.matrixWorld);" +
+        "    var dot=v.dot(camPos);" +
+        "    if(dot<0.26){item.el.style.display='none';continue;}" +
+        "    v.project(camera);" +
+        "    if(v.z>1){item.el.style.display='none';continue;}" +
+        "    var sx=(v.x*0.5+0.5)*W;" +
+        "    var sy=(-v.y*0.5+0.5)*H;" +
+        "    item.el.style.display='block';" +
+        "    item.el.style.left=sx+'px';" +
+        "    item.el.style.top=sy+'px';" +
+        "    item.el.style.opacity=Math.min(1,Math.max(0.1,(dot-0.26)*3));" +
+        "  }" +
+        "}" +
+
         // Render loop
         "function animate(){" +
         "  requestAnimationFrame(animate);" +
@@ -651,6 +754,7 @@ public class EarthMapActivity extends AppCompatActivity {
         "  if(clouds){clouds.rotation.x=rotX*0.97;clouds.rotation.y=rotY+performance.now()*0.00004;}" +
         "  camera.position.z=zoom;" +
         "  renderer.render(scene,camera);" +
+        "  updateLabels();" +
         "}" +
 
         "try { init(); addGlobeEvents(); } catch(e) { console.error(e); }";

@@ -48,6 +48,8 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.Circle;
+import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
@@ -110,6 +112,13 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     private int currentMapType = GoogleMap.MAP_TYPE_NORMAL;
     private boolean isNativeMapReady = false;
 
+    // Real-Time LocationManager Tracking
+    private JarvisLocationManager jarvisLocationManager;
+    private Marker userLiveMarker;
+    private Circle userAccuracyCircle;
+    private boolean isLiveTrackingMode = false;
+    private Button chipLiveGps;
+
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -135,6 +144,9 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         // Build Modern Dark Cyber UI Layout
         View contentView = buildUiLayout();
         setContentView(contentView);
+
+        // Initialize Jarvis LocationManager
+        jarvisLocationManager = JarvisLocationManager.getInstance(this);
 
         // Request location permissions if not already granted
         checkLocationPermission();
@@ -277,6 +289,12 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         chipLoc.setPadding(dp(10), dp(4), dp(10), dp(4));
         chipLoc.setOnClickListener(v -> moveToCurrentGpsLocation());
         chipsRow.addView(chipLoc, createChipLp());
+
+        // Live GPS Tracking Toggle Chip
+        chipLiveGps = createStyledButton("📡 Live GPS: OFF", 0xFF142B47, 0xFF88A0B8, 11);
+        chipLiveGps.setPadding(dp(10), dp(4), dp(10), dp(4));
+        chipLiveGps.setOnClickListener(v -> toggleLiveGpsTracking());
+        chipsRow.addView(chipLiveGps, createChipLp());
 
         chipScroll.addView(chipsRow);
         topHeader.addView(chipScroll);
@@ -685,38 +703,137 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }
     }
 
-    private void moveToCurrentGpsLocation() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
+    private final JarvisLocationManager.LocationUpdateListener locationUpdateListener = new JarvisLocationManager.LocationUpdateListener() {
+        @Override
+        public void onLocationChanged(@NonNull Location location) {
+            handleLiveLocationUpdate(location);
+        }
+
+        @Override
+        public void onProviderDisabled(@NonNull String provider) {
+            showStatusBanner("Location provider " + provider + " disabled", 2000);
+        }
+
+        @Override
+        public void onProviderEnabled(@NonNull String provider) {
+            showStatusBanner("Location provider " + provider + " active", 2000);
+        }
+    };
+
+    private void handleLiveLocationUpdate(Location location) {
+        if (location == null) return;
+        this.currentLat = location.getLatitude();
+        this.currentLon = location.getLongitude();
+        LatLng pos = new LatLng(currentLat, currentLon);
+
+        if (googleMap != null) {
+            // Update or add live user position marker
+            if (userLiveMarker == null) {
+                userLiveMarker = googleMap.addMarker(new MarkerOptions()
+                        .position(pos)
+                        .title("Your Current Location")
+                        .snippet(String.format(Locale.US, "Accuracy: ±%.1f m", location.getAccuracy()))
+                        .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
+            } else {
+                userLiveMarker.setPosition(pos);
+                userLiveMarker.setSnippet(String.format(Locale.US, "Accuracy: ±%.1f m", location.getAccuracy()));
+            }
+
+            // Update or add accuracy radius circle
+            if (userAccuracyCircle == null) {
+                userAccuracyCircle = googleMap.addCircle(new CircleOptions()
+                        .center(pos)
+                        .radius(Math.max(location.getAccuracy(), 10))
+                        .strokeColor(0xFF00E5FF)
+                        .strokeWidth(2f)
+                        .fillColor(0x2200E5FF));
+            } else {
+                userAccuracyCircle.setCenter(pos);
+                userAccuracyCircle.setRadius(Math.max(location.getAccuracy(), 10));
+            }
+
+            // If user is following or live tracking
+            if (isLiveTrackingMode) {
+                googleMap.animateCamera(CameraUpdateFactory.newLatLng(pos));
+            }
+        }
+
+        // Update info card live coordinates
+        if (tvCardCoords != null) {
+            tvCardCoords.setText(String.format(Locale.US, "Live GPS: %.5f, %.5f (±%.1fm)", currentLat, currentLon, location.getAccuracy()));
+        }
+
+        // Reverse geocode address if viewing current location
+        if ("My Location".equals(currentLabel) || "Your Current Location".equals(currentLabel)) {
+            jarvisLocationManager.getAddressAsync(location, new JarvisLocationManager.AddressCallback() {
+                @Override
+                public void onAddressResolved(String addressLine, String city, String country) {
+                    if (tvCardAddress != null) tvCardAddress.setText(addressLine);
+                    if (tvCardTitle != null && city != null && !city.isEmpty()) tvCardTitle.setText(city);
+                }
+
+                @Override
+                public void onError(String error) {}
+            });
+        }
+    }
+
+    private void toggleLiveGpsTracking() {
+        if (!jarvisLocationManager.hasLocationPermission()) {
             checkLocationPermission();
             return;
         }
 
-        try {
-            LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-            Location loc = null;
-            if (lm != null) {
-                loc = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-                if (loc == null) {
-                    loc = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-                }
+        isLiveTrackingMode = !isLiveTrackingMode;
+        if (isLiveTrackingMode) {
+            jarvisLocationManager.startTracking();
+            if (chipLiveGps != null) {
+                chipLiveGps.setText("📡 Live GPS: ON");
+                chipLiveGps.setTextColor(0xFF00E676);
             }
+            showStatusBanner("Live GPS Position Tracking Enabled", 2500);
 
+            Location loc = jarvisLocationManager.getLastLocation();
             if (loc != null) {
-                LatLng myPos = new LatLng(loc.getLatitude(), loc.getLongitude());
-                this.currentLat = loc.getLatitude();
-                this.currentLon = loc.getLongitude();
-                this.currentLabel = "My Location";
-
+                handleLiveLocationUpdate(loc);
                 if (googleMap != null) {
-                    updateMarkerPosition(myPos, "My Location", "Current device location");
-                    googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(myPos, 16f));
+                    googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(loc.getLatitude(), loc.getLongitude()), 16.5f));
                 }
-                showStatusBanner("Centered on your GPS location", 2000);
             } else {
-                Toast.makeText(this, "Acquiring GPS location… please ensure Location is enabled", Toast.LENGTH_SHORT).show();
+                showStatusBanner("Acquiring high-accuracy GPS fix…", 3000);
             }
-        } catch (SecurityException ignored) {}
+        } else {
+            if (chipLiveGps != null) {
+                chipLiveGps.setText("📡 Live GPS: OFF");
+                chipLiveGps.setTextColor(0xFF88A0B8);
+            }
+            showStatusBanner("Live GPS Tracking Paused", 2000);
+        }
+    }
+
+    private void moveToCurrentGpsLocation() {
+        if (!jarvisLocationManager.hasLocationPermission()) {
+            checkLocationPermission();
+            return;
+        }
+
+        jarvisLocationManager.startTracking();
+        Location loc = jarvisLocationManager.getLastLocation();
+        if (loc != null) {
+            LatLng myPos = new LatLng(loc.getLatitude(), loc.getLongitude());
+            this.currentLat = loc.getLatitude();
+            this.currentLon = loc.getLongitude();
+            this.currentLabel = "My Location";
+
+            handleLiveLocationUpdate(loc);
+            if (googleMap != null) {
+                updateMarkerPosition(myPos, "My Location", "Current device location");
+                googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(myPos, 16.5f));
+            }
+            showStatusBanner("Centered on your GPS position", 2000);
+        } else {
+            showStatusBanner("Acquiring GPS fix via LocationManager…", 3000);
+        }
     }
 
     @Override
@@ -810,16 +927,30 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
     protected void onResume() {
         super.onResume();
         if (fallbackWebView != null) fallbackWebView.onResume();
+        if (jarvisLocationManager != null && jarvisLocationManager.hasLocationPermission()) {
+            jarvisLocationManager.addListener(locationUpdateListener);
+            jarvisLocationManager.startTracking();
+        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         if (fallbackWebView != null) fallbackWebView.onPause();
+        if (jarvisLocationManager != null) {
+            jarvisLocationManager.removeListener(locationUpdateListener);
+            if (!isLiveTrackingMode) {
+                jarvisLocationManager.stopTracking();
+            }
+        }
     }
 
     @Override
     protected void onDestroy() {
+        if (jarvisLocationManager != null) {
+            jarvisLocationManager.removeListener(locationUpdateListener);
+            jarvisLocationManager.stopTracking();
+        }
         executor.shutdown();
         if (fallbackWebView != null) {
             fallbackWebView.loadUrl("about:blank");

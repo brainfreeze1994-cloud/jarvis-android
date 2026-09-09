@@ -312,6 +312,11 @@
                 android:resource="@xml/accessibility_service" />
         </service>
 
+        <!-- Location Tracker Service -->
+        <service
+            android:name=".LocationTrackerService"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"

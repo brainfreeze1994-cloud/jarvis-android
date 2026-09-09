@@ -4987,7 +4987,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         // 🚀 Space Command / Asteroid Watch voice trigger
-        if (lowerInput.matches(".*(space station|iss|nasa|asteroid|asteroid watch|eyes on asteroids|open space|space command|track iss|where is iss).*")) {
+        if (lowerInput.matches(".*\\b(space station|iss|nasa|asteroid|asteroid watch|eyes on asteroids|open space|space command|track iss|where is (the )?iss)\\b.*")) {
             startActivity(new android.content.Intent(this, SpaceActivity.class));
             String reply = "[EMOTION:focused] Accessing Deep Space Orbital Monitor and NEO defense radar, sir.";
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);

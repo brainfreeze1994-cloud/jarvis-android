@@ -80,6 +80,9 @@ public class HenryOfflineBrain {
         }
 
         // 4. Feature Navigation Guidance
+        if (lower.contains("earth map") || lower.contains("globe") || (lower.contains("earth") && lower.contains("map"))) {
+            return "[EMOTION:focused] The Interactive 3D Earth Map provides satellite projections, country exploration, and tactile globe rotation. You can say 'open earth map', 'explore globe', or 'fly to Japan on the globe' to launch it directly.";
+        }
         if (lower.contains("plant") && (lower.contains("scan") || lower.contains("identify") || lower.contains("open"))) {
             return "[EMOTION:helpful] You can launch the Plant Scanner at any time to identify flora, botanical species, and health metrics using your camera.";
         }

@@ -3561,6 +3561,21 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        // ── 🌍 Earth Map & 3D Globe Commands ─────────────────────────────────
+        if (isEarthMapCommand(userText)) {
+            String flyTo = extractFlyTo(userText);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String reply = (flyTo != null && !flyTo.isEmpty())
+                ? "Launching Earth Map satellite projection for " + flyTo + ", sir."
+                : "Launching Earth Map satellite projection, sir.";
+            history.add(new HistoryItem("model", reply));
+            addJarvisMsg(reply);
+            speak(reply, "focused");
+            saveHistory();
+            openEarthMap(flyTo);
+            return;
+        }
+
         // ── Google Maps integration ───────────────────────────────────────────
         if (lower.contains("google map") || lower.contains("google maps") ||
             lower.startsWith("open map") || lower.startsWith("show map") ||
@@ -4920,54 +4935,45 @@ public class MainActivity extends AppCompatActivity {
         // [v20] Relationship learning
         RelationshipBrain.learnFromMessage(this, userText);
 
-        // 🌍 Earth Map voice trigger
         String lowerInput = userText.toLowerCase(java.util.Locale.US);
-        if (lowerInput.matches(".*(open|show|launch|earth|globe|world).*(map|globe|earth|world).*") ||
-            lowerInput.matches(".*(map|globe).*")) {
-            java.util.regex.Matcher mFly = java.util.regex.Pattern.compile(
-                "(?:show|fly to|go to|open|find|locate)\\s+(.+?)\\s+on\\s+(?:the\\s+)?(?:map|globe)",
-                java.util.regex.Pattern.CASE_INSENSITIVE).matcher(userText);
-            String flyTo = mFly.find() ? mFly.group(1).trim() : null;
-            openEarthMap(flyTo);
-            String reply = "[EMOTION:focused] Launching Earth Map satellite projection, sir.";
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
-            saveHistory();
-            return;
-        }
+
         // 🐾 Animal Scanner voice trigger
         if (lowerInput.matches(".*(what animal|animal scanner|identify animal|scan animal|open animal).*")) {
             openAnimalScanner();
             String reply = "[EMOTION:excited] Initializing Animal Scanner optical vision, sir.";
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "excited");
-            saveHistory();
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean));
+            addJarvisMsg(clean); speak(clean, "excited");
+            saveHistory(); setState(OrbView.OrbState.IDLE);
             return;
         }
         // 🌿 Plant Scanner voice trigger
         if (lowerInput.matches(".*(what plant|plant scanner|identify plant|scan plant|open plant|what flower|what tree|what herb).*")) {
             openPlantScanner();
             String reply = "[EMOTION:excited] Opening Plant Scanner optical diagnostics, sir.";
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "excited");
-            saveHistory();
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean));
+            addJarvisMsg(clean); speak(clean, "excited");
+            saveHistory(); setState(OrbView.OrbState.IDLE);
             return;
         }
         // 🛡️ System Audit, Diagnostic & Verification Report trigger
         if (lowerInput.matches(".*(system audit|diagnostic|system report|health check|full audit|self test|diagnose henry|verification report|audit report|system verification|diagnose).*")) {
             startActivity(new android.content.Intent(this, SystemDiagnosticActivity.class));
             String reply = "[EMOTION:focused] Initializing H.E.N.R.Y. Full System Audit and Verification sequence, sir. Inspecting AI neural link, vision pipeline, chemistry engine, and core telemetry.";
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
-            saveHistory();
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean));
+            addJarvisMsg(clean); speak(clean, "focused");
+            saveHistory(); setState(OrbView.OrbState.IDLE);
             return;
         }
         // 🔐 Biometrics / Facial / Iris Recognition trigger
         if (lowerInput.matches(".*(biometric|face recognition|facial recognition|iris recognition|iris scan|fingerprint|bio lock).*")) {
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
             String reply = "[EMOTION:focused] Initializing HENRY Biometric Security for facial, iris, and fingerprint authentication, sir.";
-            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
-            saveHistory();
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean));
+            addJarvisMsg(clean); speak(clean, "focused");
+            saveHistory(); setState(OrbView.OrbState.IDLE);
             mainHandler.postDelayed(this::lockAppAndAuthenticate, 600);
             return;
         }
@@ -4976,18 +4982,20 @@ public class MainActivity extends AppCompatActivity {
             && lowerInput.matches(".*\\b(space station|nasa|asteroid|asteroid watch|eyes on asteroids|open space|space command|track iss|where is (the )?iss|international space station)\\b.*")) {
             startActivity(new android.content.Intent(this, SpaceActivity.class));
             String reply = "[EMOTION:focused] Accessing Deep Space Orbital Monitor and NEO defense radar, sir.";
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
-            saveHistory();
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean));
+            addJarvisMsg(clean); speak(clean, "focused");
+            saveHistory(); setState(OrbView.OrbState.IDLE);
             return;
         }
         // 📈 Markets voice trigger
         if (lowerInput.matches(".*(stock market|live market|open market|bitcoin price|crypto price|nasdaq|dow jones).*")) {
             startActivity(new android.content.Intent(this, MarketsActivity.class));
             String reply = "[EMOTION:focused] Bringing up real-time financial market indices, sir.";
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
-            saveHistory();
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean));
+            addJarvisMsg(clean); speak(clean, "focused");
+            saveHistory(); setState(OrbView.OrbState.IDLE);
             return;
         }
         // 🌐 Earth Radar voice trigger
@@ -4995,9 +5003,10 @@ public class MainActivity extends AppCompatActivity {
             && lowerInput.matches(".*(earthquake|seismic|earth radar|global weather|open radar).*")) {
             startActivity(new android.content.Intent(this, EarthRadarActivity.class));
             String reply = "[EMOTION:focused] Opening global Earth Radar and seismic telemetry, sir.";
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
-            saveHistory();
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean));
+            addJarvisMsg(clean); speak(clean, "focused");
+            saveHistory(); setState(OrbView.OrbState.IDLE);
             return;
         }
 
@@ -5008,16 +5017,18 @@ public class MainActivity extends AppCompatActivity {
         if (lowerInput.contains("flight tracker") || lowerInput.contains("open flight")) {
             openFlightTracker(null);
             String reply = "[EMOTION:focused] Accessing live airspace radar, sir.";
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
-            saveHistory();
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean));
+            addJarvisMsg(clean); speak(clean, "focused");
+            saveHistory(); setState(OrbView.OrbState.IDLE);
             return;
         } else if (mFlight.find()) {
             openFlightTracker(mFlight.group(1).toUpperCase());
             String reply = "[EMOTION:focused] Tracking flight " + mFlight.group(1).toUpperCase() + ", sir.";
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
-            saveHistory();
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean));
+            addJarvisMsg(clean); speak(clean, "focused");
+            saveHistory(); setState(OrbView.OrbState.IDLE);
             return;
         }
 
@@ -5028,9 +5039,10 @@ public class MainActivity extends AppCompatActivity {
             pipeIntent.putExtra(VisionActivity.EXTRA_MODE, VisionActivity.MODE_PIPELINE);
             startActivity(pipeIntent);
             String reply = "[EMOTION:focused] Initializing Vision Pipeline, sir. Breadth-First and Depth-First topological search ready across transit, circuit, and star network graphs.";
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            addJarvisMsg(stripEmotionTag(reply)); speak(stripEmotionTag(reply), "focused");
-            saveHistory();
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean));
+            addJarvisMsg(clean); speak(clean, "focused");
+            saveHistory(); setState(OrbView.OrbState.IDLE);
             return;
         }
 
@@ -5567,7 +5579,76 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // ── 🌍 Open Earth Map ─────────────────────────────────────────────────────
+    // ── 🌍 Open Earth Map & Globe Helpers ─────────────────────────────────────
+    private boolean isEarthMapCommand(String userText) {
+        if (userText == null) return false;
+        String lower = userText.toLowerCase(java.util.Locale.US).trim();
+
+        // 1. Negative filters: questions or topics that contain "world" or "earth" or "map" but aren't globe viewing
+        if (lower.contains("world war") || lower.contains("world cup") || lower.contains("world record")
+                || lower.contains("how old is the earth") || lower.contains("why is the earth")
+                || lower.contains("why is earth") || lower.contains("is the earth flat")
+                || lower.contains("population of the world") || lower.contains("richest in the world")
+                || lower.contains("highest mountain in the world") || lower.contains("hello world")
+                || lower.contains("what in the world") || lower.contains("earthquake") || lower.contains("earth radar")
+                || lower.contains("mind map") || lower.contains("roadmap") || lower.contains("hash map")
+                || lower.contains("concept map") || lower.contains("site map") || lower.contains("weather map")
+                || lower.contains("google map") || lower.contains("google maps")) {
+            return false;
+        }
+
+        // 2. Direct exact or simple trigger terms
+        if (lower.equals("earth map") || lower.equals("open earth map") || lower.equals("show earth map")
+                || lower.equals("earth") || lower.equals("open earth") || lower.equals("show earth")
+                || lower.equals("globe") || lower.equals("open globe") || lower.equals("show globe")
+                || lower.equals("show me the globe") || lower.equals("the globe") || lower.equals("earth map please")
+                || lower.equals("world map") || lower.equals("open world map") || lower.equals("show world map")
+                || lower.equals("3d earth") || lower.equals("earth 3d") || lower.equals("3d globe")
+                || lower.equals("globe 3d") || lower.equals("satellite globe") || lower.equals("interactive globe")
+                || lower.equals("planet earth") || lower.equals("view planet earth") || lower.equals("spin globe")
+                || lower.equals("spin the globe") || lower.equals("explore earth") || lower.equals("explore globe")
+                || lower.equals("earth view") || lower.equals("globe view") || lower.equals("satellite earth")) {
+            return true;
+        }
+
+        // 3. Command variations & "in other words" (phrasings like "maybe earth map", "take me to earth map", etc.)
+        if (lower.contains("earth map") || lower.contains("3d earth") || lower.contains("earth 3d")
+                || lower.contains("3d globe") || lower.contains("globe 3d") || lower.contains("satellite globe")
+                || lower.contains("interactive globe") || lower.contains("world map") || lower.contains("planet earth map")
+                || lower.contains("earth globe") || lower.contains("world globe") || lower.contains("spin the globe")
+                || lower.contains("spin globe") || lower.contains("explore earth") || lower.contains("explore globe")
+                || lower.contains("explore the earth") || lower.contains("explore the globe") || lower.contains("view earth")
+                || lower.contains("view globe") || lower.contains("satellite projection") || lower.contains("earth projection")) {
+            return true;
+        }
+
+        // Action verbs combined with globe / earth / world map
+        if (lower.matches(".*\\b(open|show|launch|start|view|see|display|explore|spin|rotate|bring up|let's see|can you open|could you open|please open|maybe|switch to)\\b.*\\b(globe|earth map|3d earth|world map)\\b.*")) {
+            return true;
+        }
+
+        // "fly to [country] on the globe/earth map" or "locate [country] on earth map/globe"
+        if (lower.matches(".*\\b(fly to|go to|locate|find|show)\\b.*\\b(on the globe|on earth map|on the world map|on earth)\\b.*")) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private String extractFlyTo(String userText) {
+        if (userText == null) return null;
+        java.util.regex.Matcher mFly = java.util.regex.Pattern.compile(
+            "(?:show|fly to|go to|open|find|locate)\\s+(.+?)\\s+on\\s+(?:the\\s+)?(?:earth\\s+map|map|globe|earth|world)",
+            java.util.regex.Pattern.CASE_INSENSITIVE).matcher(userText);
+        if (mFly.find()) {
+            String target = mFly.group(1).trim();
+            if (!target.equalsIgnoreCase("me") && !target.equalsIgnoreCase("the") && target.length() > 1) {
+                return target;
+            }
+        }
+        return null;
+    }
+
     private void openFlightTracker(String flightNumber) {
         Intent intent = new Intent(this, FlightActivity.class);
         if (flightNumber != null && !flightNumber.isEmpty()) {

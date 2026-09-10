@@ -929,7 +929,7 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
                 + "var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '© Esri Satellite' });"
                 + "var dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, attribution: '© CARTO' });"
                 + "L.control.layers({'🗺️ Streets': osm, '🛰️ Satellite': satellite, '🌌 Dark Cyber': dark}, null, {position: 'topright'}).addTo(map);"
-                + "var marker = L.marker([" + lat + ", " + lon + "]).addTo(map).bindPopup('<b>" + safeTitle + "</b><br>Lat: " + lat.toFixed(5) + "<br>Lon: " + lon.toFixed(5) + "').openPopup();"
+                + "var marker = L.marker([" + lat + ", " + lon + "]).addTo(map).bindPopup('<b>" + safeTitle + "</b><br>Lat: " + String.format(Locale.US, "%.5f", lat) + "<br>Lon: " + String.format(Locale.US, "%.5f", lon) + "').openPopup();"
                 + "map.on('click', function(e) {"
                 + "  marker.setLatLng(e.latlng).bindPopup('<b>Selected Location</b><br>Lat: ' + e.latlng.lat.toFixed(5) + '<br>Lon: ' + e.latlng.lng.toFixed(5)).openPopup();"
                 + "  if (window.AndroidMap) window.AndroidMap.onPinSelected(e.latlng.lat, e.latlng.lng, 'Selected Location');"

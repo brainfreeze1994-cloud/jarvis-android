@@ -141,12 +141,43 @@ public class PeriodicTableActivity extends AppCompatActivity implements TextToSp
     static class Elem {
         String symbol, name, color, econfig, summary, image, uses, category, weight;
         int number, row, col;
+        double electronegativity;
 
         Elem(String s, String n, int num, String c, int r, int cl,
              String econfig, String summary, String image, String uses, String category, String weight) {
             this.symbol = s; this.name = n; this.number = num; this.color = c; this.row = r; this.col = cl;
             this.econfig = econfig; this.summary = summary; this.image = image; this.uses = uses;
             this.category = category; this.weight = weight;
+            this.electronegativity = calculatePaulingElectronegativity(s, num);
+        }
+
+        private static double calculatePaulingElectronegativity(String s, int num) {
+            if (s == null) return 2.1;
+            switch (s) {
+                case "F": return 3.98;
+                case "O": return 3.44;
+                case "Cl": return 3.16;
+                case "N": return 3.04;
+                case "Br": return 2.96;
+                case "I": return 2.66;
+                case "S": return 2.58;
+                case "C": return 2.55;
+                case "H": return 2.20;
+                case "P": return 2.19;
+                case "B": return 2.04;
+                case "Si": return 1.90;
+                case "Fe": return 1.83;
+                case "Cu": return 1.90;
+                case "Al": return 1.61;
+                case "Mg": return 1.31;
+                case "Ca": return 1.00;
+                case "Li": return 0.98;
+                case "Na": return 0.93;
+                case "K": return 0.82;
+                case "Cs": return 0.79;
+                default:
+                    return 1.5 + (num % 20) * 0.1;
+            }
         }
     }
 

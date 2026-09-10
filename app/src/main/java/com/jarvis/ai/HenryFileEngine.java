@@ -77,6 +77,11 @@ public class HenryFileEngine {
         void onError(String error);
     }
 
+    public interface ArtifactCallback {
+        void onSuccess(File file, FileType type, String title, String summary, int citationCount);
+        void onError(String error);
+    }
+
     // ── Intent Detection ──────────────────────────────────────────────────────
 
     public static boolean isCreationRequest(String text) {
@@ -273,6 +278,94 @@ public class HenryFileEngine {
         }).start();
     }
 
+    public static void createArtifact(Context context, FileType type, String title, String prompt, boolean requireResearch, Bitmap userImage, ArtifactCallback callback) {
+        new Thread(() -> {
+            try {
+                File outputDir = new File(context.getFilesDir(), "documents");
+                if (!outputDir.exists()) outputDir.mkdirs();
+
+                String safeTitle = (title != null && !title.trim().isEmpty()) ? title.trim() : "Document";
+                String fileName = sanitizeFileName(safeTitle, type);
+                File targetFile = new File(outputDir, fileName);
+
+                switch (type) {
+                    case PPTX: {
+                        PresentationModel pres = buildPresentationModelWithAiOrFallback(safeTitle, prompt, requireResearch);
+                        generatePptx(targetFile, pres);
+                        if (callback != null) {
+                            callback.onSuccess(targetFile, type, pres.title,
+                                    "Created " + pres.slides.size() + "-slide presentation deck with talking points"
+                                            + (pres.references.isEmpty() ? "." : " and citations slide."),
+                                    pres.references.size());
+                        }
+                        break;
+                    }
+                    case DOCX: {
+                        DocumentModel doc = buildDocumentModelWithAiOrFallback(safeTitle, prompt, requireResearch);
+                        generateDocx(targetFile, doc);
+                        if (callback != null) {
+                            callback.onSuccess(targetFile, type, doc.title,
+                                    "Generated " + doc.sections.size() + " sections.",
+                                    doc.references.size());
+                        }
+                        break;
+                    }
+                    case PDF: {
+                        DocumentModel doc = buildDocumentModelWithAiOrFallback(safeTitle, prompt, requireResearch);
+                        generatePdf(targetFile, doc, userImage);
+                        if (callback != null) {
+                            callback.onSuccess(targetFile, type, doc.title,
+                                    "Created multi-page PDF with " + doc.sections.size() + " sections.",
+                                    doc.references.size());
+                        }
+                        break;
+                    }
+                    case XLSX: {
+                        SpreadsheetModel sheet = buildSpreadsheetModel(safeTitle, prompt);
+                        generateXlsx(targetFile, sheet);
+                        if (callback != null) {
+                            callback.onSuccess(targetFile, type, sheet.title,
+                                    "Built formatted workbook with " + sheet.rows.size() + " rows.",
+                                    0);
+                        }
+                        break;
+                    }
+                    case CSV: {
+                        SpreadsheetModel sheet = buildSpreadsheetModel(safeTitle, prompt);
+                        generateCsv(targetFile, sheet);
+                        if (callback != null) {
+                            callback.onSuccess(targetFile, type, sheet.title,
+                                    "Generated CSV data table.",
+                                    0);
+                        }
+                        break;
+                    }
+                    case MD: {
+                        DocumentModel doc = buildDocumentModelWithAiOrFallback(safeTitle, prompt, requireResearch);
+                        generateMd(targetFile, doc);
+                        if (callback != null) {
+                            callback.onSuccess(targetFile, type, doc.title, "Generated Markdown document.", 0);
+                        }
+                        break;
+                    }
+                    case TXT:
+                    default: {
+                        DocumentModel doc = buildDocumentModelWithAiOrFallback(safeTitle, prompt, requireResearch);
+                        generateTxt(targetFile, doc);
+                        if (callback != null) {
+                            callback.onSuccess(targetFile, type, doc.title, "Generated text document.", 0);
+                        }
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                if (callback != null) {
+                    callback.onError("Failed to create artifact: " + e.getMessage());
+                }
+            }
+        }).start();
+    }
+
     // ── Open & Share Utilities ────────────────────────────────────────────────
 
     public static void openFile(Context context, File file, String mimeType) {
@@ -400,8 +493,8 @@ public class HenryFileEngine {
         public String title;
         public String subtitle;
         public String dateString;
-        public final List<Section> sections = new ArrayList<>();
-        public final List<String> references = new ArrayList<>();
+        public List<Section> sections = new ArrayList<>();
+        public List<String> references = new ArrayList<>();
     }
 
     public static class Slide {
@@ -421,8 +514,8 @@ public class HenryFileEngine {
     public static class PresentationModel {
         public String title;
         public String subtitle;
-        public final List<Slide> slides = new ArrayList<>();
-        public final List<String> references = new ArrayList<>();
+        public List<Slide> slides = new ArrayList<>();
+        public List<String> references = new ArrayList<>();
     }
 
     public static class SpreadsheetModel {

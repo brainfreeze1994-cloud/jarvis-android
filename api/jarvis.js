@@ -659,7 +659,7 @@ function buildConvMessages(messages, sys, limit) {
 
 async function searchWeb(query) {
   if (!query || !query.trim()) return null;
-  const q = query.replace(/(?i)^(who is|what is|where is|tell me about|search for|look up|find out|google)\s+/i, '').trim();
+  const q = query.replace(/^(who is|what is|where is|tell me about|search for|look up|find out|google)\s+/i, '').trim();
   const snippets = [];
 
   // 1. Wikipedia Search & Extract

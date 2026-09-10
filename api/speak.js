@@ -24,8 +24,8 @@ module.exports = async function handler(req, res) {
       .replace(/\*(.*?)\*/g,              '$1')
       .replace(/#{1,6}\s/g,               '')
       .replace(/\[([^\]]+)\]\([^)]+\)/g,  '$1')
-      .replace(/(?m)^\s*[-*+]\s/gm,       '')
-      .replace(/(?m)^\s*\d+\.\s/gm,       '')
+      .replace(/^\s*[-*+]\s/gm,       '')
+      .replace(/^\s*\d+\.\s/gm,       '')
       .replace(/\n{3,}/g,                 '\n\n')
       .trim()
       .slice(0, 5000);

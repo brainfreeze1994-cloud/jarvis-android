@@ -193,10 +193,10 @@ public class HenryFileEngine {
     // ── Generation Dispatcher ─────────────────────────────────────────────────
 
     public static void processCreationRequest(Context context, String userPrompt, Bitmap userImage, GenerationCallback callback) {
-        userPrompt = cleanEmotionTags(userPrompt);
+        final String finalPrompt = cleanEmotionTags(userPrompt);
         Handler mainHandler = new Handler(Looper.getMainLooper());
-        FileType type = detectFileType(userPrompt);
-        String topic = cleanEmotionTags(extractTitleAndTopic(userPrompt));
+        FileType type = detectFileType(finalPrompt);
+        String topic = cleanEmotionTags(extractTitleAndTopic(finalPrompt));
 
         callback.onProgress("Crafting your " + type.displayName + " on \"" + topic + "\"…");
 
@@ -208,11 +208,11 @@ public class HenryFileEngine {
                 String fileName = sanitizeFileName(topic, type);
                 File targetFile = new File(outputDir, fileName);
 
-                boolean requireResearch = shouldIncludeResearch(userPrompt, topic);
+                boolean requireResearch = shouldIncludeResearch(finalPrompt, topic);
 
                 switch (type) {
                     case DOCX: {
-                        DocumentModel doc = buildDocumentModelWithAiOrFallback(topic, userPrompt, requireResearch);
+                        DocumentModel doc = buildDocumentModelWithAiOrFallback(topic, finalPrompt, requireResearch);
                         generateDocx(targetFile, doc);
                         mainHandler.post(() -> callback.onSuccess(targetFile, type, doc.title,
                                 "Generated " + doc.sections.size() + " beautifully structured sections"
@@ -221,7 +221,7 @@ public class HenryFileEngine {
                         break;
                     }
                     case PDF: {
-                        DocumentModel doc = buildDocumentModelWithAiOrFallback(topic, userPrompt, requireResearch);
+                        DocumentModel doc = buildDocumentModelWithAiOrFallback(topic, finalPrompt, requireResearch);
                         generatePdf(targetFile, doc, userImage);
                         mainHandler.post(() -> callback.onSuccess(targetFile, type, doc.title,
                                 "Created multi-page PDF with " + doc.sections.size() + " structured sections"
@@ -230,7 +230,7 @@ public class HenryFileEngine {
                         break;
                     }
                     case PPTX: {
-                        PresentationModel pres = buildPresentationModelWithAiOrFallback(topic, userPrompt, requireResearch);
+                        PresentationModel pres = buildPresentationModelWithAiOrFallback(topic, finalPrompt, requireResearch);
                         generatePptx(targetFile, pres);
                         mainHandler.post(() -> callback.onSuccess(targetFile, type, pres.title,
                                 "Created " + pres.slides.size() + "-slide presentation deck with talking points"
@@ -239,7 +239,7 @@ public class HenryFileEngine {
                         break;
                     }
                     case XLSX: {
-                        SpreadsheetModel sheet = buildSpreadsheetModel(topic, userPrompt);
+                        SpreadsheetModel sheet = buildSpreadsheetModel(topic, finalPrompt);
                         generateXlsx(targetFile, sheet);
                         mainHandler.post(() -> callback.onSuccess(targetFile, type, sheet.title,
                                 "Built formatted workbook with " + sheet.rows.size() + " data rows, calculations, and auto-styled headers.",
@@ -247,7 +247,7 @@ public class HenryFileEngine {
                         break;
                     }
                     case CSV: {
-                        SpreadsheetModel sheet = buildSpreadsheetModel(topic, userPrompt);
+                        SpreadsheetModel sheet = buildSpreadsheetModel(topic, finalPrompt);
                         generateCsv(targetFile, sheet);
                         mainHandler.post(() -> callback.onSuccess(targetFile, type, sheet.title,
                                 "Generated CSV data table with " + sheet.rows.size() + " records.",
@@ -255,7 +255,7 @@ public class HenryFileEngine {
                         break;
                     }
                     case MD: {
-                        DocumentModel doc = buildDocumentModelWithAiOrFallback(topic, userPrompt, requireResearch);
+                        DocumentModel doc = buildDocumentModelWithAiOrFallback(topic, finalPrompt, requireResearch);
                         generateMd(targetFile, doc);
                         mainHandler.post(() -> callback.onSuccess(targetFile, type, doc.title,
                                 "Created Markdown document with " + doc.sections.size() + " sections"
@@ -264,7 +264,7 @@ public class HenryFileEngine {
                         break;
                     }
                     case TXT: {
-                        DocumentModel doc = buildDocumentModelWithAiOrFallback(topic, userPrompt, requireResearch);
+                        DocumentModel doc = buildDocumentModelWithAiOrFallback(topic, finalPrompt, requireResearch);
                         generateTxt(targetFile, doc);
                         mainHandler.post(() -> callback.onSuccess(targetFile, type, doc.title,
                                 "Generated formatted text document with " + doc.sections.size() + " sections.",

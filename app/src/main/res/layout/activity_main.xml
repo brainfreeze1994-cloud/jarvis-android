@@ -256,6 +256,16 @@
                         android:clickable="true"
                         android:focusable="true"/>
 
+                    <!-- Lottie Speaking Animation to replace the old speaking animation of Henry -->
+                    <com.jarvis.ai.HenryLottieAnimationView
+                        android:id="@+id/lottie_speaking_orb"
+                        android:layout_width="176dp"
+                        android:layout_height="176dp"
+                        android:layout_gravity="center"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:visibility="gone"/>
+
                 </FrameLayout>
 
                 <!-- HENRY name -->

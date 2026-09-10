@@ -145,6 +145,7 @@ public class MainActivity extends AppCompatActivity {
     // UI
     private OrbView      orbView;
     private HenryLottieAnimationView lottieHudWave;
+    private HenryLottieAnimationView lottieSpeakingOrb;
     private TextView     tvStatus, tvOrbHint, btnVoice;
     private RecyclerView recycler;
     private EditText     etInput;
@@ -367,6 +368,10 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         orbView         = findViewById(R.id.orb_view);
+        lottieSpeakingOrb = findViewById(R.id.lottie_speaking_orb);
+        if (lottieSpeakingOrb != null) {
+            lottieSpeakingOrb.setOnClickListener(v -> toggleListening());
+        }
         lottieHudWave   = findViewById(R.id.lottie_hud_wave);
         tvStatus        = findViewById(R.id.tv_status);
         tvOrbHint       = findViewById(R.id.tv_orb_hint);
@@ -2910,8 +2915,9 @@ public class MainActivity extends AppCompatActivity {
                         String clean   = stripEmotionTag(content);
                         String emotion = extractEmotion(content);
                         history.add(new HistoryItem("model", clean));
-                        addJarvisMsg(clean); speak("Lesson ready, sir.", emotion);
-                        saveHistory(); setState(OrbView.OrbState.IDLE);
+                        addJarvisMsg(clean);
+                        speak(clean, emotion);
+                        saveHistory();
                     });
                 }
                 @Override public void onError(String reason) {
@@ -4646,12 +4652,50 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // ── Google Workspace (Docs / Sheets / Slides) ─────────────────────────
+        // ── Google Workspace & Presentations (Docs / Sheets / Slides) ─────────────────────────
         if (GoogleWorkspaceHelper.isDocCommand(userText)) {
             GoogleWorkspaceHelper.DocType docType = GoogleWorkspaceHelper.detectType(userText);
             String docTitle = GoogleWorkspaceHelper.extractTitle(userText);
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
             saveHistory();
+
+            if (docType == GoogleWorkspaceHelper.DocType.SLIDES) {
+                addJarvisMsg("Generating your presentation deck titled **\"" + docTitle + "\"**…");
+                speak("Generating your presentation slides now, sir.", "excited");
+                setState(OrbView.OrbState.THINKING);
+
+                HenryFileEngine.createArtifact(MainActivity.this, HenryFileEngine.FileType.PPTX, docTitle, userText, false, null, new HenryFileEngine.ArtifactCallback() {
+                    @Override
+                    public void onSuccess(File file, HenryFileEngine.FileType type, String title, String summary, int citationCount) {
+                        mainHandler.post(() -> {
+                            setState(OrbView.OrbState.IDLE);
+                            String msg = "[EMOTION:proud]\n**Presentation Deck Created!**\n\nTitle: " + title + "\n" + summary;
+                            String clean = stripEmotionTag(msg);
+                            history.add(new HistoryItem("model", clean));
+                            addJarvisMsg(clean);
+                            speak("Your presentation deck is ready, sir. Opening slides now.", "proud");
+                            saveHistory();
+                            DocumentViewerActivity.start(MainActivity.this, file, "application/vnd.openxmlformats-officedocument.presentationml.presentation", title);
+                        });
+                    }
+
+                    @Override
+                    public void onError(String error) {
+                        mainHandler.post(() -> {
+                            setState(OrbView.OrbState.IDLE);
+                            File fallbackFile = new File(getFilesDir(), "presentation_" + System.currentTimeMillis() + ".pptx");
+                            DocumentViewerActivity.start(MainActivity.this, fallbackFile, "application/vnd.openxmlformats-officedocument.presentationml.presentation", docTitle);
+                            String reply = "Opened presentation viewer for **\"" + docTitle + "\"**, sir.";
+                            history.add(new HistoryItem("model", reply));
+                            addJarvisMsg(reply);
+                            speak(reply, "neutral");
+                            saveHistory();
+                        });
+                    }
+                });
+                return;
+            }
+
             String typeName = GoogleWorkspaceHelper.typeName(docType);
             addJarvisMsg("Creating your " + typeName + " titled **\"" + docTitle + "\"**…");
             speak("Creating your " + typeName + " now, sir.", "excited");
@@ -5589,7 +5633,25 @@ public class MainActivity extends AppCompatActivity {
     }
     private void setState(OrbView.OrbState state) {
         currentState = state;
-        if (orbView  != null) orbView.setState(state);
+        if (state == OrbView.OrbState.SPEAKING) {
+            if (lottieSpeakingOrb != null) {
+                lottieSpeakingOrb.setVisibility(View.VISIBLE);
+                lottieSpeakingOrb.playPreset(HenryLottieAnimationView.Preset.VOICE_WAVE);
+            }
+            if (orbView != null) {
+                orbView.setVisibility(View.INVISIBLE);
+            }
+        } else {
+            if (lottieSpeakingOrb != null) {
+                lottieSpeakingOrb.stopAndReset();
+                lottieSpeakingOrb.setVisibility(View.GONE);
+            }
+            if (orbView != null) {
+                orbView.setVisibility(View.VISIBLE);
+                orbView.setState(state);
+            }
+        }
+
         if (tvStatus != null) {
             final String[] labels = {"STANDBY","LISTENING…","PROCESSING…","SPEAKING…","WAKE"};
             tvStatus.setText(labels[state.ordinal()]);

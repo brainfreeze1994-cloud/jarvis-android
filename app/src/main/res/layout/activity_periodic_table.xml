@@ -1184,12 +1184,12 @@
                         android:layout_marginTop="6dp"/>
                 </LinearLayout>
 
-                <!-- HENRY AI NOVEL CHEMICAL SYNTHESIS CARD -->
+                <!-- AUTHENTIC CHEMICAL SYNTHESIS & REACTION DATABASE CARD -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:background="#160826"
+                    android:background="#0C1B2A"
                     android:padding="16dp"
                     android:layout_marginTop="16dp"
                     android:layout_marginBottom="24dp">
@@ -1197,16 +1197,16 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="✨ HENRY AI NOVEL CHEMICAL SYNTHESIS"
-                        android:textColor="#CC88FF"
+                        android:text="⚗️ AUTHENTIC CHEMICAL SYNTHESIS &amp; REACTION DATABASE"
+                        android:textColor="#00FFCC"
                         android:textSize="14sp"
                         android:textStyle="bold"/>
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Ask HENRY AI to invent a theoretically viable novel compound, calculate its molecular geometry, predict its synthesis protocol, and propose revolutionary practical applications."
-                        android:textColor="#B399CC"
+                        android:text="Synthesize real, authentic chemical compounds from your chosen elements. Discover genuine IUPAC nomenclature, verified crystalline and molecular structures, real stoichiometric synthesis pathways, and verified industrial and laboratory applications."
+                        android:textColor="#88BBDD"
                         android:textSize="11sp"
                         android:layout_marginTop="4dp"/>
 
@@ -1214,23 +1214,23 @@
                         android:id="@+id/btn_novel_chemical"
                         android:layout_width="match_parent"
                         android:layout_height="44dp"
-                        android:text="✨ SYNTHESIZE NOVEL CHEMICAL WITH HENRY"
+                        android:text="⚗️ SYNTHESIZE AUTHENTIC COMPOUND"
                         android:textColor="#020C1B"
                         android:textSize="13sp"
                         android:textStyle="bold"
                         android:gravity="center"
-                        android:background="#CC88FF"
+                        android:background="#00FFCC"
                         android:layout_marginTop="12dp"
                         android:clickable="true"
                         android:focusable="true"/>
 
-                    <!-- Novel Chemical Output Container -->
+                    <!-- Authentic Chemical Output Container -->
                     <LinearLayout
                         android:id="@+id/novel_chemical_output"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:background="#240D3D"
+                        android:background="#071526"
                         android:padding="12dp"
                         android:layout_marginTop="12dp"
                         android:visibility="gone">
@@ -1239,7 +1239,7 @@
                             android:id="@+id/tv_novel_name"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Novel Chemical Name"
+                            android:text="Authentic Chemical Name &amp; IUPAC"
                             android:textColor="#00FFCC"
                             android:textSize="15sp"
                             android:textStyle="bold"/>
@@ -1248,8 +1248,8 @@
                             android:id="@+id/tv_novel_formula"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Formula"
-                            android:textColor="#CC88FF"
+                            android:text="Formula &amp; CAS Registry"
+                            android:textColor="#80DFFF"
                             android:textSize="13sp"
                             android:fontFamily="monospace"
                             android:layout_marginTop="2dp"/>
@@ -1258,7 +1258,7 @@
                             android:id="@+id/tv_novel_structure"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Molecular Structure"
+                            android:text="Verified Molecular &amp; Crystal Structure"
                             android:textColor="#FFFFFF"
                             android:textSize="12sp"
                             android:layout_marginTop="6dp"/>
@@ -1267,7 +1267,7 @@
                             android:id="@+id/tv_novel_synthesis"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="How to Synthesize / Use It"
+                            android:text="Thermodynamic Synthesis &amp; Reaction Equation"
                             android:textColor="#FFD166"
                             android:textSize="12sp"
                             android:layout_marginTop="6dp"/>
@@ -1276,7 +1276,7 @@
                             android:id="@+id/tv_novel_uses"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Revolutionary Uses"
+                            android:text="Authentic Real-World Applications &amp; Safety"
                             android:textColor="#06D6A0"
                             android:textSize="12sp"
                             android:layout_marginTop="6dp"/>

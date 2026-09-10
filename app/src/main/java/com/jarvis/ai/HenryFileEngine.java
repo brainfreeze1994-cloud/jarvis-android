@@ -101,6 +101,7 @@ public class HenryFileEngine {
     public static FileType detectFileType(String input) {
         String t = input.toLowerCase(Locale.US);
 
+        // Explicit extensions & clear keywords
         if (t.contains("pptx") || t.contains("presentation") || t.contains("slide deck")
                 || t.contains("slides") || t.contains("powerpoint") || t.contains("deck")) {
             return FileType.PPTX;
@@ -126,6 +127,7 @@ public class HenryFileEngine {
             return FileType.DOCX;
         }
 
+        // Smart default by request context
         if (t.contains("table") || t.contains("sales") || t.contains("expense")) {
             return FileType.XLSX;
         }
@@ -133,6 +135,7 @@ public class HenryFileEngine {
             return FileType.PPTX;
         }
 
+        // Default primary document format
         return FileType.DOCX;
     }
 
@@ -184,8 +187,8 @@ public class HenryFileEngine {
 
     // ── Generation Dispatcher ─────────────────────────────────────────────────
 
-    public static void processCreationRequest(Context context, String rawPrompt, Bitmap userImage, GenerationCallback callback) {
-        final String userPrompt = cleanEmotionTags(rawPrompt);
+    public static void processCreationRequest(Context context, String userPrompt, Bitmap userImage, GenerationCallback callback) {
+        userPrompt = cleanEmotionTags(userPrompt);
         Handler mainHandler = new Handler(Looper.getMainLooper());
         FileType type = detectFileType(userPrompt);
         String topic = cleanEmotionTags(extractTitleAndTopic(userPrompt));
@@ -358,8 +361,9 @@ public class HenryFileEngine {
         public final String heading;
         public final List<String> paragraphs = new ArrayList<>();
         public final List<String> bulletPoints = new ArrayList<>();
-        public List<String[]> tableData = null;
+        public List<String[]> tableData = null; // optional table
 
+        // Compatibility fields for diagnostics and dynamic table generation
         public String content = null;
         public final List<String> tableHeaders = new ArrayList<>();
         public final List<List<String>> tableRows = new ArrayList<>();
@@ -479,6 +483,7 @@ public class HenryFileEngine {
             String trimmed = line.trim();
             if (trimmed.isEmpty()) continue;
 
+            // Document Title
             if (trimmed.startsWith("# ") && !trimmed.startsWith("## ")) {
                 String potentialTitle = trimmed.substring(2).trim();
                 if (potentialTitle.length() > 2) {
@@ -487,6 +492,7 @@ public class HenryFileEngine {
                 continue;
             }
 
+            // Section Header
             if (trimmed.startsWith("### ") || trimmed.startsWith("## ")) {
                 if (currentTable != null && !currentTable.isEmpty() && currentSection != null) {
                     currentSection.tableData = currentTable;
@@ -502,6 +508,7 @@ public class HenryFileEngine {
                 continue;
             }
 
+            // References
             if (currentSection == null && (trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.matches("^\\d+\\..*"))) {
                 String refItem = trimmed.replaceFirst("^[-*\\d.]+\\s*", "").replace("*", "").trim();
                 if (requireResearch && !refItem.isEmpty()) {
@@ -510,9 +517,10 @@ public class HenryFileEngine {
                 continue;
             }
 
+            // Markdown Table Row
             if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
                 if (trimmed.matches("^\\|[\\s\\-:\\|]+\\|$")) {
-                    continue;
+                    continue; // Header separator line
                 }
                 String[] rawCells = trimmed.split("\\|");
                 List<String> cleanCells = new ArrayList<>();
@@ -526,6 +534,7 @@ public class HenryFileEngine {
                 continue;
             }
 
+            // Flush table if regular text arrives
             if (currentTable != null && !currentTable.isEmpty()) {
                 if (currentSection == null) {
                     currentSection = new Section("1. Details");
@@ -535,6 +544,7 @@ public class HenryFileEngine {
                 currentTable = null;
             }
 
+            // Bullet Points
             if (trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("• ") || trimmed.matches("^\\d+\\.\\s+.*")) {
                 String bullet = trimmed.replaceFirst("^[-*•\\d.]+\\s*", "").trim();
                 if (currentSection == null) {
@@ -545,6 +555,7 @@ public class HenryFileEngine {
                 continue;
             }
 
+            // Regular Paragraph
             if (currentSection == null) {
                 currentSection = new Section("1. Introduction");
                 doc.sections.add(currentSection);
@@ -891,6 +902,7 @@ public class HenryFileEngine {
         s4.paragraphs.add("Human activity has emerged as a primary driver of global biogeochemical cycles, initiating what scientists designate as the Anthropocene Epoch (United States Geological Survey [USGS], 2024). Understanding Earth's deep-time systemic resilience provides the foundational basis for planetary stewardship.");
         doc.sections.add(s4);
 
+        // APA 7th Edition References
         doc.references.add("National Aeronautics and Space Administration. (2024). Earth planetary facts and formation timelines. NASA Solar System Exploration. https://science.nasa.gov");
         doc.references.add("Sleep, N. H. (2022). The Hadean-Archaean transition and primordial ocean dynamics. Annual Review of Earth and Planetary Sciences, 50(1), 125–148. https://doi.org/10.1146/annurev-earth-032320-081402");
         doc.references.add("Smith, A. R., & Jones, B. K. (2025). Geologic chronology and macro-evolutionary patterns. Academic Press.");
@@ -1122,10 +1134,6 @@ public class HenryFileEngine {
             }
         }
 
-        if (!requireResearch) {
-            pres.references.clear();
-        }
-
         return pres;
     }
 
@@ -1172,6 +1180,7 @@ public class HenryFileEngine {
             sheet.summaryFormulaLabel = "Total Consolidated Sales";
             sheet.summaryFormulaValue = "=SUM(C2:C6)";
         } else {
+            // Expenses / General Budget
             sheet.headers.add("Category / Line Item");
             sheet.headers.add("Allocated Budget ($)");
             sheet.headers.add("Actual Incurred ($)");
@@ -1196,6 +1205,7 @@ public class HenryFileEngine {
     public static void generateDocx(File outFile, DocumentModel doc) throws Exception {
         try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(outFile))) {
 
+            // 1. [Content_Types].xml
             writeZipEntry(zos, "[Content_Types].xml",
                     "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
                     "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">\n" +
@@ -1205,18 +1215,21 @@ public class HenryFileEngine {
                     "  <Override PartName=\"/word/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml\"/>\n" +
                     "</Types>");
 
+            // 2. _rels/.rels
             writeZipEntry(zos, "_rels/.rels",
                     "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
                     "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n" +
                     "  <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/>\n" +
                     "</Relationships>");
 
+            // 3. word/_rels/document.xml.rels
             writeZipEntry(zos, "word/_rels/document.xml.rels",
                     "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
                     "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n" +
                     "  <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>\n" +
                     "</Relationships>");
 
+            // 4. word/styles.xml
             writeZipEntry(zos, "word/styles.xml",
                     "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
                     "<w:styles xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">\n" +
@@ -1246,19 +1259,23 @@ public class HenryFileEngine {
                     "  </w:style>\n" +
                     "</w:styles>");
 
+            // 5. word/document.xml
             StringBuilder body = new StringBuilder();
             body.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n");
             body.append("<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">\n");
             body.append("<w:body>\n");
 
+            // Title
             body.append("<w:p><w:pPr><w:pStyle w:val=\"Title\"/></w:pPr><w:r><w:t>")
                     .append(escapeXml(doc.title))
                     .append("</w:t></w:r></w:p>\n");
 
+            // Subtitle
             body.append("<w:p><w:pPr><w:pStyle w:val=\"Subtitle\"/></w:pPr><w:r><w:t>")
                     .append(escapeXml(doc.subtitle + " • " + doc.dateString))
                     .append("</w:t></w:r></w:p>\n");
 
+            // Sections
             for (Section sec : doc.sections) {
                 body.append("<w:p><w:pPr><w:pStyle w:val=\"Heading1\"/></w:pPr><w:r><w:t>")
                         .append(escapeXml(sec.heading))
@@ -1274,6 +1291,7 @@ public class HenryFileEngine {
                             .append("</w:t></w:r></w:p>\n");
                 }
 
+                // Render Table if present
                 List<String[]> resolvedTable = sec.getResolvedTableData();
                 if (resolvedTable != null && !resolvedTable.isEmpty()) {
                     body.append("<w:tbl>\n");
@@ -1303,6 +1321,7 @@ public class HenryFileEngine {
                 }
             }
 
+            // References (APA 7th Edition)
             if (!doc.references.isEmpty()) {
                 body.append("<w:p><w:pPr><w:pStyle w:val=\"Heading1\"/></w:pPr><w:r><w:t>References</w:t></w:r></w:p>\n");
                 for (String ref : doc.references) {
@@ -1312,6 +1331,7 @@ public class HenryFileEngine {
                 }
             }
 
+            // Page Setup: Letter, 1 inch margins (1440 dxa)
             body.append("<w:sectPr><w:pgSz w:w=\"12240\" w:h=\"15840\"/><w:pgMar w:top=\"1440\" w:right=\"1440\" w:bottom=\"1440\" w:left=\"1440\"/></w:sectPr>\n");
             body.append("</w:body></w:document>");
 
@@ -1324,6 +1344,7 @@ public class HenryFileEngine {
     public static void generateXlsx(File outFile, SpreadsheetModel sheet) throws Exception {
         try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(outFile))) {
 
+            // 1. [Content_Types].xml
             writeZipEntry(zos, "[Content_Types].xml",
                     "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
                     "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">\n" +
@@ -1334,12 +1355,14 @@ public class HenryFileEngine {
                     "  <Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/>\n" +
                     "</Types>");
 
+            // 2. _rels/.rels
             writeZipEntry(zos, "_rels/.rels",
                     "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
                     "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n" +
                     "  <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/>\n" +
                     "</Relationships>");
 
+            // 3. xl/_rels/workbook.xml.rels
             writeZipEntry(zos, "xl/_rels/workbook.xml.rels",
                     "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
                     "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n" +
@@ -1347,12 +1370,14 @@ public class HenryFileEngine {
                     "  <Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>\n" +
                     "</Relationships>");
 
+            // 4. xl/workbook.xml
             writeZipEntry(zos, "xl/workbook.xml",
                     "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
                     "<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">\n" +
                     "  <sheets><sheet name=\"Data\" sheetId=\"1\" r:id=\"rId1\"/></sheets>\n" +
                     "</workbook>");
 
+            // 5. xl/styles.xml
             writeZipEntry(zos, "xl/styles.xml",
                     "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
                     "<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">\n" +
@@ -1369,12 +1394,13 @@ public class HenryFileEngine {
                     "  <borders count=\"1\"><border><left/><right/><top/><bottom/></border></borders>\n" +
                     "  <cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs>\n" +
                     "  <cellXfs count=\"3\">\n" +
-                    "    <xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/>\n" +
-                    "    <xf numFmtId=\"0\" fontId=\"1\" fillId=\"2\" borderId=\"0\" xfId=\"0\" applyFont=\"1\" applyFill=\"1\"/>\n" +
-                    "    <xf numFmtId=\"0\" fontId=\"2\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\"/>\n" +
+                    "    <xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/>\n" + // 0: Normal
+                    "    <xf numFmtId=\"0\" fontId=\"1\" fillId=\"2\" borderId=\"0\" xfId=\"0\" applyFont=\"1\" applyFill=\"1\"/>\n" + // 1: Header
+                    "    <xf numFmtId=\"0\" fontId=\"2\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\"/>\n" + // 2: Bold
                     "  </cellXfs>\n" +
                     "</styleSheet>");
 
+            // 6. xl/worksheets/sheet1.xml
             StringBuilder ws = new StringBuilder();
             ws.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n");
             ws.append("<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">\n");
@@ -1386,6 +1412,7 @@ public class HenryFileEngine {
             ws.append("  </cols>\n");
             ws.append("  <sheetData>\n");
 
+            // Header Row (Row 1, style s="1")
             ws.append("    <row r=\"1\">\n");
             for (int col = 0; col < sheet.headers.size(); col++) {
                 String colRef = getColumnLetter(col + 1) + "1";
@@ -1395,12 +1422,14 @@ public class HenryFileEngine {
             }
             ws.append("    </row>\n");
 
+            // Data Rows (Row 2 to N, style s="0")
             int rowIdx = 2;
             for (List<String> row : sheet.rows) {
                 ws.append("    <row r=\"").append(rowIdx).append("\">\n");
                 for (int col = 0; col < row.size(); col++) {
                     String val = row.get(col);
                     String colRef = getColumnLetter(col + 1) + rowIdx;
+                    // Check if numeric
                     if (val.matches("^-?\\d+(\\.\\d+)?$")) {
                         ws.append("      <c r=\"").append(colRef).append("\" s=\"0\"><v>").append(val).append("</v></c>\n");
                     } else {
@@ -1413,6 +1442,7 @@ public class HenryFileEngine {
                 rowIdx++;
             }
 
+            // Summary Row if specified
             if (sheet.summaryFormulaLabel != null && sheet.summaryFormulaValue != null) {
                 ws.append("    <row r=\"").append(rowIdx).append("\">\n");
                 ws.append("      <c r=\"A").append(rowIdx).append("\" t=\"inlineStr\" s=\"2\"><is><t>")
@@ -1450,11 +1480,18 @@ public class HenryFileEngine {
         if (pres.title == null || pres.title.trim().isEmpty()) {
             pres.title = "H.E.N.R.Y. Presentation";
         }
+        if (pres.slides == null) {
+            pres.slides = new ArrayList<>();
+        }
+        if (pres.references == null) {
+            pres.references = new ArrayList<>();
+        }
 
         try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(outFile))) {
 
             int totalSlides = 1 + pres.slides.size() + (pres.references.isEmpty() ? 0 : 1);
 
+            // 1. [Content_Types].xml
             StringBuilder ct = new StringBuilder();
             ct.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n");
             ct.append("<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">\n");
@@ -1471,12 +1508,14 @@ public class HenryFileEngine {
             ct.append("</Types>");
             writeZipEntry(zos, "[Content_Types].xml", ct.toString());
 
+            // 2. _rels/.rels
             writeZipEntry(zos, "_rels/.rels",
                     "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
                     "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n" +
                     "  <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"ppt/presentation.xml\"/>\n" +
                     "</Relationships>");
 
+            // 3. ppt/_rels/presentation.xml.rels
             StringBuilder pRels = new StringBuilder();
             pRels.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n");
             pRels.append("<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n");
@@ -1489,6 +1528,7 @@ public class HenryFileEngine {
             pRels.append("</Relationships>");
             writeZipEntry(zos, "ppt/_rels/presentation.xml.rels", pRels.toString());
 
+            // 4. ppt/presentation.xml
             StringBuilder pXml = new StringBuilder();
             pXml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n");
             pXml.append("<p:presentation xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">\n");
@@ -1503,6 +1543,7 @@ public class HenryFileEngine {
             pXml.append("</p:presentation>");
             writeZipEntry(zos, "ppt/presentation.xml", pXml.toString());
 
+            // 5. ppt/slideMasters/slideMaster1.xml and rels
             writeZipEntry(zos, "ppt/slideMasters/slideMaster1.xml", buildPptxSlideMasterXml());
             writeZipEntry(zos, "ppt/slideMasters/_rels/slideMaster1.xml.rels",
                     "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
@@ -1511,6 +1552,7 @@ public class HenryFileEngine {
                     "  <Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme\" Target=\"../theme/theme1.xml\"/>\n" +
                     "</Relationships>");
 
+            // 6. ppt/slideLayouts/slideLayout1.xml and rels
             writeZipEntry(zos, "ppt/slideLayouts/slideLayout1.xml", buildPptxSlideLayoutXml());
             writeZipEntry(zos, "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
                     "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n" +
@@ -1518,8 +1560,11 @@ public class HenryFileEngine {
                     "  <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideMaster\" Target=\"../slideMasters/slideMaster1.xml\"/>\n" +
                     "</Relationships>");
 
+            // 7. ppt/theme/theme1.xml
             writeZipEntry(zos, "ppt/theme/theme1.xml", buildPptxThemeXml());
 
+            // 8. Slides & slide rels
+            // Slide 1: Title Slide
             List<String> titleLines = new ArrayList<>();
             if (pres.subtitle != null && !pres.subtitle.trim().isEmpty()) {
                 titleLines.add(pres.subtitle.trim());
@@ -1548,6 +1593,7 @@ public class HenryFileEngine {
                 currentSlide++;
             }
 
+            // References Slide if present
             if (!pres.references.isEmpty()) {
                 writeZipEntry(zos, "ppt/slides/slide" + currentSlide + ".xml", buildPptxSlideXml("References & Sources (APA 7th)", pres.references, false));
                 writeZipEntry(zos, "ppt/slides/_rels/slide" + currentSlide + ".xml.rels", buildPptxSlideRelsXml());
@@ -1620,6 +1666,7 @@ public class HenryFileEngine {
         sb.append("    <p:nvGrpSpPr><p:cNvPr id=\"1\" name=\"\"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>\n");
         sb.append("    <p:grpSpPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/><a:chOff x=\"0\" y=\"0\"/><a:chExt cx=\"0\" cy=\"0\"/></a:xfrm></p:grpSpPr>\n");
 
+        // Slide Title Box
         int titleY = isTitleSlide ? 2200000 : 600000;
         int titleHeight = isTitleSlide ? 1200000 : 800000;
         int titleFontSize = isTitleSlide ? 4000 : 3200;
@@ -1632,6 +1679,7 @@ public class HenryFileEngine {
         sb.append("<a:t>").append(escapeXml(title != null ? title : "Slide")).append("</a:t></a:r></a:p>\n");
         sb.append("      </p:txBody></p:sp>\n");
 
+        // Body Content Box
         int bodyY = isTitleSlide ? 3600000 : 1600000;
         int bodyHeight = isTitleSlide ? 1800000 : 4600000;
         int bodyFontSize = isTitleSlide ? 2000 : 1800;
@@ -1674,12 +1722,16 @@ public class HenryFileEngine {
         if (doc.sections == null || doc.sections.isEmpty()) {
             Section defaultSec = new Section("Overview");
             defaultSec.paragraphs.add("This document was prepared by the H.E.N.R.Y. Document Engine.");
+            if (doc.sections == null) doc.sections = new ArrayList<>();
             doc.sections.add(defaultSec);
         }
+        if (doc.references == null) {
+            doc.references = new ArrayList<>();
+        }
 
-        int pageWidth = 612;
+        int pageWidth = 612; // 8.5 x 11 inches at 72 dpi (Letter)
         int pageHeight = 792;
-        int margin = 54;
+        int margin = 54; // 0.75 in
         int contentWidth = pageWidth - (margin * 2);
 
         PdfDocument pdfDoc = new PdfDocument();
@@ -1744,10 +1796,14 @@ public class HenryFileEngine {
 
             int currentY = margin;
 
+            // Draw top accent banner
             canvas.drawRect(0, 0, pageWidth, 6, accentLinePaint);
+
+            // Header text
             canvas.drawText("H.E.N.R.Y. Document Engine • APA 7th Edition", margin, currentY + 14, headerFooterPaint);
             currentY += 30;
 
+            // Title
             StaticLayout titleLayout = new StaticLayout(doc.title, titlePaint, contentWidth, Layout.Alignment.ALIGN_NORMAL, 1.15f, 0, false);
             canvas.save();
             canvas.translate(margin, currentY);
@@ -1755,13 +1811,16 @@ public class HenryFileEngine {
             canvas.restore();
             currentY += titleLayout.getHeight() + 6;
 
+            // Subtitle
             String sub = doc.subtitle + " • " + doc.dateString;
             canvas.drawText(sub, margin, currentY + 12, subtitlePaint);
             currentY += 24;
 
+            // Divider
             canvas.drawLine(margin, currentY, pageWidth - margin, currentY, accentLinePaint);
             currentY += 20;
 
+            // Draw User-supplied image if present
             if (userImage != null && !userImage.isRecycled() && userImage.getWidth() > 0 && userImage.getHeight() > 0) {
                 try {
                     int imgW = Math.min(contentWidth, 340);
@@ -1775,9 +1834,11 @@ public class HenryFileEngine {
                 } catch (Exception ignored) {}
             }
 
+            // Draw Sections
             for (Section sec : doc.sections) {
                 if (sec == null) continue;
 
+                // Check page overflow for heading
                 if (currentY + 60 > pageHeight - margin) {
                     canvas.drawText("Page " + pageNumber, pageWidth / 2f - 15, pageHeight - 25, headerFooterPaint);
                     pdfDoc.finishPage(page);
@@ -1789,10 +1850,12 @@ public class HenryFileEngine {
                     canvas.drawRect(0, 0, pageWidth, 4, accentLinePaint);
                 }
 
+                // Section Heading
                 String heading = (sec.heading != null && !sec.heading.trim().isEmpty()) ? sec.heading.trim() : "Section";
                 canvas.drawText(heading, margin, currentY + 14, headingPaint);
                 currentY += 24;
 
+                // Paragraphs
                 List<String> paragraphs = sec.getResolvedParagraphs();
                 if (paragraphs != null) {
                     for (String p : paragraphs) {
@@ -1816,6 +1879,7 @@ public class HenryFileEngine {
                     }
                 }
 
+                // Bullets
                 if (sec.bulletPoints != null) {
                     for (String b : sec.bulletPoints) {
                         if (b == null || b.trim().isEmpty()) continue;
@@ -1838,6 +1902,7 @@ public class HenryFileEngine {
                     }
                 }
 
+                // Table
                 List<String[]> pdfTable = sec.getResolvedTableData();
                 if (pdfTable != null && !pdfTable.isEmpty() && pdfTable.get(0) != null && pdfTable.get(0).length > 0) {
                     int colCount = pdfTable.get(0).length;
@@ -1876,6 +1941,7 @@ public class HenryFileEngine {
                 currentY += 8;
             }
 
+            // References Section
             if (doc.references != null && !doc.references.isEmpty()) {
                 if (currentY + 80 > pageHeight - margin) {
                     canvas.drawText("Page " + pageNumber, pageWidth / 2f - 15, pageHeight - 25, headerFooterPaint);
@@ -1910,9 +1976,10 @@ public class HenryFileEngine {
                 }
             }
 
+            // Footer on final page
             canvas.drawText("Page " + pageNumber, pageWidth / 2f - 15, pageHeight - 25, headerFooterPaint);
             pdfDoc.finishPage(page);
-            page = null;
+            page = null; // Mark finished
 
             try (FileOutputStream fos = new FileOutputStream(outFile)) {
                 pdfDoc.writeTo(fos);
@@ -1934,12 +2001,14 @@ public class HenryFileEngine {
 
     public static void generateCsv(File outFile, SpreadsheetModel sheet) throws Exception {
         try (PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(outFile), StandardCharsets.UTF_8))) {
+            // Write Headers
             for (int i = 0; i < sheet.headers.size(); i++) {
                 pw.print("\"" + sheet.headers.get(i).replace("\"", "\"\"") + "\"");
                 if (i < sheet.headers.size() - 1) pw.print(",");
             }
             pw.println();
 
+            // Write Rows
             for (List<String> row : sheet.rows) {
                 for (int i = 0; i < row.size(); i++) {
                     pw.print("\"" + row.get(i).replace("\"", "\"\"") + "\"");
@@ -1948,6 +2017,7 @@ public class HenryFileEngine {
                 pw.println();
             }
 
+            // Summary row if present
             if (sheet.summaryFormulaLabel != null) {
                 pw.println("\"" + sheet.summaryFormulaLabel.replace("\"", "\"\"") + "\",\"" + sheet.summaryFormulaValue + "\"");
             }

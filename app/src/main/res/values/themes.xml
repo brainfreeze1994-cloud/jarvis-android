@@ -14,14 +14,17 @@
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowBackground">#070d1a</item>
     </style>
-    
-<style name="Theme.Jarvis.Dialog" parent="Theme.Material3.DayNight.Dialog">
-        <!-- Dialog customization properties -->
-        <item name="android:windowIsFloating">true</item>
-        <item name="android:windowBackground">@android:color/transparent</item>
-    </style>
-  
 
+    <style name="Theme.Jarvis.Dialog" parent="Theme.AppCompat.Dialog.Alert">
+        <item name="android:windowBackground">#070d1a</item>
+        <item name="android:textColor">#ffffff</item>
+        <item name="android:textColorPrimary">#ffffff</item>
+        <item name="android:textColorSecondary">#94a3b8</item>
+        <item name="colorPrimary">#3b82f6</item>
+        <item name="colorAccent">#00E5FF</item>
+    </style>
+
+    <style name="Theme_Jarvis_Dialog" parent="Theme.Jarvis.Dialog" />
 
     <style name="Theme.HENRY" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">#06B6D4</item>

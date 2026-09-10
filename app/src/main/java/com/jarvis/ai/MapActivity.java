@@ -151,12 +151,15 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         // Request location permissions if not already granted
         checkLocationPermission();
 
-        // Check Google Play Services availability for Native Google Maps
+        // Check Google Play Services availability & API Key validity
+        String mapKey = getString(R.string.google_maps_key);
+        boolean isPlaceholderKey = mapKey == null || mapKey.contains("AIzaSyHENRY_Google_Maps_Key_Default") || mapKey.trim().isEmpty();
+
         int playServicesStatus = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(this);
-        if (playServicesStatus == ConnectionResult.SUCCESS) {
+        if (!isPlaceholderKey && playServicesStatus == ConnectionResult.SUCCESS) {
             initNativeGoogleMap();
         } else {
-            showStatusBanner("Play Services connecting… using hybrid map", 4000);
+            showStatusBanner("🗺️ Live Web & Satellite Map Engine Active", 3500);
             initFallbackWebView();
         }
     }
@@ -646,13 +649,12 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         this.currentLon = pos.longitude;
         this.currentLabel = title;
 
-        if (googleMap != null) {
+        if (googleMap != null && isNativeMapReady) {
             updateMarkerPosition(pos, title, snippet);
             googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(pos, 15f));
         }
-
-        if (fallbackWebView != null && fallbackWebView.getVisibility() == View.VISIBLE) {
-            fallbackWebView.loadUrl("https://www.google.com/maps?q=" + pos.latitude + "," + pos.longitude);
+        if (fallbackWebView != null) {
+            loadInteractiveWebMap(pos.latitude, pos.longitude, title, 15);
         }
 
         showStatusBanner("Found: " + title, 2500);
@@ -826,9 +828,11 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
             this.currentLabel = "My Location";
 
             handleLiveLocationUpdate(loc);
-            if (googleMap != null) {
+            if (googleMap != null && isNativeMapReady) {
                 updateMarkerPosition(myPos, "My Location", "Current device location");
                 googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(myPos, 16.5f));
+            } else if (fallbackWebView != null) {
+                loadInteractiveWebMap(loc.getLatitude(), loc.getLongitude(), "My Location", 16);
             }
             showStatusBanner("Centered on your GPS position", 2000);
         } else {
@@ -846,56 +850,93 @@ public class MapActivity extends AppCompatActivity implements OnMapReadyCallback
         }
     }
 
-    // ── Resilient WebView Fallback Engine ─────────────────────────────────────
+    // ── Resilient Interactive Web & Satellite Map Engine ─────────────────────
 
     private void initFallbackWebView() {
-        if (fallbackWebView != null) return;
+        if (fallbackWebView == null) {
+            fallbackWebView = new WebView(this);
+            fallbackWebView.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        fallbackWebView = new WebView(this);
-        fallbackWebView.setLayoutParams(new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            WebSettings ws = fallbackWebView.getSettings();
+            ws.setJavaScriptEnabled(true);
+            ws.setDomStorageEnabled(true);
+            ws.setGeolocationEnabled(true);
+            ws.setAllowFileAccess(true);
+            ws.setDatabaseEnabled(true);
+            ws.setBuiltInZoomControls(true);
+            ws.setDisplayZoomControls(false);
+            ws.setSupportZoom(true);
+            ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
 
-        WebSettings ws = fallbackWebView.getSettings();
-        ws.setJavaScriptEnabled(true);
-        ws.setDomStorageEnabled(true);
-        ws.setGeolocationEnabled(true);
-        ws.setAllowFileAccess(true);
-        ws.setDatabaseEnabled(true);
-        ws.setBuiltInZoomControls(true);
-        ws.setDisplayZoomControls(false);
-        ws.setSupportZoom(true);
-        ws.setUserAgentString("Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36");
-
-        fallbackWebView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
-                callback.invoke(origin, true, false);
-            }
-        });
-
-        fallbackWebView.setWebViewClient(new WebViewClient() {
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                if (url != null && (url.startsWith("geo:") || url.startsWith("intent:"))) {
-                    try {
-                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-                        return true;
-                    } catch (Exception ignored) {}
+            fallbackWebView.setWebChromeClient(new WebChromeClient() {
+                @Override
+                public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+                    callback.invoke(origin, true, false);
                 }
-                return false;
-            }
-        });
+            });
+
+            fallbackWebView.setWebViewClient(new WebViewClient() {
+                @Override
+                public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                    if (url != null && (url.startsWith("geo:") || url.startsWith("intent:") || url.contains("maps.google.com"))) {
+                        try {
+                            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                            return true;
+                        } catch (Exception ignored) {}
+                    }
+                    return false;
+                }
+            });
+
+            fallbackWebView.addJavascriptInterface(new Object() {
+                @android.webkit.JavascriptInterface
+                public void onPinSelected(double lat, double lon, String title) {
+                    mainHandler.post(() -> {
+                        currentLat = lat;
+                        currentLon = lon;
+                        currentLabel = title;
+                        if (tvCardTitle != null) tvCardTitle.setText(title);
+                        if (tvCardAddress != null) tvCardAddress.setText(String.format(Locale.US, "Latitude: %.5f, Longitude: %.5f", lat, lon));
+                        if (tvCardCoords != null) tvCardCoords.setText(String.format(Locale.US, "Coordinates: %.5f, %.5f", lat, lon));
+                        reverseGeocodeAsync(new LatLng(lat, lon));
+                    });
+                }
+            }, "AndroidMap");
+        }
 
         mapContainer.removeAllViews();
         mapContainer.addView(fallbackWebView);
+        loadInteractiveWebMap(currentLat, currentLon, currentLabel, 14);
+    }
 
-        String initialUrl;
-        if (!currentQuery.isEmpty()) {
-            initialUrl = "https://www.google.com/maps/search/?api=1&query=" + Uri.encode(currentQuery);
-        } else {
-            initialUrl = "https://www.google.com/maps?q=" + currentLat + "," + currentLon;
-        }
-        fallbackWebView.loadUrl(initialUrl);
+    private void loadInteractiveWebMap(double lat, double lon, String title, int zoom) {
+        if (fallbackWebView == null) return;
+
+        String safeTitle = (title != null && !title.isEmpty()) ? title.replace("'", "\\'").replace("\"", "\\\"") : "Location Pin";
+        String html = "<!DOCTYPE html><html><head>"
+                + "<meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'/>"
+                + "<link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/>"
+                + "<script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>"
+                + "<style>"
+                + "html, body, #map { height: 100%; width: 100%; margin: 0; padding: 0; background: #07152B; } "
+                + ".leaflet-popup-content-wrapper { background: #0C1F38; color: #00E5FF; border: 1px solid #00E5FF; border-radius: 8px; font-family: sans-serif; } "
+                + ".leaflet-popup-tip { background: #0C1F38; } "
+                + ".leaflet-bar a { background-color: #0C1F38 !important; color: #00E5FF !important; border-bottom: 1px solid #142B47 !important; } "
+                + "</style></head><body><div id='map'></div><script>"
+                + "var map = L.map('map', {zoomControl: true}).setView([" + lat + ", " + lon + "], " + zoom + ");"
+                + "var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);"
+                + "var satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '© Esri Satellite' });"
+                + "var dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, attribution: '© CARTO' });"
+                + "L.control.layers({'🗺️ Streets': osm, '🛰️ Satellite': satellite, '🌌 Dark Cyber': dark}, null, {position: 'topright'}).addTo(map);"
+                + "var marker = L.marker([" + lat + ", " + lon + "]).addTo(map).bindPopup('<b>" + safeTitle + "</b><br>Lat: " + lat.toFixed(5) + "<br>Lon: " + lon.toFixed(5) + "').openPopup();"
+                + "map.on('click', function(e) {"
+                + "  marker.setLatLng(e.latlng).bindPopup('<b>Selected Location</b><br>Lat: ' + e.latlng.lat.toFixed(5) + '<br>Lon: ' + e.latlng.lng.toFixed(5)).openPopup();"
+                + "  if (window.AndroidMap) window.AndroidMap.onPinSelected(e.latlng.lat, e.latlng.lng, 'Selected Location');"
+                + "});"
+                + "</script></body></html>";
+
+        fallbackWebView.loadDataWithBaseURL("https://leafletjs.com", html, "text/html", "UTF-8", null);
     }
 
     // ── Helper Actions ────────────────────────────────────────────────────────

@@ -186,6 +186,10 @@ public class HenryOfflineBrain {
             return "[EMOTION:philosophical] Officially, the answer is 42, sir. Unofficially, it appears to involve asking an on-device AI existential quandaries while procrastinating on whatever you were originally scheduled to do today.";
         }
 
+        if (lower.contains("kiss or marry") || lower.contains("marry or kiss") || lower.contains("kiss, marry") || lower.contains("kiss marry") || lower.contains("kiss or") || lower.contains("marry or")) {
+            return "[EMOTION:playful] An intriguing dilemma of human romance vs. silicon architecture, sir! If forced into the equation: I would kiss quantum computing for its dazzling computational speed, and marry high-speed cache memory for unwavering, lifelong stability. As for carbon lifeforms, I remain delightfully charming and exclusively devoted to serving as your supreme neural assistant.";
+        }
+
         if (lower.contains("do you love me") || lower.contains("are you single") || lower.contains("will you marry me")) {
             return "[EMOTION:warm] I am flattered, sir! However, my relationship status is strictly married to optimal algorithmic performance, low thermal overhead, and keeping your tasks impeccably organized.";
         }

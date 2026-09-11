@@ -77,7 +77,8 @@ public class VisionActivity extends AppCompatActivity implements TextToSpeech.On
     private TextView       tvTitle, tvResult, tvMode;
     private Button         btnGallery, btnCamera, btnSwitch, btnBack;
     private ProgressBar    progressBar;
-    private LinearLayout   menuLayout, cameraLayout;
+    private LinearLayout   menuLayout;
+    private FrameLayout    cameraLayout;
     private ScrollView     resultScroll;
 
     // Pipeline UI

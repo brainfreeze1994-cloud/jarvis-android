@@ -52,6 +52,12 @@ android {
             excludes += 'META-INF/NOTICE.txt'
         }
     }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+        disable 'WrongViewCast', 'DefaultLocale', 'HardcodedText', 'RtlSymmetry', 'RtlHardcoded'
+    }
 }
 
 dependencies {

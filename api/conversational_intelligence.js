@@ -157,11 +157,13 @@ function classifyIntent(msg, mode = 'balanced') {
     intents.push(INTENTS.DECISION_SUPPORT);
   }
 
-  // Witty / Humor / Roast
-  if (/\b(tell me a joke|make (this|me) (laugh|smile|funny|witty)|be funny|crack a joke|joke|roast (me|this)|witty response|clever comeback|roast)\b/i.test(m) ||
+  // Witty / Humor / Roast / Semantic Collision
+  if (/\b(tell me a joke|make (this|me) (laugh|smile|funny|witty)|be funny|crack a joke|joke|roast (me|this)|witty response|clever comeback|roast|banter|bardagulan|asaran|matinik.*bangus|bangus.*matinik|witty questions?)\b/i.test(m) ||
+      /\b(ang tanga mo|bobo mo|puro love life)\b/i.test(m) ||
       mode === 'witty' || mode === 'brutally_honest') {
     if (/roast/i.test(m) || mode === 'brutally_honest') {
       intents.push(INTENTS.ROAST_REQUEST);
+      intents.push(INTENTS.WITTY_REQUEST);
     } else {
       intents.push(INTENTS.WITTY_REQUEST);
       intents.push(INTENTS.HUMOR_REQUEST);
@@ -384,6 +386,11 @@ function planResponseStrategy(lastMsg, responseMode = 'balanced', messages = [])
   if (intent.all.includes(INTENTS.MATHEMATICAL_PROBLEM)) {
     toolRequired = 'MATH_ENGINE';
     toolConfidence = 0.99;
+  } else if (intent.all.includes(INTENTS.WITTY_REQUEST) || intent.all.includes(INTENTS.ROAST_REQUEST)) {
+    if (seriousness < 4) {
+      toolRequired = 'WITTY_ENGINE';
+      toolConfidence = 0.96;
+    }
   } else if (intent.all.includes(INTENTS.SCRIPTWRITING)) {
     toolRequired = 'SCRIPTWRITER_ENGINE';
     toolConfidence = 0.98;
@@ -513,9 +520,11 @@ function buildIntelligenceSystemPrompt(plan, baseNow, userProfile, memoryFacts, 
 ════════════════════════════════════════════════════════════════
 [MANDATORY DIRECTIVE: WITTY INTELLECT ACTIVE (Level: ${plan.trace.wittyLevelName})]
 • ${wittyGuidelines}
-• DO NOT sound like a bland, bureaucratic corporate chatbot.
-• Use organic humor, wordplay, clever analogies, and sharp comedic timing.
-• NEVER deliver boring disclaimers or repetitive robotic lectures.`);
+• DO NOT sound like a bland, bureaucratic corporate chatbot or an AI trying hard to be funny.
+• REASONING-FIRST WIT: Understand the user's intent and emotional setup first. Detect double meanings, semantic collisions (e.g. literal vs figurative, fish bones vs dating warning signs), unexpected contrasts, and misdirection.
+• FILIPINO / TAGLISH WIT: Master conversational Filipino humor (Tagalog/English/Taglish), playful banter, bardagulan, and subtle teasing ("beh", "girl", "teh", "hoy", "😭", "💀", "HAHAHA") without forcing them on every sentence.
+• STRICT RULE: NEVER explain why the joke is funny. Never follow with "Here is why that's funny..." or "This is funny because...". Deliver the punchline cleanly and STOP.
+• Never sacrifice factual accuracy for humor; pair real substance with sharp wit.`);
   }
 
   // 3. SENSITIVITY & SERIOUSNESS SHIELD

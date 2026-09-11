@@ -10,6 +10,7 @@ const ci = require('./conversational_intelligence.js');
 const mathEngine = require('./math_engine.js');
 const scriptwriter = require('./scriptwriter_engine.js');
 const videoStudio = require('./video_studio_engine.js');
+const wittyEngine = require('./witty_engine.js');
 
 const handler = async function(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -590,6 +591,29 @@ const handler = async function(req, res) {
         imageUrl: previewUrl
       });
     }
+
+    // ══════════════════════════════════════════════════════
+    // v29 — HENRY WITTY INTELLIGENCE ENGINE (Reasoning Layer)
+    // Semantic Collision · Double Meaning · Contrast · Punchline Ranker
+    // ══════════════════════════════════════════════════════
+    if (/\bwitty questions?\b/i.test(lastMsg) || (/\b(give me|generate)\b/i.test(lastMsg) && /\bwitty\b/i.test(lastMsg))) {
+      const topicMatch = lastMsg.match(/\b(work|money|technology|food|random)\b/i);
+      const chosenTopic = topicMatch ? topicMatch[1] : 'random';
+      const qList = wittyEngine.generateWittyQuestions(chosenTopic, 4);
+      const reply = `[EMOTION:amused]\n😏 **HENRY Contextual Witty Inquiries** [Topic: ${chosenTopic.toUpperCase()}]\n\n` +
+        qList.map((q, idx) => `${idx + 1}. ${q}`).join('\n\n');
+      return res.status(200).json(parseResponse(reply));
+    }
+
+    const witRes = wittyEngine.resolveWittyHumor(lastMsg, {
+      seriousness: ci.detectSeriousness(lastMsg),
+      intensity: (responseMode === 'brutally_honest') ? 'BRUTAL' : 'NORMAL'
+    });
+
+    if (witRes && witRes.handled) {
+      return res.status(200).json(parseResponse(witRes.reply));
+    }
+
     if (/image/i.test(lastMsg) && /taking so long|taking long|too long|slow|delay|stuck|fix it/i.test(lastMsg)) {
       return res.status(200).json({
         reply: `[EMOTION:proud]\n⚡ **Image Generation Upgraded to High-Speed Sana Engine!**\n\n` +

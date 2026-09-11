@@ -5455,6 +5455,8 @@ public class MainActivity extends AppCompatActivity {
             case "cybersecurity": hint = "Analyzing security architecture…";    break;
             case "finance":       hint = "Modeling financial metrics…";         break;
             case "medical":       hint = "Reviewing clinical literature…";      break;
+            case "witty":         hint = "Calibrating wit & comebacks…";        break;
+            case "roast":         hint = "Generating witty roast…";             break;
             case "reason":        hint = "Thinking step by step…";              break;
             case "transit":       hint = "Planning your route…";                break;
             case "legal":         hint = "Checking UAE law…";                   break;

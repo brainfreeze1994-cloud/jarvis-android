@@ -421,6 +421,8 @@ public class JarvisApi {
         if (t.matches(".*\\b(bitcoin|btc|ethereum|eth|solana|sol|crypto|coin|nft|defi).*")) return "crypto";
         if (t.matches(".*\\d+\\s*(usd|eur|gbp|aed|jpy|php|inr|cad|aud)\\s*(to|in)\\s*(usd|eur|gbp|aed|jpy|php|inr|cad|aud).*")
             || t.contains("exchange rate") || t.matches(".*convert\\s+\\d+.*")) return "forex";
+        if (t.matches(".*\\b(roast me|roast\\b|insult me|burn me).*")) return "roast";
+        if (t.matches(".*\\b(witty|matinik|bangus|comeback|hirit|banat|pilosopo|sarcastic|joke|punchline).*")) return "witty";
         if (t.matches(".*\\b(news|headlines|latest news|breaking|what happened)\\b.*")) return "news";
         if (t.matches(".*\\b(calculate|compute|what is \\d|sqrt|factorial|\\d+%\\s+of).*")) return "math";
         if (t.matches(".*\\b(search|look up|find out|google|who is|what is|where is|latest|newest|breaking|right now|today's|current|2025|2026|score|results|trending|release date|specs|specifications)\\b.*")) return "search";

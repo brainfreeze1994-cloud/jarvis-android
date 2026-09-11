@@ -39,6 +39,9 @@ const INTENTS = {
   SHOPPING: 'SHOPPING',
   PRODUCT_COMPARISON: 'PRODUCT_COMPARISON',
   GAME_REQUEST: 'GAME_REQUEST',
+  MATHEMATICAL_PROBLEM: 'MATHEMATICAL_PROBLEM',
+  SCRIPTWRITING: 'SCRIPTWRITING',
+  VIDEO_PRODUCTION: 'VIDEO_PRODUCTION',
   CASUAL_CONVERSATION: 'CASUAL_CONVERSATION',
   EMOTIONAL_SUPPORT: 'EMOTIONAL_SUPPORT',
   CLARIFICATION: 'CLARIFICATION',
@@ -96,6 +99,26 @@ const WITTY_LEVELS = {
 function classifyIntent(msg, mode = 'balanced') {
   const m = (msg || '').trim().toLowerCase();
   const intents = [];
+
+  // Math & Equation Solving (PRIORITY)
+  if (/\b(solve|equation|derivative|integral|calculus|algebra|quadratic|discriminant|pythagorean|linear equation|find x|system of equations)\b/i.test(m) ||
+      /\b\d+[a-z]\s*[\+\-]\s*\d+\s*=\s*\d+/i.test(m) ||
+      /(\d+\s*[\+\-\*\/]\s*\d+)/.test(m) && /\b(calculate|solve|what is|evaluate)\b/i.test(m) ||
+      /\b(area of a circle|derivative of|radius of)\b/i.test(m)) {
+    intents.push(INTENTS.MATHEMATICAL_PROBLEM);
+    intents.push(INTENTS.CALCULATION);
+  }
+
+  // Scriptwriting & Screenplays
+  if (/\b(screenplay|script|logline|write a script|youtube script|horror script|movie script|scene heading|three act structure|act i|act ii|act iii|save the cat)\b/i.test(m)) {
+    intents.push(INTENTS.SCRIPTWRITING);
+    intents.push(INTENTS.WRITING_REQUEST);
+  }
+
+  // Video Production & Animation Studio
+  if (/\b(video studio|animation studio|make a video|generate video|create an animation|animated video|storyboard|multi-scene video|produce a video|5-minute video|12-minute video|video pipeline)\b/i.test(m)) {
+    intents.push(INTENTS.VIDEO_PRODUCTION);
+  }
 
   // Game detection (PRIORITY: Make sure game requests never trigger sports)
   if (/\b(tic[\s-]?tac[\s-]?toe|tictactoe|chess|sudoku|snake game|wordle|trivia game|riddle|puzzle|hangman|minesweeper|board game|card game|video game)\b/i.test(m) ||
@@ -358,7 +381,16 @@ function planResponseStrategy(lastMsg, responseMode = 'balanced', messages = [])
   let toolRequired = null;
   let toolConfidence = 0.0;
 
-  if (intent.all.includes(INTENTS.GAME_REQUEST)) {
+  if (intent.all.includes(INTENTS.MATHEMATICAL_PROBLEM)) {
+    toolRequired = 'MATH_ENGINE';
+    toolConfidence = 0.99;
+  } else if (intent.all.includes(INTENTS.SCRIPTWRITING)) {
+    toolRequired = 'SCRIPTWRITER_ENGINE';
+    toolConfidence = 0.98;
+  } else if (intent.all.includes(INTENTS.VIDEO_PRODUCTION)) {
+    toolRequired = 'VIDEO_STUDIO_ENGINE';
+    toolConfidence = 0.97;
+  } else if (intent.all.includes(INTENTS.GAME_REQUEST)) {
     toolRequired = 'GAME_GENERATOR';
     toolConfidence = 0.98;
   } else if (intent.all.includes(INTENTS.SPORTS)) {

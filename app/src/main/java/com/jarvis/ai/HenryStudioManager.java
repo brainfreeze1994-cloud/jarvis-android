@@ -24,7 +24,10 @@ public class HenryStudioManager {
         BUSINESS,
         HACKING,
         MEDICAL,
-        ARTIFACT
+        ARTIFACT,
+        MATH,
+        SCRIPTWRITER,
+        VIDEO_STUDIO
     }
 
     public interface StudioActionCallback {
@@ -70,6 +73,24 @@ public class HenryStudioManager {
         // Artifact Studio
         if (lower.contains("artifact studio") || lower.contains("document studio") ||
             lower.contains("deck studio") || lower.contains("sheet studio")) {
+            return true;
+        }
+
+        // Math Studio
+        if (lower.contains("math studio") || lower.contains("mathematics studio") ||
+            lower.contains("calculus studio") || lower.contains("algebra studio")) {
+            return true;
+        }
+
+        // Scriptwriter Studio
+        if (lower.contains("script studio") || lower.contains("scriptwriter studio") ||
+            lower.contains("screenplay studio") || lower.contains("story studio")) {
+            return true;
+        }
+
+        // Video & Animation Studio
+        if (lower.contains("video studio") || lower.contains("animation studio") ||
+            lower.contains("movie studio") || lower.contains("film studio")) {
             return true;
         }
 
@@ -221,7 +242,10 @@ public class HenryStudioManager {
             "📈 Business Strategy & Financial Acumen",
             "🛡 Ethical Hacking & Cybersecurity Intelligence",
             "🩺 Clinical Medicine & Healthcare Intelligence",
-            "📄 Artifact Creation Studio (Docs, Sheets, Decks)"
+            "📄 Artifact Creation Studio (Docs, Sheets, Decks)",
+            "📐 Mathematical Reasoning & Problem Solver Studio",
+            "🎬 Screenplay & Scriptwriter Studio",
+            "🎥 Video & Animation Production Studio"
         };
 
         createDialogBuilder(context)
@@ -233,6 +257,9 @@ public class HenryStudioManager {
                     case 2: showHackingStudio(context, callback); break;
                     case 3: showMedicalStudio(context, callback); break;
                     case 4: showArtifactStudio(context, callback); break;
+                    case 5: showMathStudio(context, callback); break;
+                    case 6: showScriptwriterStudio(context, callback); break;
+                    case 7: showVideoStudio(context, callback); break;
                 }
             })
             .setNegativeButton("Close", null)
@@ -365,6 +392,78 @@ public class HenryStudioManager {
                     case 1: callback.onPromptSelected("Design a comprehensive multi-tab financial forecast spreadsheet with Revenue, COGS, OpEx, and Cash Flow"); break;
                     case 2: callback.onPromptSelected("Draft a complete 10-slide pitch deck presentation outline with slide titles, bullet points, and speaker notes"); break;
                     case 3: callback.onPromptSelected("Create a technical cloud architecture specification with microservices, database schemas, and API gateway routing"); break;
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    public static void showMathStudio(Context context, StudioActionCallback callback) {
+        String[] options = {
+            "📐 Solve Linear / Quadratic Equation (Polya 4-Step)",
+            "∫ Calculus: First Derivative & Step-by-Step Chain Rule",
+            "📊 Descriptive Statistics: Mean, Median, Variance, Stdev",
+            "💰 Financial Math: Compound Interest & Amortization",
+            "📉 2D Function Plotting & Cartesian Coordinate Generator"
+        };
+
+        createDialogBuilder(context)
+            .setTitle("📐 Mathematical Reasoning & Problem Solver Studio")
+            .setItems(options, (dialog, which) -> {
+                switch (which) {
+                    case 0: callback.onPromptSelected("Solve 2x + 5 = 17 using step-by-step Polya mathematical reasoning"); break;
+                    case 1: callback.onPromptSelected("Calculate the derivative of x^3 + 4x^2 - 7x with step-by-step rule explanations"); break;
+                    case 2: callback.onPromptSelected("Compute statistics for dataset [12, 15, 18, 22, 30, 35, 42] including mean, median, and stdev"); break;
+                    case 3: callback.onPromptSelected("Calculate compound interest for principal 10000 at 7.5% annual rate compounded monthly for 5 years"); break;
+                    case 4: callback.onPromptSelected("Generate 2D coordinate points for plotting y = x^2 - 4x + 3 from x = -2 to x = 6"); break;
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    public static void showScriptwriterStudio(Context context, StudioActionCallback callback) {
+        String[] options = {
+            "🎬 Logline Generator (High-Concept, Character-Driven, Dark)",
+            "🎭 Comprehensive Character Bible & Psychological Arc",
+            "🏛 Three-Act Narrative Structure & Scene Beat Matrix",
+            "📱 YouTube Video Script (Hook, Promise, Context, CTA)",
+            "🔍 Script Quality Control (QC) & Pacing Audit"
+        };
+
+        createDialogBuilder(context)
+            .setTitle("🎬 Screenplay & Scriptwriter Studio")
+            .setItems(options, (dialog, which) -> {
+                switch (which) {
+                    case 0: callback.onPromptSelected("Generate 3 high-concept loglines for a sci-fi thriller with protagonist, goal, stakes, and unique hook"); break;
+                    case 1: callback.onPromptSelected("Build a complete Character Bible for an expert protagonist: flaw, fear, secret, voice, and transformative arc"); break;
+                    case 2: callback.onPromptSelected("Create a 3-act narrative beat breakdown with sluglines from Act I setup to Climax and resolution"); break;
+                    case 3: callback.onPromptSelected("Write a high-retention 5-minute YouTube script on Quantum Computing with hook, promise, escalation, and CTA"); break;
+                    case 4: callback.onPromptSelected("Audit screenplay formatting, show-don't-tell density, dialogue subtext, and compute a Script QC score"); break;
+                }
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    public static void showVideoStudio(Context context, StudioActionCallback callback) {
+        String[] options = {
+            "🎥 Initialize 5-Minute Cinematic Video Production Pipeline",
+            "🎬 Extended 12-Minute Deep-Dive Cinematic Production",
+            "📋 Storyboard Card Generator with Camera Angles & Lighting",
+            "🎞 Multi-Track Timeline (Video, Voice, Music Ducking, SFX, Subs)",
+            "🔄 Background Render Job Status & Individual Shot Failure Retry"
+        };
+
+        createDialogBuilder(context)
+            .setTitle("🎥 Video & Animation Production Studio")
+            .setItems(options, (dialog, which) -> {
+                switch (which) {
+                    case 0: callback.onPromptSelected("Initialize a 5-minute multi-scene video production in video studio with storyboard, style bible, and timeline"); break;
+                    case 1: callback.onPromptSelected("Create a 12-minute cinematic video project with 20 scenes, 80 shots, character bible, and 60fps style bible"); break;
+                    case 2: callback.onPromptSelected("Generate storyboard cards specifying camera angles, character movements, audio cues, and lighting for a futuristic metropolis"); break;
+                    case 3: callback.onPromptSelected("Configure multi-track video timeline with automatic audio ducking for music under narration and SRT subtitles"); break;
+                    case 4: callback.onPromptSelected("Run Video Quality Control audit verifying character consistency, zero missing frames, and shot-level retry status"); break;
                 }
             })
             .setNegativeButton("Cancel", null)

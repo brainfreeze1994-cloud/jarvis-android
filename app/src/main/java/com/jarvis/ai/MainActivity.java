@@ -2369,12 +2369,12 @@ public class MainActivity extends AppCompatActivity {
 
         // 3. MATH ENGINE (Polya 4-step solver & arithmetic)
         if (primary.type == HenryIntentRouter.IntentType.MATH_SOLVE) {
-            HenryMathEngine.MathMode mode = userText.toLowerCase(Locale.US).contains("step") ?
-                    HenryMathEngine.MathMode.STEP_BY_STEP : HenryMathEngine.MathMode.QUICK_ANSWER;
+            HenryMathEngine.MathMode mode = userText.toLowerCase(Locale.US).contains("quick") ?
+                    HenryMathEngine.MathMode.QUICK_ANSWER : HenryMathEngine.MathMode.STEP_BY_STEP;
             HenryMathEngine.MathResult mathResult = HenryMathEngine.solve(userText, mode);
             if (mathResult.solved) {
                 history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-                String fullAnswer = (mode == HenryMathEngine.MathMode.STEP_BY_STEP && mathResult.fullExplanation != null) ?
+                String fullAnswer = mathResult.fullExplanation != null && !mathResult.fullExplanation.trim().isEmpty() ?
                         mathResult.fullExplanation : mathResult.cleanAnswer;
                 history.add(new HistoryItem("model", fullAnswer)); addJarvisMsg(fullAnswer);
                 speak(mathResult.cleanAnswer, "proud"); saveHistory();

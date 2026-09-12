@@ -430,4 +430,6 @@ public class JarvisApi {
             && msg.length() > 30) return "reason";
         return "chat";
     }
+
+
 }

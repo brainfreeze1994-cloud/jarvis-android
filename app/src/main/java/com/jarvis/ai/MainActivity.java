@@ -6647,4 +6647,16 @@ public class MainActivity extends AppCompatActivity {
         // Fallback: nothing recognizable to strip, use the whole message as-is.
         return trimmed;
     }
+
+    /**
+     * Checks if the user text is asking to generate, create, or render a video/animation.
+     */
+    public static boolean isVideoStudioQuery(String text) {
+        if (text == null) return false;
+        String t = text.toLowerCase(Locale.US).trim();
+        return t.matches(".*\\b(create|make|produce|generate|render|animate)\\b.*?\\b(video|documentary|animation|movie|film|clip)\\b.*")
+            || t.matches(".*\\b(video|animation|movie)\\b.*?\\b(from script|storyboard|production)\\b.*")
+            || t.matches(".*\\b(turn this script into a video|generate video from script|render video)\\b.*")
+            || t.matches(".*\\b(create|make|generate)\\s+(?:a\\s+)?\\d+\\s*(?:second|seconds|sec|secs|minute|minutes|min|mins)\\s+video.*");
+    }
 }

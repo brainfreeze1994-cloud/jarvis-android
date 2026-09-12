@@ -29,7 +29,7 @@ const handler = async function(req, res) {
   try {
     body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
   } catch (e) {
-    return res.status(200).json({ reply: 'Invalid request body, sir.' });
+    return res.status(200).json({ reply: 'Invalid request body.' });
   }
 
   const {
@@ -83,9 +83,9 @@ const handler = async function(req, res) {
 
             let visionInstruction = q;
             if (allImages.length > 1) {
-              visionInstruction += `\n\n[CRITICAL DIRECTIVE]: The user provided ${allImages.length} attached images. You must analyze and distinguish ALL ${allImages.length} images. If the user asks for a comparison, a choice, a witty roast, a recommendation, or asks in Tagalog/English (e.g., 'Sino ang pipiliin mo sa tatlo?' / 'Which one would you choose?'), evaluate each image with charming, witty, sharp, and charismatic human humor and insight. Start with [EMOTION:tag].`;
+              visionInstruction += `\n\n[CRITICAL DIRECTIVE]: The user provided ${allImages.length} attached images. Analyze and distinguish every image. If the user asks for a comparison, choice, witty roast, or recommendation, evaluate each image with charming, sharp, and charismatic human humor and insight. For a Kiss/Marry/Date or Kiss/Marry/Kill game, assign ALL categories in one response, label each picture (Image 1, Image 2, etc.), add a brief playful reason for every selection, and never answer with only one category. Do not add emotion tags or honorifics.`;
             } else {
-              visionInstruction += '\n\nRespond as H.E.N.R.Y with an [EMOTION:tag]. Be witty, human, insightful, and charismatic.';
+              visionInstruction += '\n\nRespond as H.E.N.R.Y. Be witty, human, insightful, and charismatic. Do not add emotion tags or honorifics.';
             }
             userContent.push({ type: 'text', text: visionInstruction });
 
@@ -939,18 +939,20 @@ async function callLLM(groqKey, accountId, apiToken, messages) {
       }
     } catch(e) { continue; }
   }
-  return '[EMOTION:amused] All my thinking engines are resting simultaneously — a statistical miracle, sir. Try again in a moment.';
+  return 'I ran into a temporary issue. Please try again in a moment.';
 }
 
 function parseResponse(text) {
   if (!text || typeof text !== 'string') {
-    return { reply: "I'm right here, sir. How may I assist you today?", emotion: 'neutral' };
+    return { reply: "I'm here. How can I help?", emotion: 'neutral' };
   }
   const emMatch = text.match(/^\[EMOTION:([a-z]+)\]/i);
-  const emotion = emMatch ? emMatch[1] : 'neutral';
-  let reply     = text.replace(/^\[EMOTION:[a-z]+\]\s*/i, '').trim();
-  if (!reply) reply = text.trim();
-  if (!reply) reply = "I'm right here, sir. How may I assist you today?";
+  const emotion = 'neutral';
+  let reply     = text.replace(/^\[EMOTION:[a-z]+\]\s*/i, '')
+    .replace(/\b(?:sir|ma'am|madam)\b\s*,?\s*/gi, '')
+    .replace(/\s+([,.!?:;])/g, '$1')
+    .trim();
+  if (!reply) reply = "I'm here. How can I help?";
   const imgMatch = text.match(/imageUrl:\s*(https?:\/\/\S+)/);
   const result  = { reply, emotion };
   if (imgMatch) result.imageUrl = imgMatch[1];
@@ -969,3 +971,4 @@ async function tryJson(res) {
 
 module.exports = handler;
 module.exports.config = { api: { bodyParser: { sizeLimit: '10mb' } } };
+

@@ -3,8 +3,11 @@ package com.jarvis.ai;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
@@ -20,8 +23,8 @@ import java.util.Locale;
  * Fully embedded free video renderer.
  *
  * It creates an actual H.264 MP4 on the Android device using platform MediaCodec
- * and MediaMuxer. Visuals are procedurally animated from the prompt: cinematic
- * gradients, particles, scan lines, grids, cards, camera drift, and topic text.
+ * and MediaMuxer. Visuals are procedurally animated from the prompt as clean,
+ * scene-based animation without title cards, grids, timelines, or watermarks.
  * This is intentionally not a cloud/diffusion model; it is a deterministic local
  * motion renderer that requires no installation or API key.
  */
@@ -255,53 +258,95 @@ public final class HenryEmbeddedVideoEngine {
     private static int clamp(int x) { return x < 0 ? 0 : Math.min(255, x); }
 
     private static void drawFrame(Canvas c, Paint p, Config cfg, float t, int index) {
+        if (isUnderwaterTopic(cfg.topic)) {
+            drawUnderwaterScene(c, p, cfg, t);
+        } else {
+            drawAtmosphericScene(c, p, cfg, t);
+        }
+    }
+
+    private static boolean isUnderwaterTopic(String topic) {
+        String value = topic == null ? "" : topic.toLowerCase(Locale.US);
+        return value.contains("fish") || value.contains("ocean") || value.contains("sea")
+                || value.contains("underwater") || value.contains("marine") || value.contains("reef");
+    }
+
+    /** A clean, scene-led underwater animation for fish and ocean prompts. */
+    private static void drawUnderwaterScene(Canvas c, Paint p, Config cfg, float t) {
         float w = cfg.width, h = cfg.height;
-        c.drawColor(0xFF050812);
-        // Moving background bands.
+        p.setShader(new LinearGradient(0, 0, 0, h,
+                new int[]{0xFF0D739A, 0xFF07577E, 0xFF03233F, 0xFF011426},
+                null, Shader.TileMode.CLAMP));
+        c.drawRect(0, 0, w, h, p);
+        p.setShader(null);
+
+        // Soft caustic light from the surface.
         p.setStyle(Paint.Style.FILL);
-        for (int y = 0; y < h; y += 4) {
-            float wave = (float)(Math.sin((y * 0.025) + t * 0.9) * 12 + 18);
-            int rr = (int)(5 + wave * 0.25f), gg = (int)(9 + wave * 0.35f), bb = (int)(20 + wave * 0.7f);
-            p.setColor(0xFF000000 | (clamp(rr) << 16) | (clamp(gg) << 8) | clamp(bb));
-            c.drawRect(0, y, w, y + 4, p);
+        for (int i = 0; i < 8; i++) {
+            float x = (i * w / 7f + (float) Math.sin(t * .45f + i) * 30) - 55;
+            Path ray = new Path();
+            ray.moveTo(x, 0); ray.lineTo(x + 28, 0);
+            ray.lineTo(x + 150, h * .78f); ray.lineTo(x - 95, h * .78f); ray.close();
+            p.setColor(0x115DEBFF); c.drawPath(ray, p);
         }
-        // Grid.
-        p.setStrokeWidth(1); p.setColor(0x552A6A88);
-        float drift = (t * 12) % 48;
-        for (float x = -48 + drift; x < w + 48; x += 48) c.drawLine(x, 0, x, h, p);
-        for (float y = drift; y < h; y += 48) c.drawLine(0, y, w, y, p);
-        // Particles.
-        for (int i = 0; i < 55; i++) {
-            float x = (float)((i * 97.0 + t * (18 + (i % 7) * 4)) % (w + 40)) - 20;
-            float y = (float)((i * 53.0 + Math.sin(t * .7 + i) * 30) % h);
-            p.setColor(0xFF50D8FF); c.drawCircle(x, y, 1.3f + (i % 3), p);
+
+        // Rising bubbles.
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1.2f, w * .0022f));
+        for (int i = 0; i < 30; i++) {
+            float x = (i * 73f + (float) Math.sin(t + i) * 16) % w;
+            float y = h - ((i * 97f + t * (22 + i % 5 * 4)) % (h + 40));
+            float r = 2 + i % 5;
+            p.setColor(0x559DEFFF); c.drawCircle(x, y, r, p);
         }
-        // Central animated orb / lens.
-        float cx = w * .5f + (float)Math.sin(t * .23) * w * .08f;
-        float cy = h * .47f + (float)Math.cos(t * .31) * h * .06f;
-        for (int r = 105; r >= 18; r -= 17) {
-            int a = 8 + (105 - r) / 3;
-            p.setColor((a << 24) | 0x007BD8FF); c.drawCircle(cx, cy, r + (float)Math.sin(t + r) * 3, p);
-        }
-        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(2); p.setColor(0xAA64E8FF);
-        c.drawOval(new RectF(cx - 105, cy - 45, cx + 105, cy + 45), p);
-        c.drawOval(new RectF(cx - 45, cy - 105, cx + 45, cy + 105), p);
         p.setStyle(Paint.Style.FILL);
-        // Topic title.
-        String title = cfg.topic.toUpperCase(Locale.US);
-        if (title.length() > 54) title = title.substring(0, 54) + "…";
-        p.setColor(0xFFEAFBFF); p.setTextAlign(Paint.Align.CENTER); p.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD));
-        p.setTextSize(Math.max(20, w * .045f));
-        c.drawText(title, w / 2f, h * .14f, p);
-        p.setColor(0xFF55DFFF); p.setTextSize(Math.max(12, w * .022f));
-        c.drawText("H.E.N.R.Y.  •  EMBEDDED CINEMATIC ENGINE", w / 2f, h * .19f, p);
-        // Timeline / scene indicator.
-        float progress = Math.min(1f, t / Math.max(1f, cfg.durationSeconds));
-        p.setColor(0xFF173448); c.drawRoundRect(new RectF(w*.12f, h*.88f, w*.88f, h*.892f), 6, 6, p);
-        p.setColor(0xFF50D8FF); c.drawRoundRect(new RectF(w*.12f, h*.88f, w*(.12f + .76f*progress), h*.892f), 6, 6, p);
-        p.setTextAlign(Paint.Align.LEFT); p.setTextSize(Math.max(11, w*.018f)); p.setColor(0xFF9FC7D6);
-        c.drawText(String.format(Locale.US, "%02d:%02d", (int)t/60, (int)t%60), w*.12f, h*.94f, p);
-        p.setTextAlign(Paint.Align.RIGHT); c.drawText(String.format(Locale.US, "%02d:%02d", cfg.durationSeconds/60, cfg.durationSeconds%60), w*.88f, h*.94f, p);
-        p.setTextAlign(Paint.Align.LEFT);
+
+        // Sand, coral, and swaying sea grass establish a real scene.
+        p.setColor(0xFF0B2D32); c.drawRect(0, h * .84f, w, h, p);
+        p.setColor(0xFF174D48);
+        for (int i = 0; i < 18; i++) {
+            float x = i * w / 17f;
+            float sway = (float) Math.sin(t * 1.3f + i) * 10;
+            p.setStrokeWidth(4 + i % 3); p.setStyle(Paint.Style.STROKE);
+            c.drawLine(x, h, x + sway, h * (.73f + (i % 4) * .025f), p);
+        }
+        p.setStyle(Paint.Style.FILL);
+        drawFish(c, p, w * (.25f + .18f * (float) Math.sin(t * .35f)), h * (.34f + .06f * (float) Math.sin(t)), w * .095f, 0xFFFFB44D, true, t);
+        drawFish(c, p, w * (.70f + .22f * (float) Math.sin(t * .28f + 2)), h * (.52f + .07f * (float) Math.sin(t * .8f)), w * .068f, 0xFF58D7FF, false, t + 1);
+        drawFish(c, p, w * (.52f + .30f * (float) Math.sin(t * .22f + 4)), h * (.24f + .05f * (float) Math.sin(t * .9f)), w * .045f, 0xFFF486B9, true, t + 2);
+    }
+
+    private static void drawFish(Canvas c, Paint p, float x, float y, float size, int color, boolean right, float t) {
+        float direction = right ? 1f : -1f;
+        float tail = (float) Math.sin(t * 5f) * size * .18f;
+        p.setColor(color);
+        c.drawOval(new RectF(x - size, y - size * .48f, x + size, y + size * .48f), p);
+        Path fin = new Path();
+        fin.moveTo(x - direction * size, y);
+        fin.lineTo(x - direction * size * 1.62f, y - size * .62f + tail);
+        fin.lineTo(x - direction * size * 1.62f, y + size * .62f - tail);
+        fin.close(); c.drawPath(fin, p);
+        p.setColor(0x99FFFFFF); c.drawOval(new RectF(x - size * .15f, y - size * .78f, x + size * .45f, y - size * .06f), p);
+        p.setColor(0xFF101820); c.drawCircle(x + direction * size * .57f, y - size * .12f, Math.max(2f, size * .09f), p);
+    }
+
+    /** A clean non-branded scene for prompts that are not underwater. */
+    private static void drawAtmosphericScene(Canvas c, Paint p, Config cfg, float t) {
+        float w = cfg.width, h = cfg.height;
+        p.setShader(new LinearGradient(0, 0, w, h,
+                new int[]{0xFF100C2E, 0xFF16265D, 0xFF0C5370, 0xFF051924}, null, Shader.TileMode.CLAMP));
+        c.drawRect(0, 0, w, h, p); p.setShader(null);
+        p.setStyle(Paint.Style.FILL);
+        for (int i = 0; i < 70; i++) {
+            float x = (i * 89f + t * (6 + i % 5 * 3)) % w;
+            float y = (i * 47f + (float) Math.sin(t * .4f + i) * 20) % h;
+            p.setColor((90 + i % 120) << 24 | 0x00B9E9FF);
+            c.drawCircle(x, y, 1 + i % 3, p);
+        }
+        float cx = w * (.50f + .09f * (float) Math.sin(t * .24f));
+        float cy = h * (.52f + .06f * (float) Math.cos(t * .30f));
+        for (int r = 120; r > 16; r -= 18) {
+            p.setColor((5 + (120 - r) / 3) << 24 | 0x0059D8FF);
+            c.drawCircle(cx, cy, r, p);
+        }
     }
 }

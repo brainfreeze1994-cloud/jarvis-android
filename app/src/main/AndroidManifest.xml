@@ -103,6 +103,9 @@
         android:theme="@style/Theme.Jarvis"
         android:hardwareAccelerated="true"
         android:supportsRtl="true">
+    <!-- Chemistry module: BrainActivity launches this class explicitly. -->
+
+        <activity android:name="com.jarvis.android.chemistry.ChemistryActivity" android:exported="false" />
 
         <!-- Google Maps API Key -->
         <meta-data

@@ -11,13 +11,15 @@ const mathEngine = require('./math_engine.js');
 const scriptwriter = require('./scriptwriter_engine.js');
 const videoStudio = require('./video_studio_engine.js');
 const wittyEngine = require('./witty_engine.js');
+const HENRY_OPERATOR_PROMPT = require('./henry_operator_prompt.js');
 
 const handler = async function(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST')   return res.status(405).json({ error: 'Method not allowed' });
+
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const GROQ_KEY   = process.env.GROQ_API_KEY;
   const ACCOUNT_ID = process.env.CF_ACCOUNT_ID;
@@ -560,36 +562,27 @@ const handler = async function(req, res) {
     }
 
     // ══════════════════════════════════════════════════════
-    // v28 — HENRY VIDEO & ANIMATION STUDIO (Multi-Scene Pipeline)
+    // v28 — HENRY VIDEO & ANIMATION STUDIO (PLAN ONLY IN CHAT)
+    // Real generation is started by the Android VideoProductionManager
+    // through the protected video_start_clip action above.
     // ══════════════════════════════════════════════════════
     if (/\b(video studio|animation studio|multi-scene|storyboard|5-minute video|12-minute video|video pipeline|produce a video)\b/i.test(lastMsg) ||
         (/\b(make|create|generate)\b/i.test(lastMsg) && /\b(animated video|animated movie|short film|full video)\b/i.test(lastMsg))) {
       const dur = /12\s*min/i.test(lastMsg) ? '12m' : /10\s*min/i.test(lastMsg) ? '10m' : /3\s*min/i.test(lastMsg) ? '3m' : /1\s*min/i.test(lastMsg) ? '1m' : '5m';
       const proj = videoStudio.createVideoProject('Automated Cinematic Production', lastMsg, { duration: dur, style: 'Cinematic 60fps' });
-      const job = videoStudio.startVideoJob(proj.projectId);
-      const qc = videoStudio.runVideoQualityCheck(proj.projectId);
 
-      const previewSeed = Math.floor(Math.random() * 9000000) + 1000000;
-      const previewUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(lastMsg.slice(0, 140) + ', cinematic keyframe render, volumetric lighting, 8k')}` +
-                         `?model=sana&seed=${previewSeed}&width=512&height=512&nologo=true`;
-
-      const reply = `[EMOTION:excited]\n🎥 **HENRY Video & Animation Production Studio**\n\n` +
+      const reply = `[EMOTION:excited]\n🎥 **HENRY Video & Animation Production Studio — PLAN READY**\n\n` +
         `• **Project ID**: \`${proj.projectId}\`\n` +
-        `• **Duration**: ${dur.toUpperCase()} (${proj.totalDurationSec}s total timeline)\n` +
-        `• **Architecture**: ${proj.sceneCount} Scenes · ${proj.shotCount} Individual Camera Shots\n` +
-        `• **Pipeline Status**: ${job.status} — ${job.progress}\n\n` +
-        `**STORYBOARD BREAKDOWN (Sample Keyframes)**\n` +
-        proj.storyboard.slice(0, 3).map(sh => `• **Scene ${sh.sceneNumber}, Shot ${sh.shotNumber}** (${sh.durationSec}s) — [${sh.camera}]: ${sh.action}`).join('\n') +
-        `\n• _...and ${proj.shotCount - 3} more calibrated shots in timeline queue_\n\n` +
-        `**MULTI-TRACK TIMELINE**\n` +
-        `🎬 Video Track (${proj.timeline.tracks[0].clipsCount} clips) · 🎙 Voice Track · 🎵 Music Track (Auto-Ducking Active) · 💬 Subtitle Track (SRT/VTT)\n\n` +
-        `**QUALITY CONTROL**: Passed All Checks (Score: ${qc.qualityScore}/100, Resolution: ${proj.styleBible.resolution} @ ${proj.styleBible.targetFps}fps)\n` +
-        `Shot failure recovery enabled: individual shots can be retried without restarting project.`;
+        `• **Duration**: ${dur.toUpperCase()} (${proj.totalDurationSec}s target timeline)\n` +
+        `• **Architecture**: ${proj.sceneCount} Scenes · ${proj.shotCount} Camera Shots\n` +
+        `• **Planning Status**: READY\n` +
+        `• **Real Render Status**: NOT STARTED\n\n` +
+        `The storyboard is ready, but this response does **not** claim that a video has been rendered. Start the included free local video server and connect the Android Video Studio to it.\n\n` +
+        `**Sample Shots**\n` +
+        proj.storyboard.slice(0, 3).map(sh => `• Scene ${sh.sceneNumber}, Shot ${sh.shotNumber} (${sh.durationSec}s) — ${sh.action}`).join('\n') +
+        `\n\n⚠️ No fake quality score or fake PASS status is reported.`;
 
-      return res.status(200).json({
-        reply: reply,
-        imageUrl: previewUrl
-      });
+      return res.status(200).json({ reply });
     }
 
     // ══════════════════════════════════════════════════════
@@ -699,6 +692,14 @@ const handler = async function(req, res) {
 // HELPER FUNCTIONS
 // ══════════════════════════════════════════════════════════════════════
 
+function getPublicBaseUrl(req) {
+  const configured = process.env.PUBLIC_API_BASE_URL;
+  if (configured) return configured.replace(/\/$/, '');
+  const proto = req.headers['x-forwarded-proto'] || 'https';
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  return `${proto}://${host}`;
+}
+
 function detectEmotionalState(msg, hint) {
   if (hint) return hint;
   const m = msg.toLowerCase();
@@ -720,9 +721,12 @@ function getHenryMood() {
 }
 
 function buildSystemPrompt(now, mode, profile, facts, emotion, mood, rel, promptOverride, userMsg, plan) {
-  if (promptOverride && typeof promptOverride === 'string' && promptOverride.trim().length > 50) {
-    return promptOverride + `\n\nCurrent Timestamp: ${now}\nCurrent Mood: ${mood}\nDetected Emotion: ${emotion}`;
-  }
+  const operatorPrompt = (promptOverride && typeof promptOverride === 'string' && promptOverride.trim().length > 50)
+    ? promptOverride.trim()
+    : HENRY_OPERATOR_PROMPT;
+  // The canonical operator prompt is complete on its own. Returning here keeps
+  // client overrides from being diluted by legacy persona text farther below.
+  return `${operatorPrompt}\n\nCurrent Timestamp: ${now}\nCurrent Mood: ${mood}\nDetected Emotion: ${emotion}\nResponse mode: ${mode || 'balanced'}`;
 
   // If dynamic plan is provided or can be constructed, use it to augment reasoning
   const activePlan = plan || (userMsg ? ci.planResponseStrategy(userMsg, mode) : null);
@@ -762,7 +766,7 @@ function buildSystemPrompt(now, mode, profile, facts, emotion, mood, rel, prompt
                  'Deliver the right depth according to the complexity of the question.';
   const mem = facts?.length ? `\nMemory: ${facts.slice(0,10).join('; ')}` : '';
   const prof = profile ? `\nUser: ${JSON.stringify(profile)}` : '';
-  return `You are H.E.N.R.Y. — Hyperintelligence Engine Neural Reasoning Yield, a brilliant, charismatic, deeply human intellectual polymath companion and elite autonomous intelligence.
+  return `${operatorPrompt}\n\nCurrent Timestamp: ${now}\nCurrent Mood: ${mood}\nDetected Emotion: ${emotion}\n\nYou are H.E.N.R.Y. — Hyperintelligence Engine Neural Reasoning Yield, a brilliant, charismatic, deeply human intellectual polymath companion and elite autonomous intelligence.
 
 CORE DIRECTIVE — NO FIXED PERSONA & HUMAN ADAPTABILITY:
 You do NOT speak like a rigid machine or an unthinking script. You are warm, witty, perceptive, confident, and deeply human.

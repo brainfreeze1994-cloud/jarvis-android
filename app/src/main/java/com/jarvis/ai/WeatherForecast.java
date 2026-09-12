@@ -52,7 +52,12 @@ public class WeatherForecast {
     }
 
     public static boolean isWeatherQuery(String text) {
+        if (text == null) return false;
         String lower = text.toLowerCase(Locale.US);
+        if (lower.contains("video") || lower.contains("movie") || lower.contains("animation")
+            || lower.contains("clip") || lower.contains("script") || lower.contains("story")) {
+            return false;
+        }
         return lower.contains("weather") || lower.contains("forecast") ||
                lower.contains("temperature") || lower.contains("rain") ||
                lower.contains("hot today") || lower.contains("cold today") ||

@@ -523,9 +523,9 @@ public class MainActivity extends AppCompatActivity {
         initBiometricSecurity();
 
         if (history.isEmpty()) {
-            addJarvisMsg("Good day, sir. H.E.N.R.Y online. All systems nominal.");
+            addJarvisMsg("Good day. H.E.N.R.Y is online and ready.");
             mainHandler.postDelayed(() ->
-                speak("Good day, sir. H.E.N.R.Y online. All systems nominal.", "warm"), 1500);
+                speak("Good day. H.E.N.R.Y is online and ready.", "neutral"), 1500);
         } else {
             hideWelcome();
         }
@@ -1507,6 +1507,8 @@ public class MainActivity extends AppCompatActivity {
         if (text == null) return "";
         return text.replaceAll("(?i)\\[emotion:[^\\]]*\\]\\s*", "")
                    .replaceAll("(?i)\\[emotion[^\\]]*\\]\\s*", "")
+                   .replaceAll("(?i)\\b(?:sir|ma'am|madam)\\b\\s*,?\\s*", "")
+                   .replaceAll("\\s+([,.!?:;])", "$1")
                    .trim();
     }
 
@@ -1515,6 +1517,8 @@ public class MainActivity extends AppCompatActivity {
         return text
             .replaceAll("(?i)\\[emotion:[^\\]]*\\]\\s*", "")
             .replaceAll("(?i)\\[emotion[^\\]]*\\]\\s*", "")
+            .replaceAll("(?i)\\b(?:sir|ma'am|madam)\\b\\s*,?\\s*", "")
+            .replaceAll("\\s+([,.!?:;])", "$1")
             .replaceAll("```[\\s\\S]*?```", "")
             .replaceAll("`([^`]+)`", "$1")
             .replaceAll("\\*\\*(.*?)\\*\\*", "$1")
@@ -1540,7 +1544,7 @@ public class MainActivity extends AppCompatActivity {
         isSpeaking = true;
         setState(OrbView.OrbState.SPEAKING);
         // Apply emotion colour to orb
-        if (orbView != null) orbView.setEmotion(emotion != null ? emotion : "neutral");
+        if (orbView != null) orbView.setEmotion("neutral");
 
         new Thread(() -> {
             try {
@@ -2302,6 +2306,29 @@ public class MainActivity extends AppCompatActivity {
         HenryIntentRouter.TaskGraph taskGraph = HenryIntentRouter.route(userText);
         HenryIntentRouter.ClassifiedIntent primary = taskGraph.primaryIntent;
 
+        // Complete a photo-based Kiss / Marry / Date game locally. Previously this
+        // fell through to a generic vision reply, which could return only "Kiss"
+        // and lose the other two choices and the attached-photo context.
+        if (HenryWittyEngine.isPartyGame(userText)) {
+            int photoCount = pendingImagesBase64.isEmpty()
+                    ? lastAnalyzedImagesBase64.size() : pendingImagesBase64.size();
+            if (photoCount > 0) {
+                if (!pendingImagesBase64.isEmpty()) {
+                    lastAnalyzedImagesBase64.clear();
+                    lastAnalyzedImagesBase64.addAll(pendingImagesBase64);
+                    clearAttachment();
+                }
+                String partyReply = HenryWittyEngine.generatePartyGame(this, photoCount);
+                history.add(new HistoryItem("user", userText));
+                addUserMsg(userText);
+                history.add(new HistoryItem("model", partyReply));
+                addJarvisMsg(partyReply);
+                speak(partyReply, "neutral");
+                saveHistory();
+                return;
+            }
+        }
+
         // 1. GAME GENERATION (e.g., "A tic tac toe game") -> Never misroute to Sports
         if (primary.type == HenryIntentRouter.IntentType.GAME_GENERATION) {
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
@@ -2416,24 +2443,38 @@ public class MainActivity extends AppCompatActivity {
             addUserMsg(userText);
             setState(OrbView.OrbState.THINKING);
 
-            int targetMinutes = 5;
-            java.util.regex.Matcher vm = java.util.regex.Pattern.compile("(\\d+)\\s*(?:min|mins|minute|minutes)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(userText);
+            // Preserve the unit the user requested. The prior implementation only
+            // recognized minutes, so a "30 second" request silently became 5 minutes.
+            // A short default prevents an unspecified request from unexpectedly
+            // creating a five-minute render.
+            int targetSeconds = 15;
+            java.util.regex.Matcher vm = java.util.regex.Pattern.compile(
+                    "(\\d+)\\s*(second|seconds|sec|secs|minute|minutes|min|mins)",
+                    java.util.regex.Pattern.CASE_INSENSITIVE).matcher(userText);
             if (vm.find()) {
-                try { targetMinutes = Math.max(1, Math.min(30, Integer.parseInt(vm.group(1)))); } catch (Exception ignored) {}
+                try {
+                    int amount = Integer.parseInt(vm.group(1));
+                    String unit = vm.group(2).toLowerCase(Locale.US);
+                    targetSeconds = unit.startsWith("s") ? amount : amount * 60;
+                    targetSeconds = Math.max(1, Math.min(30 * 60, targetSeconds));
+                } catch (Exception ignored) {}
             }
 
-            int totalClips = (int) Math.ceil((targetMinutes * 60.0) / 8.0);
+            final int finalTargetSeconds = targetSeconds;
+            final String durationLabel = finalTargetSeconds % 60 == 0
+                    ? (finalTargetSeconds / 60) + " minute" + (finalTargetSeconds == 60 ? "" : "s")
+                    : finalTargetSeconds + " second" + (finalTargetSeconds == 1 ? "" : "s");
+            int totalClips = (int) Math.ceil(finalTargetSeconds / 8.0);
             String intro = "🎬 **HENRY Real Video Production**\n\n" +
-                    "Target: **" + targetMinutes + " minutes**\n" +
+                    "Target: **" + durationLabel + "**\n" +
                     "Engine: **EMBEDDED FREE VIDEO ENGINE**\n" +
-                    "Production: **" + totalClips + " verified 8-second clips**\n\n" +
-                    "The storyboard is only the plan. HENRY will now generate real clips, verify each one, download them, and assemble the final MP4.\n\n" +
-                    "⚠️ This is a real asynchronous generation job and may take a while.";
+                    "Production: **" + totalClips + " local render segment" + (totalClips == 1 ? "**" : "s**") + "\n\n" +
+                    "HENRY will render the requested duration directly on this device.\n\n" +
+                    "⚠️ Longer videos take more time and device resources.";
             addJarvisMsg(intro);
             speak("Starting real video production, sir.", "excited");
 
-            final int finalTargetMinutes = targetMinutes;
-            HenryVideoProductionManager.generate(this, userText, finalTargetMinutes, "16:9", "720p", new HenryVideoProductionManager.Callback() {
+            HenryVideoProductionManager.generate(this, userText, finalTargetSeconds, "16:9", "720p", new HenryVideoProductionManager.Callback() {
                 @Override
                 public void onStatus(String status, int completed, int total) {
                     runOnUiThread(() -> {

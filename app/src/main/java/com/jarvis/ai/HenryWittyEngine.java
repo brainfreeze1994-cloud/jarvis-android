@@ -138,7 +138,17 @@ public class HenryWittyEngine {
         if (t.contains("witty") || t.contains("banat") || t.contains("hirit") || t.contains("pilosopo") || t.contains("bardagulan")) return true;
         if (t.contains("give me a funny answer") || t.contains("tell me a joke") || t.contains("make me laugh")) return true;
         if (t.contains("sarcastic answer") || t.contains("savage answer") || t.contains("patama")) return true;
-        
+
+        // Natural Filipino/Taglish semantic collisions. Do NOT use a literal
+        // string such as "matinik.*bangus" with contains(); contains() does not
+        // interpret regex. Detect the concepts independently and allow either
+        // ordering so normal conversational phrasing is recognized.
+        boolean fishWord = t.contains("bangus") || t.contains("isda") || t.contains("fish");
+        boolean thornWord = t.contains("matinik") || t.contains("tinik");
+        boolean datingWord = t.contains("boys") || t.contains("boy") || t.contains("lalaki")
+                || t.contains("guys") || t.contains("dating");
+        if (fishWord && thornWord && (datingWord || t.contains("pero") || t.contains("ka"))) return true;
+
         // Single word cues that match our double-meaning lexicon
         if (t.equals("bangus") || t.equals("ampalaya") || t.equals("matinik")) return true;
 

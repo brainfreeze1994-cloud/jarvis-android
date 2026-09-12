@@ -2445,6 +2445,39 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // 7. REAL VIDEO & ANIMATION PRODUCTION STUDIO
+        /**
+ * Pulls the actual script out of a video-generation request, so the trigger phrase itself
+ * ("create a 30 second video about...") doesn't end up rendered as on-screen text.
+ */
+private static String extractVideoScript(String raw) {
+    if (raw == null) return "";
+    String trimmed = raw.trim();
+
+    // Explicit "trigger: script" form — everything after the first colon is the script.
+    int colon = trimmed.indexOf(':');
+    if (colon >= 0 && colon < trimmed.length() - 1) {
+        String after = trimmed.substring(colon + 1).trim();
+        if (!after.isEmpty()) return after;
+    }
+
+    // Strip a leading "create/make/... a 30 second video [about/on/of/for] " clause.
+    java.util.regex.Matcher lead = java.util.regex.Pattern.compile(
+            "^(create|make|produce|generate|render|animate)\\b.*?\\b(video|documentary|animation|animated|movie|film|clip)\\b\\s*(about|on|of|for|showing|covering|called|titled)?\\s*",
+            java.util.regex.Pattern.CASE_INSENSITIVE).matcher(trimmed);
+    if (lead.find() && lead.start() == 0) {
+        String remainder = trimmed.substring(lead.end()).trim();
+        if (!remainder.isEmpty()) return remainder;
+    }
+
+    // Strip fixed trigger phrases like "generate video from script" / "turn this script into a video".
+    String stripped = trimmed.replaceAll(
+            "(?i)\\b(turn this script into a video|generate video from script|render video|video storyboard)\\b\\s*[:\\-]?\\s*", "");
+    stripped = stripped.trim();
+    if (!stripped.isEmpty() && !stripped.equalsIgnoreCase(trimmed)) return stripped;
+
+    // Fallback: nothing recognizable to strip, use the whole message as-is.
+    return trimmed;
+}
         if (primary.type == HenryIntentRouter.IntentType.VIDEO_STUDIO) {
             history.add(new HistoryItem("user", userText));
             addUserMsg(userText);
@@ -2480,7 +2513,8 @@ public class MainActivity extends AppCompatActivity {
                     "⚠️ Longer videos take more time and device resources.";
             addJarvisMsg(intro);
             speak("Starting real video production, sir.", "excited");
-
+            final String videoScript = extractVideoScript(userText);
+    
          HenryVideoProductionManager.generateFromScript(this, userText, finalTargetSeconds, "16:9", "720p", new HenryVideoProductionManager.Callback() {
                 @Override
                 public void onStatus(String status, int completed, int total) {

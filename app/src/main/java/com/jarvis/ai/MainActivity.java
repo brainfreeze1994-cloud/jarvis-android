@@ -2369,12 +2369,12 @@ public class MainActivity extends AppCompatActivity {
 
         // 3. MATH ENGINE (Polya 4-step solver & arithmetic)
         if (primary.type == HenryIntentRouter.IntentType.MATH_SOLVE) {
-            HenryMathEngine.MathMode mode = userText.toLowerCase(Locale.US).contains("quick") ?
-                    HenryMathEngine.MathMode.QUICK_ANSWER : HenryMathEngine.MathMode.STEP_BY_STEP;
+            HenryMathEngine.MathMode mode = userText.toLowerCase(Locale.US).contains("step") ?
+                    HenryMathEngine.MathMode.STEP_BY_STEP : HenryMathEngine.MathMode.QUICK_ANSWER;
             HenryMathEngine.MathResult mathResult = HenryMathEngine.solve(userText, mode);
             if (mathResult.solved) {
                 history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-                String fullAnswer = mathResult.fullExplanation != null && !mathResult.fullExplanation.trim().isEmpty() ?
+                String fullAnswer = (mode == HenryMathEngine.MathMode.STEP_BY_STEP && mathResult.fullExplanation != null) ?
                         mathResult.fullExplanation : mathResult.cleanAnswer;
                 history.add(new HistoryItem("model", fullAnswer)); addJarvisMsg(fullAnswer);
                 speak(mathResult.cleanAnswer, "proud"); saveHistory();
@@ -2410,13 +2410,69 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // 7. VIDEO & ANIMATION PRODUCTION STUDIO
+        // 7. REAL VIDEO & ANIMATION PRODUCTION STUDIO
         if (primary.type == HenryIntentRouter.IntentType.VIDEO_STUDIO) {
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            HenryVideoStudioEngine.VideoProject proj = HenryVideoStudioEngine.planProduction(userText, 5);
-            String summary = HenryVideoStudioEngine.formatProjectSummary(proj);
-            history.add(new HistoryItem("model", summary)); addJarvisMsg(summary);
-            speak("Video storyboard and timeline tracks generated, sir.", "proud"); saveHistory();
+            history.add(new HistoryItem("user", userText));
+            addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING);
+
+            int targetMinutes = 5;
+            java.util.regex.Matcher vm = java.util.regex.Pattern.compile("(\\d+)\\s*(?:min|mins|minute|minutes)", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(userText);
+            if (vm.find()) {
+                try { targetMinutes = Math.max(1, Math.min(30, Integer.parseInt(vm.group(1)))); } catch (Exception ignored) {}
+            }
+
+            int totalClips = (int) Math.ceil((targetMinutes * 60.0) / 8.0);
+            String intro = "🎬 **HENRY Real Video Production**\n\n" +
+                    "Target: **" + targetMinutes + " minutes**\n" +
+                    "Engine: **EMBEDDED FREE VIDEO ENGINE**\n" +
+                    "Production: **" + totalClips + " verified 8-second clips**\n\n" +
+                    "The storyboard is only the plan. HENRY will now generate real clips, verify each one, download them, and assemble the final MP4.\n\n" +
+                    "⚠️ This is a real asynchronous generation job and may take a while.";
+            addJarvisMsg(intro);
+            speak("Starting real video production, sir.", "excited");
+
+            final int finalTargetMinutes = targetMinutes;
+            HenryVideoProductionManager.generate(this, userText, finalTargetMinutes, "16:9", "720p", new HenryVideoProductionManager.Callback() {
+                @Override
+                public void onStatus(String status, int completed, int total) {
+                    runOnUiThread(() -> {
+                        if (tvOrbHint != null) tvOrbHint.setText(status);
+                        if (completed == 0 || completed == total || completed % 3 == 0) {
+                            addJarvisMsg("🎬 " + status + "\nProgress: " + completed + "/" + total);
+                        }
+                    });
+                }
+
+                @Override
+                public void onSuccess(java.io.File finalVideo, int completedClips) {
+                    runOnUiThread(() -> {
+                        setState(OrbView.OrbState.IDLE);
+                        String result = "✅ **VIDEO COMPLETED**\n\n" +
+                                "Generated and verified the **embedded local MP4 renderer**.\n" +
+                                "Final MP4: `" + finalVideo.getAbsolutePath() + "`\n" +
+                                "File size: " + (finalVideo.length() / 1024 / 1024) + " MB\n\n" +
+                                "The MP4 was rendered directly inside the Android app. No server, paid video API, Gemini/Veo, or simulated completion was used.";
+                        history.add(new HistoryItem("model", result));
+                        addJarvisMsg(result);
+                        saveHistory();
+                        speak("Your video is complete, sir.", "proud");
+                        openGeneratedVideo(finalVideo);
+                    });
+                }
+
+                @Override
+                public void onError(String error) {
+                    runOnUiThread(() -> {
+                        setState(OrbView.OrbState.IDLE);
+                        String result = "❌ **VIDEO PRODUCTION FAILED**\n\n" + error +
+                                "\n\nThe embedded renderer could not complete this video. HENRY will never fake a completed video.";
+                        history.add(new HistoryItem("model", result));
+                        addJarvisMsg(result);
+                        saveHistory();
+                    });
+                }
+            });
             return;
         }
 
@@ -6764,4 +6820,17 @@ public class MainActivity extends AppCompatActivity {
                 break;
         }
     }
+
+    private void openGeneratedVideo(java.io.File file) {
+        try {
+            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".provider", file);
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(uri, "video/mp4");
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, "Video saved: " + file.getAbsolutePath(), Toast.LENGTH_LONG).show();
+        }
+    }
+
 }

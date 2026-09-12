@@ -523,9 +523,9 @@ public class MainActivity extends AppCompatActivity {
         initBiometricSecurity();
 
         if (history.isEmpty()) {
-            addJarvisMsg("Good day. H.E.N.R.Y is online and ready.");
+            addJarvisMsg("Good day, sir. H.E.N.R.Y online. All systems nominal.");
             mainHandler.postDelayed(() ->
-                speak("Good day. H.E.N.R.Y is online and ready.", "neutral"), 1500);
+                speak("Good day, sir. H.E.N.R.Y online. All systems nominal.", "warm"), 1500);
         } else {
             hideWelcome();
         }
@@ -1507,8 +1507,6 @@ public class MainActivity extends AppCompatActivity {
         if (text == null) return "";
         return text.replaceAll("(?i)\\[emotion:[^\\]]*\\]\\s*", "")
                    .replaceAll("(?i)\\[emotion[^\\]]*\\]\\s*", "")
-                   .replaceAll("(?i)\\b(?:sir|ma'am|madam)\\b\\s*,?\\s*", "")
-                   .replaceAll("\\s+([,.!?:;])", "$1")
                    .trim();
     }
 
@@ -1517,8 +1515,6 @@ public class MainActivity extends AppCompatActivity {
         return text
             .replaceAll("(?i)\\[emotion:[^\\]]*\\]\\s*", "")
             .replaceAll("(?i)\\[emotion[^\\]]*\\]\\s*", "")
-            .replaceAll("(?i)\\b(?:sir|ma'am|madam)\\b\\s*,?\\s*", "")
-            .replaceAll("\\s+([,.!?:;])", "$1")
             .replaceAll("```[\\s\\S]*?```", "")
             .replaceAll("`([^`]+)`", "$1")
             .replaceAll("\\*\\*(.*?)\\*\\*", "$1")
@@ -1544,7 +1540,7 @@ public class MainActivity extends AppCompatActivity {
         isSpeaking = true;
         setState(OrbView.OrbState.SPEAKING);
         // Apply emotion colour to orb
-        if (orbView != null) orbView.setEmotion("neutral");
+        if (orbView != null) orbView.setEmotion(emotion != null ? emotion : "neutral");
 
         new Thread(() -> {
             try {
@@ -2297,306 +2293,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void askHenry(String userText) {
-        if (userText == null || userText.trim().isEmpty()) return;
-
-        // ══════════════════════════════════════════════════════════════════════
-        // DETERMINISTIC INTENT ROUTING LAYER (HenryIntentRouter)
-        // High-confidence deterministic dispatching for Game, Math, Ultra, Witty, Opinion, etc.
-        // ══════════════════════════════════════════════════════════════════════
-        HenryIntentRouter.TaskGraph taskGraph = HenryIntentRouter.route(userText);
-        HenryIntentRouter.ClassifiedIntent primary = taskGraph.primaryIntent;
-
-        // Complete a photo-based Kiss / Marry / Date game locally. Previously this
-        // fell through to a generic vision reply, which could return only "Kiss"
-        // and lose the other two choices and the attached-photo context.
-        if (HenryWittyEngine.isPartyGame(userText)) {
-            int photoCount = pendingImagesBase64.isEmpty()
-                    ? lastAnalyzedImagesBase64.size() : pendingImagesBase64.size();
-            if (photoCount > 0) {
-                // Keep the exact photos in the visible chat beside the answer.
-                // The earlier path cleared the attachment before creating a chat item.
-                List<String> partyPhotoUris = new ArrayList<>();
-                for (Uri uri : pendingImagesUris) {
-                    if (uri != null) partyPhotoUris.add(uri.toString());
-                }
-                if (!pendingImagesBase64.isEmpty()) {
-                    lastAnalyzedImagesBase64.clear();
-                    lastAnalyzedImagesBase64.addAll(pendingImagesBase64);
-                    clearAttachment();
-                }
-                String partyReply = HenryWittyEngine.generatePartyGame(this, photoCount);
-                history.add(new HistoryItem("user", userText));
-                if (!partyPhotoUris.isEmpty()) addUserMsgWithImages(userText, partyPhotoUris);
-                else addUserMsg(userText);
-                history.add(new HistoryItem("model", partyReply));
-                addJarvisMsg(partyReply);
-                speak(partyReply, "neutral");
-                saveHistory();
-                return;
-            }
-        }
-
-        // 1. GAME GENERATION (e.g., "A tic tac toe game") -> Never misroute to Sports
-        if (primary.type == HenryIntentRouter.IntentType.GAME_GENERATION) {
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            String title = userText.toLowerCase(Locale.US).contains("tic tac toe") ? "Tic Tac Toe" : "Game Studio";
-            String code = HenryStudioManager.getInstantGameCode(userText);
-            history.add(new HistoryItem("model", stripEmotionTag(code))); addJarvisMsg(stripEmotionTag(code));
-            speak("Here is your complete game engine code, sir.", "excited");
-            saveHistory();
-            return;
-        }
-
-        // 2. ULTRA MULTI-INTENT ORCHESTRATION PIPELINE
-        if (primary.type == HenryIntentRouter.IntentType.ULTRA_ORCHESTRATION) {
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            setState(OrbView.OrbState.THINKING);
-            String initMsg = "⚡ ULTRA MODE ACTIVATED: Decomposing workflow into discrete stages (Research -> Multi-Artifact Generation -> Verification)...";
-            history.add(new HistoryItem("model", initMsg)); addJarvisMsg(initMsg);
-            speak("Ultra mode activated. Executing autonomous workflow pipeline, sir.", "excited");
-            HenryUltraOrchestrator.execute(this, userText, new HenryUltraOrchestrator.OrchestrationCallback() {
-                @Override
-                public void onPlanReady(java.util.List<HenryUltraOrchestrator.UltraSubTask> tasks) {
-                    runOnUiThread(() -> addJarvisMsg("📋 Planned " + tasks.size() + " subtasks for autonomous execution."));
-                }
-                @Override
-                public void onTaskStarted(int taskIndex, String taskTitle) {
-                    runOnUiThread(() -> setState(OrbView.OrbState.THINKING));
-                }
-                @Override
-                public void onTaskProgress(int taskIndex, String progressMessage) {
-                    runOnUiThread(() -> {
-                        if (tvOrbHint != null) tvOrbHint.setText(progressMessage);
-                    });
-                }
-                @Override
-                public void onTaskCompleted(int taskIndex, String outcome, java.io.File artifact) {
-                    runOnUiThread(() -> {
-                        if (artifact != null) {
-                            addJarvisMsg("📦 " + outcome);
-                        }
-                    });
-                }
-                @Override
-                public void onOrchestrationComplete(HenryUltraOrchestrator.UltraExecutionResult result) {
-                    runOnUiThread(() -> {
-                        setState(OrbView.OrbState.SPEAKING);
-                        history.add(new HistoryItem("model", result.finalReportMarkdown));
-                        addJarvisMsg(result.finalReportMarkdown);
-                        speak("Ultra workflow completed successfully with all verified artifacts, sir.", "proud");
-                        saveHistory();
-                    });
-                }
-                @Override
-                public void onError(String error) {
-                    runOnUiThread(() -> {
-                        setState(OrbView.OrbState.IDLE);
-                        history.add(new HistoryItem("model", "⚠️ " + error));
-                        addJarvisMsg("⚠️ " + error);
-                        speak("Ultra orchestration encountered an error, sir.", "concerned");
-                        saveHistory();
-                    });
-                }
-            });
-            return;
-        }
-
-        // 3. MATH ENGINE (Polya 4-step solver & arithmetic)
-        if (primary.type == HenryIntentRouter.IntentType.MATH_SOLVE) {
-            HenryMathEngine.MathMode mode = userText.toLowerCase(Locale.US).contains("step") ?
-                    HenryMathEngine.MathMode.STEP_BY_STEP : HenryMathEngine.MathMode.QUICK_ANSWER;
-            HenryMathEngine.MathResult mathResult = HenryMathEngine.solve(userText, mode);
-            if (mathResult.solved) {
-                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-                String fullAnswer = (mode == HenryMathEngine.MathMode.STEP_BY_STEP && mathResult.fullExplanation != null) ?
-                        mathResult.fullExplanation : mathResult.cleanAnswer;
-                history.add(new HistoryItem("model", fullAnswer)); addJarvisMsg(fullAnswer);
-                speak(mathResult.cleanAnswer, "proud"); saveHistory();
-                return;
-            }
-        }
-
-        // 4. WITTY BANTER / ROAST / COMEDY ENGINE
-        if (primary.type == HenryIntentRouter.IntentType.WITTY_RESPONSE) {
-            String wittyResponse = HenryWittyEngine.generateWittyResponse(this, userText);
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            String clean = stripEmotionTag(wittyResponse);
-            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
-            speak(clean, "witty"); saveHistory();
-            return;
-        }
-
-        // 5. DECISIVE OPINION & COMPARISON ENGINE
-        if (primary.type == HenryIntentRouter.IntentType.OPINION_COMPARISON) {
-            String opinionResponse = HenryOpinionEngine.evaluate(userText);
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            history.add(new HistoryItem("model", opinionResponse)); addJarvisMsg(opinionResponse);
-            speak("Here is my decisive breakdown and recommendation, sir.", "proud"); saveHistory();
-            return;
-        }
-
-        // 6. SCRIPTWRITER & SCREENPLAY ENGINE
-        if (primary.type == HenryIntentRouter.IntentType.SCRIPTWRITING) {
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            HenryScriptwriterEngine.ScriptResult sr = HenryScriptwriterEngine.generateScript(userText, HenryScriptwriterEngine.ScriptFormat.YOUTUBE_LONG, 5);
-            history.add(new HistoryItem("model", sr.fullScript)); addJarvisMsg(sr.fullScript);
-            speak("Script generated with 3-act narrative beats and timing cadence, sir.", "proud"); saveHistory();
-            return;
-        }
-
-        // 7. REAL VIDEO & ANIMATION PRODUCTION STUDIO
-        /**
- * Pulls the actual script out of a video-generation request, so the trigger phrase itself
- * ("create a 30 second video about...") doesn't end up rendered as on-screen text.
- */
-private static String extractVideoScript(String raw) {
-    if (raw == null) return "";
-    String trimmed = raw.trim();
-
-    // Explicit "trigger: script" form — everything after the first colon is the script.
-    int colon = trimmed.indexOf(':');
-    if (colon >= 0 && colon < trimmed.length() - 1) {
-        String after = trimmed.substring(colon + 1).trim();
-        if (!after.isEmpty()) return after;
-    }
-
-    // Strip a leading "create/make/... a 30 second video [about/on/of/for] " clause.
-    java.util.regex.Matcher lead = java.util.regex.Pattern.compile(
-            "^(create|make|produce|generate|render|animate)\\b.*?\\b(video|documentary|animation|animated|movie|film|clip)\\b\\s*(about|on|of|for|showing|covering|called|titled)?\\s*",
-            java.util.regex.Pattern.CASE_INSENSITIVE).matcher(trimmed);
-    if (lead.find() && lead.start() == 0) {
-        String remainder = trimmed.substring(lead.end()).trim();
-        if (!remainder.isEmpty()) return remainder;
-    }
-
-    // Strip fixed trigger phrases like "generate video from script" / "turn this script into a video".
-    String stripped = trimmed.replaceAll(
-            "(?i)\\b(turn this script into a video|generate video from script|render video|video storyboard)\\b\\s*[:\\-]?\\s*", "");
-    stripped = stripped.trim();
-    if (!stripped.isEmpty() && !stripped.equalsIgnoreCase(trimmed)) return stripped;
-
-    // Fallback: nothing recognizable to strip, use the whole message as-is.
-    return trimmed;
-}
-        if (primary.type == HenryIntentRouter.IntentType.VIDEO_STUDIO) {
-            history.add(new HistoryItem("user", userText));
-            addUserMsg(userText);
-            setState(OrbView.OrbState.THINKING);
-
-            // Preserve the unit the user requested. The prior implementation only
-            // recognized minutes, so a "30 second" request silently became 5 minutes.
-            // A short default prevents an unspecified request from unexpectedly
-            // creating a five-minute render.
-            int targetSeconds = 15;
-            java.util.regex.Matcher vm = java.util.regex.Pattern.compile(
-                    "(\\d+)\\s*(second|seconds|sec|secs|minute|minutes|min|mins)",
-                    java.util.regex.Pattern.CASE_INSENSITIVE).matcher(userText);
-            if (vm.find()) {
-                try {
-                    int amount = Integer.parseInt(vm.group(1));
-                    String unit = vm.group(2).toLowerCase(Locale.US);
-                    targetSeconds = unit.startsWith("s") ? amount : amount * 60;
-                    targetSeconds = Math.max(1, Math.min(30 * 60, targetSeconds));
-                } catch (Exception ignored) {}
-            }
-
-            final int finalTargetSeconds = targetSeconds;
-            final String durationLabel = finalTargetSeconds % 60 == 0
-                    ? (finalTargetSeconds / 60) + " minute" + (finalTargetSeconds == 60 ? "" : "s")
-                    : finalTargetSeconds + " second" + (finalTargetSeconds == 1 ? "" : "s");
-            int totalClips = (int) Math.ceil(finalTargetSeconds / 8.0);
-            String intro = "🎬 **HENRY Real Video Production**\n\n" +
-                    "Target: **" + durationLabel + "**\n" +
-                    "Engine: **EMBEDDED FREE VIDEO ENGINE**\n" +
-                    "Production: **" + totalClips + " local render segment" + (totalClips == 1 ? "**" : "s**") + "\n\n" +
-                    "HENRY will render the requested duration directly on this device.\n\n" +
-                    "⚠️ Longer videos take more time and device resources.";
-            addJarvisMsg(intro);
-            speak("Starting real video production, sir.", "excited");
-            final String videoScript = extractVideoScript(userText);
-    
-         HenryVideoProductionManager.generateFromScript(this, userText, finalTargetSeconds, "16:9", "720p", new HenryVideoProductionManager.Callback() {
-                @Override
-                public void onStatus(String status, int completed, int total) {
-                    runOnUiThread(() -> {
-                        if (tvOrbHint != null) tvOrbHint.setText(status);
-                        if (completed == 0 || completed == total || completed % 3 == 0) {
-                            addJarvisMsg("🎬 " + status + "\nProgress: " + completed + "/" + total);
-                        }
-                    });
-                }
-
-                @Override
-                public void onSuccess(java.io.File finalVideo, int completedClips) {
-                    runOnUiThread(() -> {
-                        setState(OrbView.OrbState.IDLE);
-                        String result = "✅ **VIDEO COMPLETED**\n\n" +
-                                "Generated and verified the **embedded local MP4 renderer**.\n" +
-                                "Final MP4: `" + finalVideo.getAbsolutePath() + "`\n" +
-                                "File size: " + (finalVideo.length() / 1024 / 1024) + " MB\n\n" +
-                                "The MP4 was rendered directly inside the Android app. No server, paid video API, Gemini/Veo, or simulated completion was used.";
-                        history.add(new HistoryItem("model", result));
-                        addJarvisMsg(result);
-                        saveHistory();
-                        speak("Your video is complete, sir.", "proud");
-                        openGeneratedVideo(finalVideo);
-                    });
-                }
-
-                @Override
-                public void onError(String error) {
-                    runOnUiThread(() -> {
-                        setState(OrbView.OrbState.IDLE);
-                        String result = "❌ **VIDEO PRODUCTION FAILED**\n\n" + error +
-                                "\n\nThe embedded renderer could not complete this video. HENRY will never fake a completed video.";
-                        history.add(new HistoryItem("model", result));
-                        addJarvisMsg(result);
-                        saveHistory();
-                    });
-                }
-            });
-            return;
-        }
-
-        // 8. IMAGE GENERATION PIPELINE
-        if (primary.type == HenryIntentRouter.IntentType.IMAGE_GENERATION) {
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            setState(OrbView.OrbState.THINKING);
-            addJarvisMsg("🎨 Generating image: " + ImageGenerator.extractPrompt(userText) + "...");
-            speak("Synthesizing image tokens, sir.", "neutral");
-            boolean isAnim = userText.toLowerCase(Locale.US).contains("animate") || userText.toLowerCase(Locale.US).contains("gif");
-            HenryImagePipeline.generateImage(this, userText, isAnim, new HenryImagePipeline.ImageCallback() {
-                @Override
-                public void onStateChanged(HenryImagePipeline.ImageState state, String message) {
-                    runOnUiThread(() -> {
-                        if (tvOrbHint != null) tvOrbHint.setText(message);
-                    });
-                }
-                @Override
-                public void onSuccess(Bitmap bitmap, java.io.File savedFile, String prompt) {
-                    runOnUiThread(() -> {
-                        setState(OrbView.OrbState.IDLE);
-                        String r = "Here is your generated image, sir. Saved to device cache (" + savedFile.getName() + ").";
-                        history.add(new HistoryItem("model", r));
-                        addJarvisMsg(r);
-                        speak("Image generation complete, sir.", "excited");
-                        saveHistory();
-                    });
-                }
-                @Override
-                public void onError(String error, boolean canRetry) {
-                    runOnUiThread(() -> {
-                        setState(OrbView.OrbState.IDLE);
-                        history.add(new HistoryItem("model", "⚠️ Image generation failed: " + error));
-                        addJarvisMsg("⚠️ Image generation failed: " + error);
-                        speak("Image generation encountered an issue, sir.", "concerned");
-                        saveHistory();
-                    });
-                }
-            });
-            return;
-        }
-
         // ── Vision Intelligence — checked FIRST ───────────────────────────────
         {
             String vl = userText.toLowerCase(java.util.Locale.US).trim();
@@ -3770,31 +3466,36 @@ private static String extractVideoScript(String raw) {
             speak(clean, "excited");
             saveHistory();
 
-            Intent chemIntent = new Intent(this, PeriodicTableActivity.class);
-            if (periodicLower.contains("mixer") || periodicLower.contains("mix") || periodicLower.contains("molecule") || periodicLower.contains("molecular") || periodicLower.contains("structure") || periodicLower.contains("compound") || periodicLower.contains("reaction")) {
-                chemIntent.putExtra(PeriodicTableActivity.EXTRA_MODE, PeriodicTableActivity.MODE_MIXER);
-            } else if (periodicLower.contains("bohr") || periodicLower.contains("orbital")) {
-                chemIntent.putExtra(PeriodicTableActivity.EXTRA_MODE, PeriodicTableActivity.MODE_BOHR);
-            }
+            Intent chemIntent;
+            if (periodicLower.contains("chemistry lab") || periodicLower.contains("molecular lab") || periodicLower.contains("chemistry activity")) {
+                chemIntent = new Intent(this, com.jarvis.android.chemistry.ChemistryActivity.class);
+            } else {
+                chemIntent = new Intent(this, PeriodicTableActivity.class);
+                if (periodicLower.contains("mixer") || periodicLower.contains("mix") || periodicLower.contains("molecule") || periodicLower.contains("molecular") || periodicLower.contains("structure") || periodicLower.contains("compound") || periodicLower.contains("reaction")) {
+                    chemIntent.putExtra(PeriodicTableActivity.EXTRA_MODE, PeriodicTableActivity.MODE_MIXER);
+                } else if (periodicLower.contains("bohr") || periodicLower.contains("orbital")) {
+                    chemIntent.putExtra(PeriodicTableActivity.EXTRA_MODE, PeriodicTableActivity.MODE_BOHR);
+                }
 
-            if (periodicLower.contains("water") || periodicLower.contains("h2o")) {
-                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "H2O");
-            } else if (periodicLower.contains("peroxide") || periodicLower.contains("h2o2")) {
-                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "H2O2");
-            } else if (periodicLower.contains("salt") || periodicLower.contains("nacl")) {
-                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "NaCl");
-            } else if (periodicLower.contains("methane") || periodicLower.contains("ch4")) {
-                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "CH4");
-            } else if (periodicLower.contains("ammonia") || periodicLower.contains("nh3")) {
-                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "NH3");
-            } else if (periodicLower.contains("benzene") || periodicLower.contains("c6h6")) {
-                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "C6H6");
-            } else if (periodicLower.contains("ethanol") || periodicLower.contains("alcohol")) {
-                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "C2H5OH");
-            } else if (periodicLower.contains("carbon dioxide") || periodicLower.contains("co2")) {
-                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "CO2");
-            } else if (periodicLower.contains("carbon monoxide") || periodicLower.matches(".*\\bco\\b.*")) {
-                chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "CO");
+                if (periodicLower.contains("water") || periodicLower.contains("h2o")) {
+                    chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "H2O");
+                } else if (periodicLower.contains("peroxide") || periodicLower.contains("h2o2")) {
+                    chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "H2O2");
+                } else if (periodicLower.contains("salt") || periodicLower.contains("nacl")) {
+                    chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "NaCl");
+                } else if (periodicLower.contains("methane") || periodicLower.contains("ch4")) {
+                    chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "CH4");
+                } else if (periodicLower.contains("ammonia") || periodicLower.contains("nh3")) {
+                    chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "NH3");
+                } else if (periodicLower.contains("benzene") || periodicLower.contains("c6h6")) {
+                    chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "C6H6");
+                } else if (periodicLower.contains("ethanol") || periodicLower.contains("alcohol")) {
+                    chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "C2H5OH");
+                } else if (periodicLower.contains("carbon dioxide") || periodicLower.contains("co2")) {
+                    chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "CO2");
+                } else if (periodicLower.contains("carbon monoxide") || periodicLower.matches(".*\\bco\\b.*")) {
+                    chemIntent.putExtra(PeriodicTableActivity.EXTRA_COMPOUND, "CO");
+                }
             }
 
             startActivity(chemIntent);
@@ -5314,6 +5015,18 @@ private static String extractVideoScript(String raw) {
             return;
         }
 
+        // ⚗️ Chemistry Lab voice trigger
+        if (!lowerInput.contains("kiss") && !lowerInput.contains("marry")
+            && lowerInput.matches(".*(chemistry lab|molecular lab|chemistry activity|open chemistry lab|molecular structure viewer|chemistry matrix lab).*")) {
+            startActivity(new android.content.Intent(this, com.jarvis.android.chemistry.ChemistryActivity.class));
+            String reply = "[EMOTION:excited] Launching the interactive Chemistry Lab and Molecular Structure Viewer, sir.";
+            String clean = stripEmotionTag(reply);
+            history.add(new HistoryItem("model", clean));
+            addJarvisMsg(clean); speak(clean, "excited");
+            saveHistory(); setState(OrbView.OrbState.IDLE);
+            return;
+        }
+
         // ✈ Flight Tracker voice trigger
         java.util.regex.Matcher mFlight = java.util.regex.Pattern.compile(
             "(?:track|check|status of|show|find)\\s+(?:flight\\s+)?([A-Za-z]{2}\\d{1,4})",
@@ -5709,11 +5422,6 @@ private static String extractVideoScript(String raw) {
         messages.add(new Message(Message.TYPE_USER, text));
         adapter.notifyItemInserted(messages.size() - 1); scrollToBottom();
     }
-    private void addUserMsgWithImages(String text, List<String> imageUris) {
-        text = stripEmotionTag(text);
-        messages.add(new Message(Message.TYPE_USER, text, imageUris));
-        adapter.notifyItemInserted(messages.size() - 1); scrollToBottom();
-    }
     private void addJarvisMsg(String text) {
         text = stripEmotionTag(text);
         if (text == null || text.trim().isEmpty()) return;
@@ -5764,8 +5472,6 @@ private static String extractVideoScript(String raw) {
             case "cybersecurity": hint = "Analyzing security architecture…";    break;
             case "finance":       hint = "Modeling financial metrics…";         break;
             case "medical":       hint = "Reviewing clinical literature…";      break;
-            case "witty":         hint = "Calibrating wit & comebacks…";        break;
-            case "roast":         hint = "Generating witty roast…";             break;
             case "reason":        hint = "Thinking step by step…";              break;
             case "transit":       hint = "Planning your route…";                break;
             case "legal":         hint = "Checking UAE law…";                   break;
@@ -6908,16 +6614,37 @@ private static String extractVideoScript(String raw) {
         }
     }
 
-    private void openGeneratedVideo(java.io.File file) {
-        try {
-            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".provider", file);
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setDataAndType(uri, "video/mp4");
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(intent);
-        } catch (Exception e) {
-            Toast.makeText(this, "Video saved: " + file.getAbsolutePath(), Toast.LENGTH_LONG).show();
-        }
-    }
+    /**
+     * Pulls the actual script out of a video-generation request, so the trigger phrase itself
+     * ("create a 30 second video about...") doesn't end up rendered as on-screen text.
+     */
+    private static String extractVideoScript(String raw) {
+        if (raw == null) return "";
+        String trimmed = raw.trim();
 
+        // Explicit "trigger: script" form — everything after the first colon is the script.
+        int colon = trimmed.indexOf(':');
+        if (colon >= 0 && colon < trimmed.length() - 1) {
+            String after = trimmed.substring(colon + 1).trim();
+            if (!after.isEmpty()) return after;
+        }
+
+        // Strip a leading "create/make/... a 30 second video [about/on/of/for] " clause.
+        java.util.regex.Matcher lead = java.util.regex.Pattern.compile(
+                "^(create|make|produce|generate|render|animate)\\b.*?\\b(video|documentary|animation|animated|movie|film|clip)\\b\\s*(about|on|of|for|showing|covering|called|titled)?\\s*",
+                java.util.regex.Pattern.CASE_INSENSITIVE).matcher(trimmed);
+        if (lead.find() && lead.start() == 0) {
+            String remainder = trimmed.substring(lead.end()).trim();
+            if (!remainder.isEmpty()) return remainder;
+        }
+
+        // Strip fixed trigger phrases like "turn this script into a video" / "generate video from script".
+        String stripped = trimmed.replaceAll(
+                "(?i)\\b(turn this script into a video|generate video from script|render video|video storyboard)\\b\\s*[:\\-]?\\s*", "");
+        stripped = stripped.trim();
+        if (!stripped.isEmpty() && !stripped.equalsIgnoreCase(trimmed)) return stripped;
+
+        // Fallback: nothing recognizable to strip, use the whole message as-is.
+        return trimmed;
+    }
 }

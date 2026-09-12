@@ -3,10 +3,9 @@ package com.jarvis.ai;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
-import android.graphics.Path;
-import android.graphics.RectF;
 import android.graphics.Shader;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
@@ -14,55 +13,139 @@ import android.media.MediaCodecList;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
 import android.os.SystemClock;
+import android.text.Layout;
+import android.text.StaticLayout;
+import android.text.TextPaint;
 
 import java.io.File;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /**
  * Fully embedded free video renderer.
  *
- * It creates an actual H.264 MP4 on the Android device using platform MediaCodec
- * and MediaMuxer. Visuals are procedurally animated from the prompt as clean,
- * scene-based animation without title cards, grids, timelines, or watermarks.
- * This is intentionally not a cloud/diffusion model; it is a deterministic local
- * motion renderer that requires no installation or API key.
+ * Creates an actual H.264 MP4 on the Android device using platform MediaCodec and
+ * MediaMuxer. Duration and scenes are both derived from a script: one scene per
+ * sentence, duration auto-scaled 15s–15min from word count, each scene fades in/out
+ * with a slow Ken Burns zoom and its sentence rendered as wrapped on-screen text,
+ * Lottie-style. No cloud provider, API key, FFmpeg install, or diffusion model.
  */
 public final class HenryEmbeddedVideoEngine {
     private static final int FPS = 12;
     private static final int UNIQUE_FPS = 6;
-    private static final int MAX_WIDTH = 640;
-    private static final int MAX_HEIGHT = 360;
     private static final int I_FRAME_SECONDS = 2;
+
+    public static final int SCRIPT_MIN_DURATION_SEC = 15;
+    public static final int SCRIPT_MAX_DURATION_SEC = 15 * 60;
+    private static final double WORDS_PER_SECOND = 2.3; // ~140 wpm speaking pace
+    private static final double MIN_SCENE_SECONDS = 1.6;
+
+    private static final int[] SCENE_PALETTE = {
+            0xFF1A1A2E, 0xFF16213E, 0xFF0F3460, 0xFF533483,
+            0xFF1B262C, 0xFF3282B8, 0xFF2C3333, 0xFF122C34
+    };
 
     public interface ProgressCallback { void onProgress(String status, int percent); }
 
+    /** One script-derived scene: text + the time window (in seconds) it's shown for. */
+    public static final class SceneText {
+        final String text;
+        final float startSec;
+        final float endSec;
+        final int colorIndex;
+
+        SceneText(String text, float startSec, float endSec, int colorIndex) {
+            this.text = text;
+            this.startSec = startSec;
+            this.endSec = endSec;
+            this.colorIndex = colorIndex;
+        }
+    }
+
     public static final class Config {
-        final String topic;
         final int durationSeconds;
         final String aspectRatio;
         final String resolution;
         final int width;
         final int height;
+        final List<SceneText> scenes;
 
-        private Config(String topic, int durationSeconds, String aspectRatio, String resolution, int width, int height) {
-            this.topic = topic == null || topic.trim().isEmpty() ? "HENRY Cinematic Presentation" : topic.trim();
+        private Config(int durationSeconds, String aspectRatio, String resolution,
+                       int width, int height, List<SceneText> scenes) {
             this.durationSeconds = Math.max(1, durationSeconds);
             this.aspectRatio = aspectRatio;
             this.resolution = resolution;
             this.width = width;
             this.height = height;
+            this.scenes = scenes;
         }
 
-        public static Config from(String topic, int seconds, String aspectRatio, String resolution) {
+        /**
+         * Duration and scenes are both derived from the script itself.
+         * Duration = word count / speaking pace, clamped to [15s, 900s].
+         */
+        public static Config fromScript(String script, String aspectRatio, String resolution) {
+            return fromScript(script, 0, aspectRatio, resolution);
+        }
+
+        /**
+         * Same as {@link #fromScript(String, String, String)}, but if explicitDurationSeconds
+         * is greater than 0 (e.g. the user asked for "30 seconds" or "2 minutes"), that duration
+         * wins instead of the word-count estimate — still clamped to [15s, 900s].
+         */
+        public static Config fromScript(String script, int explicitDurationSeconds, String aspectRatio, String resolution) {
             boolean portrait = "9:16".equals(aspectRatio);
             int w = portrait ? 360 : 640;
             int h = portrait ? 640 : 360;
-            return new Config(topic, seconds, portrait ? "9:16" : "16:9", resolution == null ? "360p" : resolution, w, h);
+            int durationSeconds = explicitDurationSeconds > 0
+                    ? Math.max(SCRIPT_MIN_DURATION_SEC, Math.min(SCRIPT_MAX_DURATION_SEC, explicitDurationSeconds))
+                    : estimateDurationSeconds(script);
+            List<SceneText> scenes = buildScenesFromScript(script, durationSeconds);
+            return new Config(durationSeconds, portrait ? "9:16" : "16:9",
+                    resolution == null ? "360p" : resolution, w, h, scenes);
         }
     }
 
     private HenryEmbeddedVideoEngine() {}
+
+    /** Word count / speaking pace, clamped to the 15s–15min range. */
+    public static int estimateDurationSeconds(String script) {
+        String trimmed = script == null ? "" : script.trim();
+        int wordCount = trimmed.isEmpty() ? 0 : trimmed.split("\\s+").length;
+        double estimated = wordCount / WORDS_PER_SECOND;
+        return (int) Math.round(Math.max(SCRIPT_MIN_DURATION_SEC, Math.min(SCRIPT_MAX_DURATION_SEC, estimated)));
+    }
+
+    /** Splits the script into one scene per sentence, sized proportionally to its word count. */
+    private static List<SceneText> buildScenesFromScript(String script, int totalSeconds) {
+        List<SceneText> scenes = new ArrayList<>();
+        String trimmed = script == null ? "" : script.trim();
+        String[] raw = trimmed.split("(?<=[.!?])\\s+");
+        List<String> sentences = new ArrayList<>();
+        for (String s : raw) if (!s.trim().isEmpty()) sentences.add(s.trim());
+        if (sentences.isEmpty()) sentences.add(trimmed.isEmpty() ? "H.E.N.R.Y." : trimmed);
+
+        double[] weights = new double[sentences.size()];
+        double sum = 0;
+        for (int i = 0; i < sentences.size(); i++) {
+            int words = sentences.get(i).split("\\s+").length;
+            weights[i] = Math.max(words, 3);
+            sum += weights[i];
+        }
+
+        float cursor = 0f;
+        for (int i = 0; i < sentences.size(); i++) {
+            float dur = (float) ((weights[i] / sum) * totalSeconds);
+            dur = Math.max(dur, (float) Math.min(MIN_SCENE_SECONDS, totalSeconds));
+            float end = (i == sentences.size() - 1) ? totalSeconds : Math.min(cursor + dur, totalSeconds);
+            scenes.add(new SceneText(sentences.get(i), cursor, end, i % SCENE_PALETTE.length));
+            cursor = end;
+            if (cursor >= totalSeconds) break;
+        }
+        return scenes;
+    }
 
     public static boolean isSupported() {
         try {
@@ -103,7 +186,7 @@ public final class HenryEmbeddedVideoEngine {
             long lastProgress = 0;
             for (int unique = 0; unique < totalUniqueFrames; unique++) {
                 float time = unique / (float) UNIQUE_FPS;
-                drawFrame(canvas, paint, config, time, unique);
+                drawScriptScene(canvas, paint, config, time);
                 bitmap.getPixels(pixels, 0, config.width, 0, 0, config.width, config.height);
                 byte[] yuv = argbToYuv(pixels, config.width, config.height, colorFormat);
                 for (int r = 0; r < repeat; r++) {
@@ -257,96 +340,58 @@ public final class HenryEmbeddedVideoEngine {
 
     private static int clamp(int x) { return x < 0 ? 0 : Math.min(255, x); }
 
-    private static void drawFrame(Canvas c, Paint p, Config cfg, float t, int index) {
-        if (isUnderwaterTopic(cfg.topic)) {
-            drawUnderwaterScene(c, p, cfg, t);
-        } else {
-            drawAtmosphericScene(c, p, cfg, t);
+    // ------------------------------------------------------------------
+    // Script scene rendering: Lottie-style fade + slow zoom + wrapped text
+    // ------------------------------------------------------------------
+
+    private static SceneText findActiveScene(List<SceneText> scenes, float t) {
+        for (SceneText s : scenes) {
+            if (t >= s.startSec && t < s.endSec) return s;
         }
+        return scenes.get(scenes.size() - 1);
     }
 
-    private static boolean isUnderwaterTopic(String topic) {
-        String value = topic == null ? "" : topic.toLowerCase(Locale.US);
-        return value.contains("fish") || value.contains("ocean") || value.contains("sea")
-                || value.contains("underwater") || value.contains("marine") || value.contains("reef");
+    private static float smoothstep(float edge0, float edge1, float x) {
+        float v = Math.max(0f, Math.min(1f, (x - edge0) / Math.max(0.0001f, edge1 - edge0)));
+        return v * v * (3 - 2 * v);
     }
 
-    /** A clean, scene-led underwater animation for fish and ocean prompts. */
-    private static void drawUnderwaterScene(Canvas c, Paint p, Config cfg, float t) {
+    private static void drawScriptScene(Canvas c, Paint p, Config cfg, float t) {
         float w = cfg.width, h = cfg.height;
-        p.setShader(new LinearGradient(0, 0, 0, h,
-                new int[]{0xFF0D739A, 0xFF07577E, 0xFF03233F, 0xFF011426},
-                null, Shader.TileMode.CLAMP));
+        SceneText scene = findActiveScene(cfg.scenes, t);
+        float span = Math.max(0.001f, scene.endSec - scene.startSec);
+        float local = (t - scene.startSec) / span; // 0..1 progress through this scene
+        float fadeWindow = Math.min(0.5f, span * 0.25f) / span;
+        float alphaIn = smoothstep(0f, fadeWindow, local);
+        float alphaOut = 1f - smoothstep(1f - fadeWindow, 1f, local);
+        float alpha = Math.min(alphaIn, alphaOut);
+
+        int baseColor = SCENE_PALETTE[scene.colorIndex];
+        int nextColor = SCENE_PALETTE[(scene.colorIndex + 1) % SCENE_PALETTE.length];
+        p.setShader(new LinearGradient(0, 0, w, h, baseColor, nextColor, Shader.TileMode.CLAMP));
         c.drawRect(0, 0, w, h, p);
         p.setShader(null);
 
-        // Soft caustic light from the surface.
-        p.setStyle(Paint.Style.FILL);
-        for (int i = 0; i < 8; i++) {
-            float x = (i * w / 7f + (float) Math.sin(t * .45f + i) * 30) - 55;
-            Path ray = new Path();
-            ray.moveTo(x, 0); ray.lineTo(x + 28, 0);
-            ray.lineTo(x + 150, h * .78f); ray.lineTo(x - 95, h * .78f); ray.close();
-            p.setColor(0x115DEBFF); c.drawPath(ray, p);
-        }
+        float scale = 1f + 0.06f * local;
+        c.save();
+        c.translate(w / 2f, h / 2f);
+        c.scale(scale, scale);
+        c.translate(-w / 2f, -h / 2f);
 
-        // Rising bubbles.
-        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(Math.max(1.2f, w * .0022f));
-        for (int i = 0; i < 30; i++) {
-            float x = (i * 73f + (float) Math.sin(t + i) * 16) % w;
-            float y = h - ((i * 97f + t * (22 + i % 5 * 4)) % (h + 40));
-            float r = 2 + i % 5;
-            p.setColor(0x559DEFFF); c.drawCircle(x, y, r, p);
-        }
-        p.setStyle(Paint.Style.FILL);
+        TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        textPaint.setColor(Color.argb((int) (alpha * 255), 255, 255, 255));
+        textPaint.setTextSize(Math.max(16f, w * 0.075f));
+        textPaint.setTextAlign(Paint.Align.LEFT);
 
-        // Sand, coral, and swaying sea grass establish a real scene.
-        p.setColor(0xFF0B2D32); c.drawRect(0, h * .84f, w, h, p);
-        p.setColor(0xFF174D48);
-        for (int i = 0; i < 18; i++) {
-            float x = i * w / 17f;
-            float sway = (float) Math.sin(t * 1.3f + i) * 10;
-            p.setStrokeWidth(4 + i % 3); p.setStyle(Paint.Style.STROKE);
-            c.drawLine(x, h, x + sway, h * (.73f + (i % 4) * .025f), p);
-        }
-        p.setStyle(Paint.Style.FILL);
-        drawFish(c, p, w * (.25f + .18f * (float) Math.sin(t * .35f)), h * (.34f + .06f * (float) Math.sin(t)), w * .095f, 0xFFFFB44D, true, t);
-        drawFish(c, p, w * (.70f + .22f * (float) Math.sin(t * .28f + 2)), h * (.52f + .07f * (float) Math.sin(t * .8f)), w * .068f, 0xFF58D7FF, false, t + 1);
-        drawFish(c, p, w * (.52f + .30f * (float) Math.sin(t * .22f + 4)), h * (.24f + .05f * (float) Math.sin(t * .9f)), w * .045f, 0xFFF486B9, true, t + 2);
-    }
+        int layoutWidth = (int) (w * 0.82f);
+        StaticLayout layout = StaticLayout.Builder
+                .obtain(scene.text, 0, scene.text.length(), textPaint, layoutWidth)
+                .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                .setLineSpacing(1.05f, 1.1f)
+                .build();
 
-    private static void drawFish(Canvas c, Paint p, float x, float y, float size, int color, boolean right, float t) {
-        float direction = right ? 1f : -1f;
-        float tail = (float) Math.sin(t * 5f) * size * .18f;
-        p.setColor(color);
-        c.drawOval(new RectF(x - size, y - size * .48f, x + size, y + size * .48f), p);
-        Path fin = new Path();
-        fin.moveTo(x - direction * size, y);
-        fin.lineTo(x - direction * size * 1.62f, y - size * .62f + tail);
-        fin.lineTo(x - direction * size * 1.62f, y + size * .62f - tail);
-        fin.close(); c.drawPath(fin, p);
-        p.setColor(0x99FFFFFF); c.drawOval(new RectF(x - size * .15f, y - size * .78f, x + size * .45f, y - size * .06f), p);
-        p.setColor(0xFF101820); c.drawCircle(x + direction * size * .57f, y - size * .12f, Math.max(2f, size * .09f), p);
-    }
-
-    /** A clean non-branded scene for prompts that are not underwater. */
-    private static void drawAtmosphericScene(Canvas c, Paint p, Config cfg, float t) {
-        float w = cfg.width, h = cfg.height;
-        p.setShader(new LinearGradient(0, 0, w, h,
-                new int[]{0xFF100C2E, 0xFF16265D, 0xFF0C5370, 0xFF051924}, null, Shader.TileMode.CLAMP));
-        c.drawRect(0, 0, w, h, p); p.setShader(null);
-        p.setStyle(Paint.Style.FILL);
-        for (int i = 0; i < 70; i++) {
-            float x = (i * 89f + t * (6 + i % 5 * 3)) % w;
-            float y = (i * 47f + (float) Math.sin(t * .4f + i) * 20) % h;
-            p.setColor((90 + i % 120) << 24 | 0x00B9E9FF);
-            c.drawCircle(x, y, 1 + i % 3, p);
-        }
-        float cx = w * (.50f + .09f * (float) Math.sin(t * .24f));
-        float cy = h * (.52f + .06f * (float) Math.cos(t * .30f));
-        for (int r = 120; r > 16; r -= 18) {
-            p.setColor((5 + (120 - r) / 3) << 24 | 0x0059D8FF);
-            c.drawCircle(cx, cy, r, p);
-        }
+        c.translate((w - layoutWidth) / 2f, (h - layout.getHeight()) / 2f);
+        layout.draw(c);
+        c.restore();
     }
 }

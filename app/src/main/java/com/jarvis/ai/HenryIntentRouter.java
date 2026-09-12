@@ -251,7 +251,11 @@ public class HenryIntentRouter {
 
     private static boolean isVideoStudioRequest(String t) {
         if (t.contains("video studio") || t.contains("animation studio")) return true;
-        if (t.matches(".*\\b(create|make|produce|generate)\\s+(a|an)?\\s*\\d+\\s*(minute|min|sec|second)\\s*(video|documentary|animation|movie|film).*")) return true;
+        boolean creationVerb = t.matches(".*\\b(create|make|produce|generate|render|animate)\\b.*");
+        boolean videoNoun = t.matches(".*\\b(video|documentary|animation|animated|movie|film|clip)\\b.*");
+        boolean duration = t.matches(".*\\b\\d+\\s*(second|seconds|sec|secs|minute|minutes|min|mins)\\b.*");
+        // Allows either "create a 30-second video" or "make a video ... for 30 sec".
+        if (creationVerb && videoNoun && duration) return true;
         if (t.matches(".*\\b(turn this script into a video|generate video from script|render video|video storyboard).*")) return true;
         return false;
     }

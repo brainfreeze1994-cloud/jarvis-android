@@ -94,9 +94,9 @@ public class HenryWittyEngine {
     }
 
     public static WitIntensity getIntensity(Context context) {
-        if (context == null) return WitIntensity.NORMAL;
+        if (context == null) return WitIntensity.HIGH;
         SharedPreferences sp = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
-        String name = sp.getString(KEY_INTENSITY, WitIntensity.NORMAL.name());
+        String name = sp.getString(KEY_INTENSITY, WitIntensity.HIGH.name());
         try {
             return WitIntensity.valueOf(name);
         } catch (Exception e) {
@@ -134,25 +134,39 @@ public class HenryWittyEngine {
         if (text == null) return false;
         String t = text.toLowerCase(Locale.US);
 
+        if (isPartyGame(text)) return true;
         if (t.contains("roast me") || t.contains("roast") || t.contains("insult me") || t.contains("burn me")) return true;
         if (t.contains("witty") || t.contains("banat") || t.contains("hirit") || t.contains("pilosopo") || t.contains("bardagulan")) return true;
         if (t.contains("give me a funny answer") || t.contains("tell me a joke") || t.contains("make me laugh")) return true;
         if (t.contains("sarcastic answer") || t.contains("savage answer") || t.contains("patama")) return true;
-
-        // Natural Filipino/Taglish semantic collisions. Do NOT use a literal
-        // string such as "matinik.*bangus" with contains(); contains() does not
-        // interpret regex. Detect the concepts independently and allow either
-        // ordering so normal conversational phrasing is recognized.
-        boolean fishWord = t.contains("bangus") || t.contains("isda") || t.contains("fish");
-        boolean thornWord = t.contains("matinik") || t.contains("tinik");
-        boolean datingWord = t.contains("boys") || t.contains("boy") || t.contains("lalaki")
-                || t.contains("guys") || t.contains("dating");
-        if (fishWord && thornWord && (datingWord || t.contains("pero") || t.contains("ka"))) return true;
-
+        
         // Single word cues that match our double-meaning lexicon
         if (t.equals("bangus") || t.equals("ampalaya") || t.equals("matinik")) return true;
 
         return false;
+    }
+
+    /** Recognizes Kiss / Marry / Date (and the traditional Kiss / Marry / Kill) games. */
+    public static boolean isPartyGame(String text) {
+        if (text == null) return false;
+        String t = text.toLowerCase(Locale.US);
+        return (t.contains("kiss") && t.contains("marry") && (t.contains("date") || t.contains("kill")))
+                || t.contains("kiss marry date") || t.contains("kiss, marry") || t.contains("kmd");
+    }
+
+    /**
+     * Completes the entire party-game turn in one response. Image positions are
+     * used deliberately: the local engine cannot reliably identify people in photos.
+     */
+    public static String generatePartyGame(Context context, int imageCount) {
+        if (imageCount < 3) {
+            return "I need three photos for a proper Kiss, Marry, Date round—otherwise this game has the structural integrity of a group project at 11:59 PM.";
+        }
+        return "Okay, full commitment—no mysterious one-word answers today.\n\n" +
+                "💋 **Kiss:** Image 2 — confident energy, a little danger, and exactly the kind of decision that deserves a dramatic soundtrack.\n" +
+                "🌹 **Date:** Image 1 — looks like the best balance of charm and a conversation that would not need CPR after five minutes.\n" +
+                "💍 **Marry:** Image 3 — steady main-character energy; the choice for someone who can survive both romance and the family group chat.\n\n" +
+                "Purely a playful first-impression ranking based on the photos, of course. The real winner is whoever replies without making you decode a one-word text.";
     }
 
     /**
@@ -180,10 +194,14 @@ public class HenryWittyEngine {
 
         WitIntensity intensity = getIntensity(context);
         if (intensity == WitIntensity.OFF) {
-            return "I will keep things entirely professional and straightforward, sir.";
+            return "I will keep things entirely professional and straightforward.";
         }
 
         String lower = userQuery.toLowerCase(Locale.US);
+
+        if (isPartyGame(userQuery)) {
+            return "Send three photos and I will assign all three categories in one go—Kiss, Date, and Marry. No cliffhanger, no one-word reply, no emotional damage from unfinished admin.";
+        }
 
         // 1. Check double-meaning lexicon first
         for (Map.Entry<String, String[]> entry : DOUBLE_MEANING_LEXICON.entrySet()) {
@@ -204,7 +222,7 @@ public class HenryWittyEngine {
         }
 
         // 4. Default high-wit contrast response
-        return "[EMOTION:witty] " + getSavvyComeback(lower);
+        return getSavvyComeback(lower) + " Honestly, that question arrived with the confidence of a blockbuster and the planning of a group chat.";
     }
 
     private static String generateRoast(WitIntensity intensity) {
@@ -215,7 +233,7 @@ public class HenryWittyEngine {
                 "Tinititigan kita sa pamamagitan ng camera logic ko, at ang masasabi ko lang: napakalakas ng loob mo, sana sumabay din ang execution.",
                 "If confidence were currency, you'd be a billionaire, but if accuracy were required to stay out of debt, you'd be filing for Chapter 11 by sunrise."
         };
-        return "[EMOTION:witty] " + savageRoasts[random.nextInt(savageRoasts.length)];
+        return savageRoasts[random.nextInt(savageRoasts.length)] + " Please do not make me open a support ticket for your decision-making department.";
     }
 
     private static String generateContextualJoke() {

@@ -33,19 +33,35 @@ public class SmartHomeHelper {
     }
 
     public static boolean isSmartHomeQuery(String input) {
-        String t = input.toLowerCase();
-        // "ac" bare-matched "active" ("active storms"), sending storm queries
-        // here instead of the storm tracker. Bail out on storm/weather words.
-        if (t.contains("storm") || t.contains("typhoon") || t.contains("hurricane") ||
-            t.contains("cyclone")) return false;
-        return t.contains("light") || t.contains("lamp") || containsWord(t, "ac") || t.contains("air con")
-            || t.contains("thermostat") || t.contains("temperature") || t.contains("smart home")
-            || t.contains("alexa") || t.contains("google home") || t.contains("hue")
-            || t.contains("turn on") || t.contains("turn off") || containsWord(t, "dim")
-            || t.contains("brightness") && (t.contains("room") || t.contains("light"))
-            || t.contains("lock") && t.contains("door") || t.contains("unlock")
-            || containsWord(t, "fan") || t.contains("curtain") || t.contains("blinds")
-            || t.contains("plug") || t.contains("socket") || t.contains("switch");
+        if (input == null) return false;
+        String t = input.toLowerCase().trim();
+
+        // Reject queries that are clearly not smart home control (video, stories, traffic, recipes, weather/storms)
+        if (t.contains("video") || t.contains("movie") || t.contains("clip") || t.contains("animation")
+            || t.contains("script") || t.contains("traffic") || t.contains("story") || t.contains("recipe")
+            || t.contains("storm") || t.contains("typhoon") || t.contains("hurricane") || t.contains("cyclone")
+            || t.contains("flight") || t.contains("weather")) {
+            return false;
+        }
+
+        boolean hasLight = (containsWord(t, "lights") || containsWord(t, "lamp") || containsWord(t, "lamps")
+            || (containsWord(t, "light") && (t.contains("turn") || t.contains("switch") || t.contains("dim")
+                || t.contains("bright") || t.contains("room") || t.contains("bedroom") || t.contains("living")
+                || t.contains("kitchen") || t.contains("hallway") || t.contains("ceiling") || t.contains("desk")
+                || t.contains("on") || t.contains("off"))));
+
+        boolean hasFan = containsWord(t, "fan") && (t.contains("turn") || t.contains("ceiling")
+            || t.contains("speed") || t.contains("on") || t.contains("off") || t.contains("room"));
+
+        return hasLight || hasFan || containsWord(t, "ac") || t.contains("air con") || t.contains("aircon")
+            || t.contains("thermostat") || (t.contains("temperature") && (t.contains("set") || t.contains("room")))
+            || t.contains("smart home") || t.contains("alexa") || t.contains("google home") || t.contains("hue")
+            || (t.contains("turn on") && (t.contains("device") || t.contains("appliance") || t.contains("heater")))
+            || (t.contains("turn off") && (t.contains("device") || t.contains("appliance") || t.contains("heater")))
+            || containsWord(t, "dim") || t.contains("curtain") || t.contains("blinds")
+            || (t.contains("brightness") && (t.contains("room") || t.contains("light")))
+            || (t.contains("lock") && t.contains("door")) || (t.contains("unlock") && t.contains("door"))
+            || t.contains("smart plug") || t.contains("smart switch") || t.contains("smart socket");
     }
 
     public static String parseCommand(String input) {

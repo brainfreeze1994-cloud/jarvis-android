@@ -577,12 +577,12 @@ public class SystemDiagnosticEngine {
 
         // Test arithmetic
         HenryMathEngine.MathResult r1 = HenryMathEngine.solve("45 * 2 + 10", HenryMathEngine.MathMode.QUICK_ANSWER);
-        boolean t1Ok = r1.solved && r1.numericValue == 100.0;
+        boolean t1Ok = r1.solved && r1.numericValue == 100.0 && r1.fullExplanation != null && !r1.fullExplanation.trim().isEmpty();
         details.add("Arithmetic: 45 * 2 + 10 = " + r1.cleanAnswer + (t1Ok ? " [PASS]" : " [FAIL]"));
 
         // Test linear equation
         HenryMathEngine.MathResult r2 = HenryMathEngine.solve("2x + 5 = 15", HenryMathEngine.MathMode.STEP_BY_STEP);
-        boolean t2Ok = r2.solved && r2.numericValue == 5.0;
+        boolean t2Ok = r2.solved && r2.numericValue == 5.0 && r2.fullExplanation != null && !r2.fullExplanation.trim().isEmpty();
         details.add("Linear: 2x + 5 = 15 -> " + r2.cleanAnswer + (t2Ok ? " [PASS]" : " [FAIL]"));
 
         // Test derivative
@@ -677,10 +677,11 @@ public class SystemDiagnosticEngine {
         details.add("Audio Ducking Configured: " + (proj.audioDuckingEnabled ? "Yes (-14dB)" : "No"));
 
         long latency = System.currentTimeMillis() - t0;
+        details.add("Audit scope: PLANNING/STORYBOARD only; no claim of rendered video generation.");
         return new SubsystemResult("video_studio", "Video & Animation Production Studio", "CREATIVE",
                 passed, passed ? "PASS" : "FAIL", passed ? 0xFF00FFCC : 0xFFFF4757,
-                passed ? "Multi-scene storyboard and shot breakdown verified" : "Video studio error",
-                details, latency, "Modular Video Studio Pipeline", passed ? "PASS" : "FAIL",
+                passed ? "Video planning pipeline verified (rendering is a separate provider-dependent capability)" : "Video planning error",
+                details, latency, "Modular Video Studio Planning Pipeline", passed ? "PASS" : "FAIL",
                 passed ? null : "Storyboard scene count below threshold", passed ? "NONE" : "LOW",
                 passed ? null : "Inspect HenryVideoStudioEngine scene generation logic.");
     }

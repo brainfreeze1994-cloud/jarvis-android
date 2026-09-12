@@ -2313,6 +2313,12 @@ public class MainActivity extends AppCompatActivity {
             int photoCount = pendingImagesBase64.isEmpty()
                     ? lastAnalyzedImagesBase64.size() : pendingImagesBase64.size();
             if (photoCount > 0) {
+                // Keep the exact photos in the visible chat beside the answer.
+                // The earlier path cleared the attachment before creating a chat item.
+                List<String> partyPhotoUris = new ArrayList<>();
+                for (Uri uri : pendingImagesUris) {
+                    if (uri != null) partyPhotoUris.add(uri.toString());
+                }
                 if (!pendingImagesBase64.isEmpty()) {
                     lastAnalyzedImagesBase64.clear();
                     lastAnalyzedImagesBase64.addAll(pendingImagesBase64);
@@ -2320,7 +2326,8 @@ public class MainActivity extends AppCompatActivity {
                 }
                 String partyReply = HenryWittyEngine.generatePartyGame(this, photoCount);
                 history.add(new HistoryItem("user", userText));
-                addUserMsg(userText);
+                if (!partyPhotoUris.isEmpty()) addUserMsgWithImages(userText, partyPhotoUris);
+                else addUserMsg(userText);
                 history.add(new HistoryItem("model", partyReply));
                 addJarvisMsg(partyReply);
                 speak(partyReply, "neutral");
@@ -5666,6 +5673,11 @@ public class MainActivity extends AppCompatActivity {
     private void addUserMsg(String text) {
         text = stripEmotionTag(text);
         messages.add(new Message(Message.TYPE_USER, text));
+        adapter.notifyItemInserted(messages.size() - 1); scrollToBottom();
+    }
+    private void addUserMsgWithImages(String text, List<String> imageUris) {
+        text = stripEmotionTag(text);
+        messages.add(new Message(Message.TYPE_USER, text, imageUris));
         adapter.notifyItemInserted(messages.size() - 1); scrollToBottom();
     }
     private void addJarvisMsg(String text) {

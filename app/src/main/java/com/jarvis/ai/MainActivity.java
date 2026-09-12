@@ -2481,7 +2481,7 @@ public class MainActivity extends AppCompatActivity {
             addJarvisMsg(intro);
             speak("Starting real video production, sir.", "excited");
 
-            HenryVideoProductionManager.generate(this, userText, finalTargetSeconds, "16:9", "720p", new HenryVideoProductionManager.Callback() {
+         HenryVideoProductionManager.generateFromScript(this, userText, finalTargetSeconds, "16:9", "720p", new HenryVideoProductionManager.Callback() {
                 @Override
                 public void onStatus(String status, int completed, int total) {
                     runOnUiThread(() -> {

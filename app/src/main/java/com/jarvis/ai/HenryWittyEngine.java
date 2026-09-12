@@ -91,6 +91,16 @@ public class HenryWittyEngine {
                 "Pogi ka raw? Sinabi ba 'yan ng nanay mo o may objective peer-reviewed scientific source ka?",
                 "Ang confidence mo pang-international model, pero ang camera roll mo puno ng 47 angles para makakuha ng isang acceptable."
         });
+
+        DOUBLE_MEANING_LEXICON.put("ex", new String[]{
+                "Ex na naman? That chapter has more rereads than a Wattpad classic, but the plot still refuses to improve.",
+                "Ang ex mo parang free trial: expired na, pero may pop-up pa rin sa isip mo."
+        });
+
+        DOUBLE_MEANING_LEXICON.put("late", new String[]{
+                "Late ka na naman? Hindi na 'yan fashionably late—may sariling time zone na ang entrance mo.",
+                "Your ETA is starting to feel less like a time and more like a work of fiction."
+        });
     }
 
     public static WitIntensity getIntensity(Context context) {
@@ -222,18 +232,18 @@ public class HenryWittyEngine {
         }
 
         // 4. Default high-wit contrast response
-        return getSavvyComeback(lower) + " Honestly, that question arrived with the confidence of a blockbuster and the planning of a group chat.";
+        return getSavvyComeback(lower) + " " + getHumanWordplay(lower);
     }
 
     private static String generateRoast(WitIntensity intensity) {
         String[] savageRoasts = {
-                "I would love to roast you, but my system architecture is configured not to burn items of zero economic or thermodynamic value.",
+                "I would roast you, but your recent decisions have already been running the barbecue without supervision.",
                 "You ask for a roast as if your daily life decisions haven't already done the cooking for me.",
-                "Your thought process is like an unindexed SQL database running on a floppy disk—audible groaning, high latency, and almost always returns NULL.",
-                "Tinititigan kita sa pamamagitan ng camera logic ko, at ang masasabi ko lang: napakalakas ng loob mo, sana sumabay din ang execution.",
+                "Your thought process is like a group project: plenty of activity, no clear owner, and one detail doing all the work.",
+                "Napakalakas ng loob mo; sana sumabay din ang execution para hindi puro trailer ang buhay.",
                 "If confidence were currency, you'd be a billionaire, but if accuracy were required to stay out of debt, you'd be filing for Chapter 11 by sunrise."
         };
-        return savageRoasts[random.nextInt(savageRoasts.length)] + " Please do not make me open a support ticket for your decision-making department.";
+        return savageRoasts[random.nextInt(savageRoasts.length)] + " Your decision-making department has been placed on a very gentle performance review.";
     }
 
     private static String generateContextualJoke() {
@@ -250,9 +260,23 @@ public class HenryWittyEngine {
         String[] comebacks = {
                 "Pakinggan mo sarili mo. Kahit si Alan Turing magre-restart ng router pag narinig 'yan.",
                 "Impressive premise, pero ang delivery parang 2G connection sa ilalim ng basement.",
-                "I compute at three trillion floating point operations per second, and yet none of that computational power prepared me for this exact question.",
+                "That question arrived wearing confidence, but it forgot to bring a plan.",
                 "Gusto mo ng diretso o gusto mo 'yung may background music pa para hindi masyadong masakit?"
         };
         return comebacks[random.nextInt(comebacks.length)];
+    }
+
+    /** Adds natural wordplay without referring to HENRY, AI, or internal capabilities. */
+    private static String getHumanWordplay(String query) {
+        if (query.contains("love") || query.contains("date") || query.contains("crush")) {
+            return "Romance is not a spreadsheet, but this one is still missing several cells of common sense.";
+        }
+        if (query.contains("work") || query.contains("school") || query.contains("deadline")) {
+            return "At this point the deadline is not approaching—it has moved in and started paying rent.";
+        }
+        if (query.contains("money") || query.contains("buy") || query.contains("price")) {
+            return "That budget has the same energy as a diet that begins after one last snack.";
+        }
+        return "It has the confidence of a blockbuster and the planning of a group chat.";
     }
 }

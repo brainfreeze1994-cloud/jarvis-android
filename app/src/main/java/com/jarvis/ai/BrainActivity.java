@@ -26,35 +26,41 @@ public class BrainActivity extends AppCompatActivity {
         if (brainView != null) {
             brainView.setOnRegionClickListener(region -> {
                 switch (region) {
-                    case "mental_imagery":
-                        startActivity(new Intent(this, MentalImageryActivity.class));
+                    case "reasoning_core":
+                        launchPrompt("Explain the conceptual reasoning and architecture behind H.E.N.R.Y.");
                         break;
-                    case "sensory_substitution":
-                        startActivity(new Intent(this, SensorySubstitutionActivity.class));
+                    case "vision_cortex":
+                        startActivity(new Intent(this, VisionActivity.class));
                         break;
-                    case "neural_plasticity":
-                        startActivity(new Intent(this, NeuralPlasticityActivity.class));
-                        break;
-                    case "default_mode":
-                        startActivity(new Intent(this, DefaultModeNetworkActivity.class));
-                        break;
-                    case "memory":
+                    case "memory_banks":
                         startActivity(new Intent(this, SmartMemoryActivity.class));
                         break;
-                    case "hacking_skills":
-                        HenryStudioManager.showHackingStudio(this, this::launchPrompt);
+                    case "planning_core":
+                        launchPrompt("ULTRA: Plan and execute multi-step research and production workflow");
                         break;
-                    case "finance_skills":
-                        HenryStudioManager.showBusinessStudio(this, this::launchPrompt);
+                    case "action_engine":
+                        launchPrompt("Show active tool execution and action engine commands");
                         break;
-                    case "medical_skills":
-                        HenryStudioManager.showMedicalStudio(this, this::launchPrompt);
+                    case "research_core":
+                        startActivity(new Intent(this, SpaceActivity.class));
                         break;
-                    case "programming_studio":
+                    case "creative_engine":
+                        HenryStudioManager.showScriptwriterStudio(this, this::launchPrompt);
+                        break;
+                    case "safety_core":
+                        startActivity(new Intent(this, SystemDiagnosticActivity.class));
+                        break;
+                    case "code_engine":
                         HenryStudioManager.showProgrammingStudio(this, this::launchPrompt);
                         break;
-                    case "artifact_studio":
-                        HenryStudioManager.showArtifactStudio(this, this::launchPrompt);
+                    case "science_core":
+                        startActivity(new Intent(this, com.jarvis.android.chemistry.ChemistryActivity.class));
+                        break;
+                    case "math_engine":
+                        launchPrompt("Solve 3x^2 - 12x + 9 = 0 using Polya step-by-step reasoning");
+                        break;
+                    default:
+                        Toast.makeText(this, "Region activated: " + region, Toast.LENGTH_SHORT).show();
                         break;
                 }
             });

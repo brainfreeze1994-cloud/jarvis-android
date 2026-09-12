@@ -28,16 +28,17 @@ public class HenryBrainView extends View {
 
     // {id, label, cx%, cy%, rx%, ry%, ARGB color}
     private static final Object[][] REGIONS = {
-        {"mental_imagery",       "Mental\nImagery",      0.50f, 0.18f, 0.18f, 0.10f, 0xFF00D4FF},
-        {"neural_plasticity",    "Neural\nPlasticity",   0.25f, 0.30f, 0.14f, 0.10f, 0xFF00FF99},
-        {"default_mode",         "Default\nMode",        0.75f, 0.30f, 0.14f, 0.10f, 0xFFCC88FF},
-        {"sensory_substitution", "Sensory\nSub.",        0.20f, 0.50f, 0.13f, 0.09f, 0xFFFF9944},
-        {"memory",               "Memory\nBanks",        0.80f, 0.50f, 0.13f, 0.09f, 0xFFFFDD00},
-        {"hacking_skills",       "Hacking &\nCyber",     0.30f, 0.69f, 0.12f, 0.08f, 0xFFFF2A6D},
-        {"finance_skills",       "Business\n& Finance",  0.50f, 0.74f, 0.12f, 0.08f, 0xFF00E676},
-        {"medical_skills",       "Medical\n& Health",    0.70f, 0.69f, 0.12f, 0.08f, 0xFF00D4FF},
-        {"programming_studio",   "Coding\nStudio",       0.28f, 0.85f, 0.13f, 0.07f, 0xFFFFD700},
-        {"artifact_studio",      "Artifact\nStudio",     0.72f, 0.85f, 0.13f, 0.07f, 0xFF00E5FF},
+        {"reasoning_core",       "Reasoning\nCore",      0.50f, 0.17f, 0.16f, 0.09f, 0xFF00D4FF},
+        {"vision_cortex",        "Vision\nCortex",       0.24f, 0.29f, 0.14f, 0.09f, 0xFF00FF99},
+        {"memory_banks",         "Memory\nBanks",        0.76f, 0.29f, 0.14f, 0.09f, 0xFFFFDD00},
+        {"planning_core",        "Planning\n(ULTRA)",    0.20f, 0.47f, 0.13f, 0.08f, 0xFFFF9944},
+        {"action_engine",        "Action\nEngine",       0.80f, 0.47f, 0.13f, 0.08f, 0xFFFF2A6D},
+        {"research_core",        "Research\nCore",       0.50f, 0.46f, 0.13f, 0.08f, 0xFF7000FF},
+        {"creative_engine",      "Creative\nEngine",     0.26f, 0.65f, 0.13f, 0.08f, 0xFFFF66CC},
+        {"safety_core",          "Safety\n& Audit",      0.74f, 0.65f, 0.13f, 0.08f, 0xFF00E676},
+        {"code_engine",          "Code\nEngine",         0.28f, 0.82f, 0.13f, 0.07f, 0xFFFFD700},
+        {"science_core",         "Science\n(Chemistry)", 0.72f, 0.82f, 0.13f, 0.07f, 0xFF00E5FF},
+        {"math_engine",          "Math\nEngine",         0.50f, 0.76f, 0.13f, 0.07f, 0xFF00B0FF},
     };
 
     private String hoveredRegion = null;

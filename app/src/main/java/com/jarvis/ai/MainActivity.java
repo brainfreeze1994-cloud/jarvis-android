@@ -2293,6 +2293,172 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void askHenry(String userText) {
+        if (userText == null || userText.trim().isEmpty()) return;
+
+        // ══════════════════════════════════════════════════════════════════════
+        // DETERMINISTIC INTENT ROUTING LAYER (HenryIntentRouter)
+        // High-confidence deterministic dispatching for Game, Math, Ultra, Witty, Opinion, etc.
+        // ══════════════════════════════════════════════════════════════════════
+        HenryIntentRouter.TaskGraph taskGraph = HenryIntentRouter.route(userText);
+        HenryIntentRouter.ClassifiedIntent primary = taskGraph.primaryIntent;
+
+        // 1. GAME GENERATION (e.g., "A tic tac toe game") -> Never misroute to Sports
+        if (primary.type == HenryIntentRouter.IntentType.GAME_GENERATION) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String title = userText.toLowerCase(Locale.US).contains("tic tac toe") ? "Tic Tac Toe" : "Game Studio";
+            String code = HenryStudioManager.getInstantGameCode(userText);
+            history.add(new HistoryItem("model", stripEmotionTag(code))); addJarvisMsg(stripEmotionTag(code));
+            speak("Here is your complete game engine code, sir.", "excited");
+            saveHistory();
+            return;
+        }
+
+        // 2. ULTRA MULTI-INTENT ORCHESTRATION PIPELINE
+        if (primary.type == HenryIntentRouter.IntentType.ULTRA_ORCHESTRATION) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING);
+            String initMsg = "⚡ ULTRA MODE ACTIVATED: Decomposing workflow into discrete stages (Research -> Multi-Artifact Generation -> Verification)...";
+            history.add(new HistoryItem("model", initMsg)); addJarvisMsg(initMsg);
+            speak("Ultra mode activated. Executing autonomous workflow pipeline, sir.", "excited");
+            HenryUltraOrchestrator.execute(this, userText, new HenryUltraOrchestrator.OrchestrationCallback() {
+                @Override
+                public void onPlanReady(java.util.List<HenryUltraOrchestrator.UltraSubTask> tasks) {
+                    runOnUiThread(() -> addJarvisMsg("📋 Planned " + tasks.size() + " subtasks for autonomous execution."));
+                }
+                @Override
+                public void onTaskStarted(int taskIndex, String taskTitle) {
+                    runOnUiThread(() -> setState(OrbView.OrbState.THINKING));
+                }
+                @Override
+                public void onTaskProgress(int taskIndex, String progressMessage) {
+                    runOnUiThread(() -> {
+                        if (tvOrbHint != null) tvOrbHint.setText(progressMessage);
+                    });
+                }
+                @Override
+                public void onTaskCompleted(int taskIndex, String outcome, java.io.File artifact) {
+                    runOnUiThread(() -> {
+                        if (artifact != null) {
+                            addJarvisMsg("📦 " + outcome);
+                        }
+                    });
+                }
+                @Override
+                public void onOrchestrationComplete(HenryUltraOrchestrator.UltraExecutionResult result) {
+                    runOnUiThread(() -> {
+                        setState(OrbView.OrbState.SPEAKING);
+                        history.add(new HistoryItem("model", result.finalReportMarkdown));
+                        addJarvisMsg(result.finalReportMarkdown);
+                        speak("Ultra workflow completed successfully with all verified artifacts, sir.", "proud");
+                        saveHistory();
+                    });
+                }
+                @Override
+                public void onError(String error) {
+                    runOnUiThread(() -> {
+                        setState(OrbView.OrbState.IDLE);
+                        history.add(new HistoryItem("model", "⚠️ " + error));
+                        addJarvisMsg("⚠️ " + error);
+                        speak("Ultra orchestration encountered an error, sir.", "concerned");
+                        saveHistory();
+                    });
+                }
+            });
+            return;
+        }
+
+        // 3. MATH ENGINE (Polya 4-step solver & arithmetic)
+        if (primary.type == HenryIntentRouter.IntentType.MATH_SOLVE) {
+            HenryMathEngine.MathMode mode = userText.toLowerCase(Locale.US).contains("step") ?
+                    HenryMathEngine.MathMode.STEP_BY_STEP : HenryMathEngine.MathMode.QUICK_ANSWER;
+            HenryMathEngine.MathResult mathResult = HenryMathEngine.solve(userText, mode);
+            if (mathResult.solved) {
+                history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                String fullAnswer = (mode == HenryMathEngine.MathMode.STEP_BY_STEP && mathResult.fullExplanation != null) ?
+                        mathResult.fullExplanation : mathResult.cleanAnswer;
+                history.add(new HistoryItem("model", fullAnswer)); addJarvisMsg(fullAnswer);
+                speak(mathResult.cleanAnswer, "proud"); saveHistory();
+                return;
+            }
+        }
+
+        // 4. WITTY BANTER / ROAST / COMEDY ENGINE
+        if (primary.type == HenryIntentRouter.IntentType.WITTY_RESPONSE) {
+            String wittyResponse = HenryWittyEngine.generateWittyResponse(this, userText);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            String clean = stripEmotionTag(wittyResponse);
+            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
+            speak(clean, "witty"); saveHistory();
+            return;
+        }
+
+        // 5. DECISIVE OPINION & COMPARISON ENGINE
+        if (primary.type == HenryIntentRouter.IntentType.OPINION_COMPARISON) {
+            String opinionResponse = HenryOpinionEngine.evaluate(userText);
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            history.add(new HistoryItem("model", opinionResponse)); addJarvisMsg(opinionResponse);
+            speak("Here is my decisive breakdown and recommendation, sir.", "proud"); saveHistory();
+            return;
+        }
+
+        // 6. SCRIPTWRITER & SCREENPLAY ENGINE
+        if (primary.type == HenryIntentRouter.IntentType.SCRIPTWRITING) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            HenryScriptwriterEngine.ScriptResult sr = HenryScriptwriterEngine.generateScript(userText, HenryScriptwriterEngine.ScriptFormat.YOUTUBE_LONG, 5);
+            history.add(new HistoryItem("model", sr.fullScript)); addJarvisMsg(sr.fullScript);
+            speak("Script generated with 3-act narrative beats and timing cadence, sir.", "proud"); saveHistory();
+            return;
+        }
+
+        // 7. VIDEO & ANIMATION PRODUCTION STUDIO
+        if (primary.type == HenryIntentRouter.IntentType.VIDEO_STUDIO) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            HenryVideoStudioEngine.VideoProject proj = HenryVideoStudioEngine.planProduction(userText, 5);
+            String summary = HenryVideoStudioEngine.formatProjectSummary(proj);
+            history.add(new HistoryItem("model", summary)); addJarvisMsg(summary);
+            speak("Video storyboard and timeline tracks generated, sir.", "proud"); saveHistory();
+            return;
+        }
+
+        // 8. IMAGE GENERATION PIPELINE
+        if (primary.type == HenryIntentRouter.IntentType.IMAGE_GENERATION) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            setState(OrbView.OrbState.THINKING);
+            addJarvisMsg("🎨 Generating image: " + ImageGenerator.extractPrompt(userText) + "...");
+            speak("Synthesizing image tokens, sir.", "neutral");
+            boolean isAnim = userText.toLowerCase(Locale.US).contains("animate") || userText.toLowerCase(Locale.US).contains("gif");
+            HenryImagePipeline.generateImage(this, userText, isAnim, new HenryImagePipeline.ImageCallback() {
+                @Override
+                public void onStateChanged(HenryImagePipeline.ImageState state, String message) {
+                    runOnUiThread(() -> {
+                        if (tvOrbHint != null) tvOrbHint.setText(message);
+                    });
+                }
+                @Override
+                public void onSuccess(Bitmap bitmap, java.io.File savedFile, String prompt) {
+                    runOnUiThread(() -> {
+                        setState(OrbView.OrbState.IDLE);
+                        String r = "Here is your generated image, sir. Saved to device cache (" + savedFile.getName() + ").";
+                        history.add(new HistoryItem("model", r));
+                        addJarvisMsg(r);
+                        speak("Image generation complete, sir.", "excited");
+                        saveHistory();
+                    });
+                }
+                @Override
+                public void onError(String error, boolean canRetry) {
+                    runOnUiThread(() -> {
+                        setState(OrbView.OrbState.IDLE);
+                        history.add(new HistoryItem("model", "⚠️ Image generation failed: " + error));
+                        addJarvisMsg("⚠️ Image generation failed: " + error);
+                        speak("Image generation encountered an issue, sir.", "concerned");
+                        saveHistory();
+                    });
+                }
+            });
+            return;
+        }
+
         // ── Vision Intelligence — checked FIRST ───────────────────────────────
         {
             String vl = userText.toLowerCase(java.util.Locale.US).trim();

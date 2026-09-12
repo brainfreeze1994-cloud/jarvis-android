@@ -16,15 +16,28 @@ public final class HenryVideoProductionManager {
 
     private HenryVideoProductionManager() {}
 
-    public static void generate(Context context, String topic, int targetMinutes,
-                                String aspectRatio, String resolution, Callback callback) {
-        final int minutes = Math.max(1, Math.min(30, targetMinutes));
+    /**
+     * Script-driven video: duration is auto-scaled from the script's word count (15s–15min),
+     * and each sentence becomes its own on-screen scene with fade + slow zoom, Lottie-style.
+     */
+    public static void generateFromScript(Context context, String script,
+                                           String aspectRatio, String resolution, Callback callback) {
+        generateFromScript(context, script, 0, aspectRatio, resolution, callback);
+    }
+
+    /**
+     * Same as {@link #generateFromScript(Context, String, String, String, Callback)}, but takes
+     * an explicit target duration in seconds (e.g. parsed from "make a 30 second video") — pass
+     * 0 to fall back to the word-count estimate instead.
+     */
+    public static void generateFromScript(Context context, String script, int explicitDurationSeconds,
+                                           String aspectRatio, String resolution, Callback callback) {
         new Thread(() -> {
             try {
-                callback.onStatus("EMBEDDED VIDEO ENGINE: preparing local renderer…", 0, 1);
-                File out = new File(context.getCacheDir(), "HENRY_EMBEDDED_" + System.currentTimeMillis() + ".mp4");
-                HenryEmbeddedVideoEngine.Config config = HenryEmbeddedVideoEngine.Config.from(
-                        topic, minutes * 60, aspectRatio, resolution);
+                callback.onStatus("EMBEDDED VIDEO ENGINE: parsing script into scenes…", 0, 1);
+                File out = new File(context.getCacheDir(), "HENRY_SCRIPT_" + System.currentTimeMillis() + ".mp4");
+                HenryEmbeddedVideoEngine.Config config = HenryEmbeddedVideoEngine.Config.fromScript(
+                        script, explicitDurationSeconds, aspectRatio, resolution);
                 HenryEmbeddedVideoEngine.render(context, config, (status, percent) -> {
                     callback.onStatus(status, percent, 100);
                 }, out);
@@ -35,6 +48,6 @@ public final class HenryVideoProductionManager {
             } catch (Throwable e) {
                 callback.onError(e.getMessage() != null ? e.getMessage() : "Embedded video production failed.");
             }
-        }, "henry-embedded-video-production").start();
+        }, "henry-script-video-production").start();
     }
 }

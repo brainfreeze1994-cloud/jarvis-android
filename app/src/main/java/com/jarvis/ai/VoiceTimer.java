@@ -54,7 +54,11 @@ public class VoiceTimer {
 
     /** Full start — parses duration + optional label from command text. */
     public static String startFromText(Context ctx, String text, Callback cb) {
+        if (text == null) return null;
         String t = text.toLowerCase(java.util.Locale.US);
+        if (t.contains("video") || t.contains("movie") || t.contains("animation") || t.contains("clip") || t.contains("script")) {
+            return null;
+        }
         if (!t.contains("timer") && !t.contains("count")) {
             if (!t.matches(".*\\d+\\s*(hour|minute|min|second|sec).*")) return null;
         }

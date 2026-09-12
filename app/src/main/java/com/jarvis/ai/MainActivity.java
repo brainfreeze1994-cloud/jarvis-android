@@ -6654,9 +6654,11 @@ public class MainActivity extends AppCompatActivity {
     public static boolean isVideoStudioQuery(String text) {
         if (text == null) return false;
         String t = text.toLowerCase(Locale.US).trim();
-        return t.matches(".*\\b(create|make|produce|generate|render|animate)\\b.*?\\b(video|documentary|animation|movie|film|clip)\\b.*")
-            || t.matches(".*\\b(video|animation|movie)\\b.*?\\b(from script|storyboard|production)\\b.*")
-            || t.matches(".*\\b(turn this script into a video|generate video from script|render video)\\b.*")
-            || t.matches(".*\\b(create|make|generate)\\s+(?:a\\s+)?\\d+\\s*(?:second|seconds|sec|secs|minute|minutes|min|mins)\\s+video.*");
+        boolean hasVideoWord = t.contains("video") || t.contains("animation") || t.contains("movie") || t.contains("film") || t.contains("clip");
+        if (!hasVideoWord) return false;
+
+        return t.contains("create") || t.contains("make") || t.contains("generate")
+            || t.contains("produce") || t.contains("render") || t.contains("animate")
+            || t.contains("from script") || t.contains("storyboard");
     }
 }

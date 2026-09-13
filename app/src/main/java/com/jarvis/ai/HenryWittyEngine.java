@@ -3,7 +3,9 @@ package com.jarvis.ai;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
@@ -165,8 +167,46 @@ public class HenryWittyEngine {
     }
 
     /**
+     * Builds a structured vision-analysis prompt for a Kiss/Marry/Date round. Requiring
+     * one strictly-formatted line per photo (rather than open-ended commentary) is what
+     * makes the reply reliably parseable afterward for the slideshow video.
+     */
+    public static String buildPartyGameVisionPrompt(int photoCount) {
+        int n = Math.max(1, Math.min(photoCount, 3));
+        return "Play Kiss, Marry, Date using the " + photoCount + " attached photos, in the exact order " +
+                "they were sent. Assign the three roles Kiss, Date, and Marry across the first " + n +
+                " photos, each role used exactly once. Base each reason on specific, observable details " +
+                "in that actual photo — clothing, expression, setting, energy — not generic filler, and " +
+                "keep each reason to one short witty sentence.\n\n" +
+                "Reply with exactly " + n + " lines, one per photo, in this exact format and nothing else " +
+                "before or after:\n" +
+                "Photo 1: ROLE — reason\n" +
+                "Photo 2: ROLE — reason\n" +
+                (n > 2 ? "Photo 3: ROLE — reason\n" : "") +
+                "ROLE must be exactly one of: Kiss, Date, Marry.";
+    }
+
+    /**
+     * Parses "Photo N: ROLE — reason" lines out of a vision reply. Returns one
+     * String[]{photoIndex, role, reason} per matched line, in the order they
+     * appeared in the reply (not necessarily photo order, if the model reorders).
+     */
+    public static List<String[]> parsePartyGameLines(String reply) {
+        List<String[]> result = new ArrayList<>();
+        if (reply == null) return result;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                "Photo\\s*(\\d+)\\s*:\\s*(Kiss|Date|Marry)\\s*[\\u2014\\-:]\\s*(.+)",
+                java.util.regex.Pattern.CASE_INSENSITIVE).matcher(reply);
+        while (m.find()) {
+            result.add(new String[]{ m.group(1).trim(), m.group(2).trim(), m.group(3).trim() });
+        }
+        return result;
+    }
+
+    /**
      * Completes the entire party-game turn in one response. Image positions are
      * used deliberately: the local engine cannot reliably identify people in photos.
+     * Kept only as an offline fallback for when the real vision call fails.
      */
     public static String generatePartyGame(Context context, int imageCount) {
         if (imageCount < 3) {

@@ -138,8 +138,16 @@ const handler = async function(req, res) {
 
     // ══════════════════════════════════════════════════════
     // WEATHER
+    // Guarded against video/animation requests that merely mention
+    // "weather" in their narration script (e.g. a video's spoken script
+    // saying "the weather is clear today") — those must not be hijacked
+    // into a weather card instead of generating the video.
     // ══════════════════════════════════════════════════════
-    if (/weather|temperature|forecast|humid|rain|wind|uv index|feels like/i.test(lastMsg)) {
+    const isVideoOrAnimationRequest =
+      /\b(video studio|animation studio|multi-scene|storyboard|5-minute video|12-minute video|video pipeline|produce a video|generate video from script|turn this script into a video|video storyboard)\b/i.test(lastMsg) ||
+      (/\b(create|make|generate|produce|render|animate|build)\b/i.test(lastMsg) && /\b(video|animation|animated|movie|motion|clip|documentary|film)\b/i.test(lastMsg));
+
+    if (!isVideoOrAnimationRequest && /weather|temperature|forecast|humid|rain|wind|uv index|feels like/i.test(lastMsg)) {
       const cityMatch = lastMsg.match(/weather\s+(?:in|for|of)?\s+([a-zA-Z\s]+?)(?:\?|$|,|\.|today|tomorrow|now)/i)
                      || lastMsg.match(/(?:in|for)\s+([A-Za-z\s]+?)(?:\?|$|,|\.)/i);
       const city = (cityMatch?.[1]?.trim()) || (userProfile?.city) || 'Dubai';

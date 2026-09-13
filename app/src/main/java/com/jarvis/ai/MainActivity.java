@@ -171,6 +171,12 @@ public class MainActivity extends AppCompatActivity {
     private String pendingPdfText;      // PDF text waiting to be sent
     private String pendingDocScanQuestion; // question asked when scan launched
 
+    // Party-game (Kiss/Marry/Date) turn tracking — set right before the vision call is
+    // made, read once the real reply comes back so we can (a) parse per-photo verdicts
+    // and (b) turn the actual uploaded photos into a real slideshow video.
+    private boolean isPartyGameTurn = false;
+    private List<Uri> partyGamePhotoUris = new ArrayList<>();
+
     private TextToSpeech tts;
     private boolean      ttsReady   = false;
     private boolean      isSpeaking = false;
@@ -2336,33 +2342,33 @@ public class MainActivity extends AppCompatActivity {
         HenryIntentRouter.TaskGraph taskGraph = HenryIntentRouter.route(userText);
         HenryIntentRouter.ClassifiedIntent primary = taskGraph.primaryIntent;
 
-        // Complete a photo-based Kiss / Marry / Date game locally. Previously this
-        // fell through to a generic vision reply, which could return only "Kiss"
-        // and lose the other two choices and the attached-photo context.
+        // Photo-based Kiss / Marry / Date game — routes through the SAME real vision
+        // call used for "analyze these images" (further below in this method) instead
+        // of a hardcoded template, so the verdict is actually based on what's in each
+        // photo. The onSuccess handler for that call parses the structured reply and
+        // turns the photos into a real slideshow video.
         if (HenryWittyEngine.isPartyGame(userText)) {
             int photoCount = pendingImagesBase64.isEmpty()
                     ? lastAnalyzedImagesBase64.size() : pendingImagesBase64.size();
             if (photoCount > 0) {
-                // Keep the exact photos in the visible chat beside the answer.
-                // The earlier path cleared the attachment before creating a chat item.
-                List<String> partyPhotoUris = new ArrayList<>();
-                for (Uri uri : pendingImagesUris) {
-                    if (uri != null) partyPhotoUris.add(uri.toString());
+                if (photoCount < 3) {
+                    history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+                    String needMore = "I need three photos for a proper Kiss, Marry, Date round—otherwise this game has the structural integrity of a group project at 11:59 PM.";
+                    history.add(new HistoryItem("model", needMore)); addJarvisMsg(needMore);
+                    speak(needMore, "neutral");
+                    saveHistory();
+                    return;
                 }
-                if (!pendingImagesBase64.isEmpty()) {
-                    lastAnalyzedImagesBase64.clear();
-                    lastAnalyzedImagesBase64.addAll(pendingImagesBase64);
-                    clearAttachment();
-                }
-                String partyReply = HenryWittyEngine.generatePartyGame(this, photoCount);
-                history.add(new HistoryItem("user", userText));
-                if (!partyPhotoUris.isEmpty()) addUserMsgWithImages(userText, partyPhotoUris);
-                else addUserMsg(userText);
-                history.add(new HistoryItem("model", partyReply));
-                addJarvisMsg(partyReply);
-                speak(partyReply, "neutral");
-                saveHistory();
-                return;
+                isPartyGameTurn = true;
+                partyGamePhotoUris = new ArrayList<>();
+                for (Uri uri : pendingImagesUris) if (uri != null) partyGamePhotoUris.add(uri);
+                // Do NOT reassign userText here — that would replace the chat bubble
+                // shown to the user with the internal vision prompt. The prompt
+                // substitution happens via effectiveUserText further below, which is
+                // what actually gets sent to the vision model; the displayed message
+                // and history stay as the user's real text.
+                // fall through — the real vision call further below in this method
+                // will run with the substituted prompt and the attached photos.
             }
         }
 
@@ -2447,7 +2453,11 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // 4. WITTY BANTER / ROAST / COMEDY ENGINE
-        if (primary.type == HenryIntentRouter.IntentType.WITTY_RESPONSE) {
+        // Skipped when images are attached: a request like "analyze these images,
+        // provide a witty synthesis" legitimately contains the word "witty" but is
+        // a real vision-analysis request, not a joke/roast request — it must fall
+        // through to the real image-analysis pipeline below, not this canned engine.
+        if (primary.type == HenryIntentRouter.IntentType.WITTY_RESPONSE && pendingImagesBase64.isEmpty()) {
             String wittyResponse = HenryWittyEngine.generateWittyResponse(this, userText);
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
             String clean = stripEmotionTag(wittyResponse);
@@ -2457,7 +2467,10 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // 5. DECISIVE OPINION & COMPARISON ENGINE
-        if (primary.type == HenryIntentRouter.IntentType.OPINION_COMPARISON) {
+        // Skipped when images are attached: "which one is better" about two attached
+        // photos needs the real vision pipeline to actually look at them, not a
+        // generic text-only decision-framework template with no idea what's pictured.
+        if (primary.type == HenryIntentRouter.IntentType.OPINION_COMPARISON && pendingImagesBase64.isEmpty()) {
             String opinionResponse = HenryOpinionEngine.evaluate(userText);
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
             history.add(new HistoryItem("model", opinionResponse)); addJarvisMsg(opinionResponse);
@@ -5207,6 +5220,15 @@ public class MainActivity extends AppCompatActivity {
             clearAttachment();
         }
 
+        // ── Party-game (Kiss/Marry/Date) vision prompt substitution ────────────
+        // Replaces the raw "kiss marry date" text with a structured prompt so the
+        // vision model returns one parseable line per photo instead of freeform text.
+        if (isPartyGameTurn) {
+            int photoCountForPrompt = pendingImagesBase64.isEmpty()
+                    ? lastAnalyzedImagesBase64.size() : pendingImagesBase64.size();
+            effectiveUserText = HenryWittyEngine.buildPartyGameVisionPrompt(photoCountForPrompt);
+        }
+
         // ── Default: send to AI backend ────────────────────────────────────────
         List<String> attachedUris = new ArrayList<>();
         for (Uri u : pendingImagesUris) {
@@ -5456,6 +5478,48 @@ public class MainActivity extends AppCompatActivity {
                         speak(toShow, emotion);
                     }
 
+                    // Party-game (Kiss/Marry/Date) follow-up: turn the real per-photo
+                    // verdict into an actual slideshow video using the same photos.
+                    if (isPartyGameTurn) {
+                        isPartyGameTurn = false;
+                        List<Uri> photosForVideo = new ArrayList<>(partyGamePhotoUris);
+                        List<String[]> parsed = HenryWittyEngine.parsePartyGameLines(cleanReply);
+                        if (!photosForVideo.isEmpty() && !parsed.isEmpty()) {
+                            List<String> captionsInPhotoOrder = new ArrayList<>();
+                            for (int i = 0; i < photosForVideo.size(); i++) {
+                                String caption = "";
+                                for (String[] line : parsed) {
+                                    try {
+                                        if (Integer.parseInt(line[0]) == i + 1) {
+                                            caption = line[1].toUpperCase(Locale.US) + " — " + line[2];
+                                            break;
+                                        }
+                                    } catch (NumberFormatException ignored) {}
+                                }
+                                captionsInPhotoOrder.add(caption);
+                            }
+                            addJarvisMsg("🎬 Turning this into a slideshow video with your photos…");
+                            HenryVideoProductionManager.generateFromPhotos(MainActivity.this, photosForVideo, captionsInPhotoOrder,
+                                    "9:16", "480p", new HenryVideoProductionManager.Callback() {
+                                @Override
+                                public void onStatus(String status, int completed, int total) {
+                                    runOnUiThread(() -> { if (tvOrbHint != null) tvOrbHint.setText(status); });
+                                }
+                                @Override
+                                public void onSuccess(java.io.File finalVideo, int completedClips) {
+                                    runOnUiThread(() -> {
+                                        addJarvisMsg("✅ Slideshow video ready (" + (finalVideo.length() / 1024) + " KB).");
+                                        openGeneratedVideo(finalVideo);
+                                    });
+                                }
+                                @Override
+                                public void onError(String error) {
+                                    runOnUiThread(() -> addJarvisMsg("⚠️ Could not render the slideshow video: " + error));
+                                }
+                            });
+                        }
+                    }
+
                     // [v20] Transit action buttons
                     if (isTransit) {
                         showTransitActions(transitRoute);
@@ -5491,6 +5555,7 @@ public class MainActivity extends AppCompatActivity {
             @Override 
             public void onError(String error) {
                 mainHandler.post(() -> hideTyping());
+                isPartyGameTurn = false;
 
                 new Thread(() -> {
                     // Check Room cached AI responses first for offline-first experience

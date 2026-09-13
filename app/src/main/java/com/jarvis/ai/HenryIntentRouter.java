@@ -253,9 +253,11 @@ public class HenryIntentRouter {
         if (t.contains("video studio") || t.contains("animation studio")) return true;
         boolean creationVerb = t.matches(".*\\b(create|make|produce|generate|render|animate)\\b.*");
         boolean videoNoun = t.matches(".*\\b(video|documentary|animation|animated|movie|film|clip)\\b.*");
-        boolean duration = t.matches(".*\\b\\d+\\s*(second|seconds|sec|secs|minute|minutes|min|mins)\\b.*");
-        // Allows either "create a 30-second video" or "make a video ... for 30 sec".
-        if (creationVerb && videoNoun && duration) return true;
+        // Duration is a bonus, not a requirement — "create a video of an elephant eating
+        // plants" is just as much a real video request as "create a 30 second video".
+        // Requiring a duration here used to send undated requests to the network fallback
+        // instead of the real on-device renderer, which only ever returns a fake static image.
+        if (creationVerb && videoNoun) return true;
         if (t.matches(".*\\b(turn this script into a video|generate video from script|render video|video storyboard).*")) return true;
         return false;
     }

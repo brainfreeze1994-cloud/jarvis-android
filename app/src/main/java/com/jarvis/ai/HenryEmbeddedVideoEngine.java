@@ -55,12 +55,23 @@ public final class HenryEmbeddedVideoEngine {
         final float startSec;
         final float endSec;
         final int colorIndex;
+        Bitmap background; // null => gradient background; non-null => this image fills the frame
 
         SceneText(String text, float startSec, float endSec, int colorIndex) {
+            this(text, startSec, endSec, colorIndex, null);
+        }
+
+        SceneText(String text, float startSec, float endSec, int colorIndex, Bitmap background) {
             this.text = text;
             this.startSec = startSec;
             this.endSec = endSec;
             this.colorIndex = colorIndex;
+            this.background = background;
+        }
+
+        /** Attaches (or replaces) this scene's background image after construction. */
+        public void setBackground(Bitmap background) {
+            this.background = background;
         }
     }
 
@@ -103,6 +114,30 @@ public final class HenryEmbeddedVideoEngine {
                     ? Math.max(SCRIPT_MIN_DURATION_SEC, Math.min(SCRIPT_MAX_DURATION_SEC, explicitDurationSeconds))
                     : estimateDurationSeconds(script);
             List<SceneText> scenes = buildScenesFromScript(script, durationSeconds);
+            return new Config(durationSeconds, portrait ? "9:16" : "16:9",
+                    resolution == null ? "360p" : resolution, w, h, scenes);
+        }
+
+        /**
+         * Photo-slideshow mode: one scene per photo, each shown for an equal share of the
+         * total duration (default ~5s/photo, clamped 15s–15min overall), with its caption
+         * overlaid using the same fade + Ken Burns zoom as script mode. photos.size() must
+         * equal captions.size().
+         */
+        public static Config fromPhotos(List<Bitmap> photos, List<String> captions, String aspectRatio, String resolution) {
+            boolean portrait = "9:16".equals(aspectRatio);
+            int w = portrait ? 360 : 640;
+            int h = portrait ? 640 : 360;
+            int count = Math.max(1, photos.size());
+            int durationSeconds = Math.max(SCRIPT_MIN_DURATION_SEC, Math.min(SCRIPT_MAX_DURATION_SEC, count * 5));
+            List<SceneText> scenes = new ArrayList<>();
+            float slice = durationSeconds / (float) count;
+            for (int i = 0; i < photos.size(); i++) {
+                float start = i * slice;
+                float end = (i == photos.size() - 1) ? durationSeconds : (i + 1) * slice;
+                String caption = i < captions.size() ? captions.get(i) : "";
+                scenes.add(new SceneText(caption, start, end, i % SCENE_PALETTE.length, photos.get(i)));
+            }
             return new Config(durationSeconds, portrait ? "9:16" : "16:9",
                     resolution == null ? "360p" : resolution, w, h, scenes);
         }
@@ -365,33 +400,58 @@ public final class HenryEmbeddedVideoEngine {
         float alphaIn = smoothstep(0f, fadeWindow, local);
         float alphaOut = 1f - smoothstep(1f - fadeWindow, 1f, local);
         float alpha = Math.min(alphaIn, alphaOut);
-
-        int baseColor = SCENE_PALETTE[scene.colorIndex];
-        int nextColor = SCENE_PALETTE[(scene.colorIndex + 1) % SCENE_PALETTE.length];
-        p.setShader(new LinearGradient(0, 0, w, h, baseColor, nextColor, Shader.TileMode.CLAMP));
-        c.drawRect(0, 0, w, h, p);
-        p.setShader(null);
-
         float scale = 1f + 0.06f * local;
+
         c.save();
         c.translate(w / 2f, h / 2f);
         c.scale(scale, scale);
         c.translate(-w / 2f, -h / 2f);
 
-        TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
-        textPaint.setColor(Color.argb((int) (alpha * 255), 255, 255, 255));
-        textPaint.setTextSize(Math.max(16f, w * 0.075f));
-        textPaint.setTextAlign(Paint.Align.LEFT);
+        if (scene.background != null) {
+            drawCenterCropped(c, p, scene.background, w, h);
+            // Bottom scrim so the caption stays legible over any photo brightness.
+            p.setShader(new LinearGradient(0, h * 0.55f, 0, h,
+                    0x00000000, 0xCC000000, Shader.TileMode.CLAMP));
+            c.drawRect(0, h * 0.55f, w, h, p);
+            p.setShader(null);
+        } else {
+            int baseColor = SCENE_PALETTE[scene.colorIndex];
+            int nextColor = SCENE_PALETTE[(scene.colorIndex + 1) % SCENE_PALETTE.length];
+            p.setShader(new LinearGradient(0, 0, w, h, baseColor, nextColor, Shader.TileMode.CLAMP));
+            c.drawRect(0, 0, w, h, p);
+            p.setShader(null);
+        }
 
-        int layoutWidth = (int) (w * 0.82f);
-        StaticLayout layout = StaticLayout.Builder
-                .obtain(scene.text, 0, scene.text.length(), textPaint, layoutWidth)
-                .setAlignment(Layout.Alignment.ALIGN_CENTER)
-                .setLineSpacing(1.05f, 1.1f)
-                .build();
+        if (scene.text != null && !scene.text.trim().isEmpty()) {
+            TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+            textPaint.setColor(Color.argb((int) (alpha * 255), 255, 255, 255));
+            textPaint.setTextSize(Math.max(16f, w * (scene.background != null ? 0.058f : 0.075f)));
+            textPaint.setTextAlign(Paint.Align.LEFT);
 
-        c.translate((w - layoutWidth) / 2f, (h - layout.getHeight()) / 2f);
-        layout.draw(c);
+            int layoutWidth = (int) (w * 0.86f);
+            StaticLayout layout = StaticLayout.Builder
+                    .obtain(scene.text, 0, scene.text.length(), textPaint, layoutWidth)
+                    .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                    .setLineSpacing(1.05f, 1.1f)
+                    .build();
+
+            float verticalCenter = scene.background != null
+                    ? h * 0.82f - layout.getHeight() / 2f  // near the bottom, over the scrim
+                    : (h - layout.getHeight()) / 2f;         // vertically centered, script mode
+            c.translate((w - layoutWidth) / 2f, verticalCenter);
+            layout.draw(c);
+        }
         c.restore();
+    }
+
+    /** Scales+crops a bitmap to fill the target frame (like CSS background-size: cover). */
+    private static void drawCenterCropped(Canvas c, Paint p, Bitmap bmp, float w, float h) {
+        float bmpW = bmp.getWidth(), bmpH = bmp.getHeight();
+        float scale = Math.max(w / bmpW, h / bmpH);
+        float drawW = bmpW * scale, drawH = bmpH * scale;
+        float left = (w - drawW) / 2f, top = (h - drawH) / 2f;
+        android.graphics.Rect src = new android.graphics.Rect(0, 0, bmp.getWidth(), bmp.getHeight());
+        android.graphics.RectF dst = new android.graphics.RectF(left, top, left + drawW, top + drawH);
+        c.drawBitmap(bmp, src, dst, p);
     }
 }

@@ -636,7 +636,11 @@ const handler = async function(req, res) {
     }
 
     // ══════════════════════════════════════════════════════
-    // v27 — VIDEO GENERATION & MOTION ANIMATION (Free & Unlimited)
+    // v27 — STILL-IMAGE FALLBACK for video/animation phrasing
+    // (Safety net only — the Android app's real on-device video renderer should
+    // catch genuine video requests before this ever runs. This branch can only
+    // ever produce ONE static illustration, never an actual rendered video, so
+    // the reply must say that plainly instead of claiming "video ready".)
     // ══════════════════════════════════════════════════════
     if (/generate|create|make|render|produce|animate|build/i.test(lastMsg) && /video|animation|animated|movie|motion|clip/i.test(lastMsg)) {
       const rawPrompt = lastMsg.replace(/generate|create|make|render|produce|animate|an animated|a video of|an animation of|video of|animation of|movie of|clip of/gi, '').replace(/[^\w\s,.'-]/g, '').trim();
@@ -645,11 +649,8 @@ const handler = async function(req, res) {
       const motionUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(clean + ', dynamic cinematic motion animation, 60fps')}` +
                         `?model=sana&seed=${seed}&width=512&height=512&nologo=true`;
       return res.status(200).json({
-        reply: `[EMOTION:excited]\n🎬 **Video & Motion Animation Ready!**\n\n` +
-               `Motion Scene: *${clean}*\n\n` +
-               `• **Engine**: High-speed Sana Motion Pipeline\n` +
-               `• **Framerate**: 60fps Dynamic Rendering\n` +
-               `• **Usage**: 100% Free & Unlimited`,
+        reply: `[EMOTION:neutral]\n🖼️ Here's a single still illustration for *${clean}* — not an actual rendered video.\n\n` +
+               `For a real MP4 with multiple scenes and narration timing, ask on the Android app (e.g. "create a video of ${clean}") — that renders it directly on your device.`,
         imageUrl: motionUrl
       });
     }
@@ -979,4 +980,3 @@ async function tryJson(res) {
 
 module.exports = handler;
 module.exports.config = { api: { bodyParser: { sizeLimit: '10mb' } } };
-

@@ -33,9 +33,16 @@ import java.util.Locale;
  * Lottie-style. No cloud provider, API key, FFmpeg install, or diffusion model.
  */
 public final class HenryEmbeddedVideoEngine {
-    private static final int FPS = 12;
-    private static final int UNIQUE_FPS = 6;
+    private static final int FPS = 24;         // standard smooth playback rate for social platforms
+    private static final int UNIQUE_FPS = 12;  // real distinct frames/sec; each held for 2 output frames
     private static final int I_FRAME_SECONDS = 2;
+
+    // HD, social-media-ready resolution — both dimensions are multiples of 16 (required by many
+    // hardware encoders internally) and land within ~1% of true 720x1280/1280x720.
+    private static final int PORTRAIT_WIDTH = 720;   // TikTok / YouTube Shorts / Reels (9:16)
+    private static final int PORTRAIT_HEIGHT = 1280;
+    private static final int LANDSCAPE_WIDTH = 1280;  // standard YouTube (16:9)
+    private static final int LANDSCAPE_HEIGHT = 720;
 
     public static final int SCRIPT_MIN_DURATION_SEC = 15;
     public static final int SCRIPT_MAX_DURATION_SEC = 15 * 60;
@@ -108,14 +115,14 @@ public final class HenryEmbeddedVideoEngine {
          */
         public static Config fromScript(String script, int explicitDurationSeconds, String aspectRatio, String resolution) {
             boolean portrait = "9:16".equals(aspectRatio);
-            int w = portrait ? 360 : 640;
-            int h = portrait ? 640 : 360;
+            int w = portrait ? PORTRAIT_WIDTH : LANDSCAPE_WIDTH;
+            int h = portrait ? PORTRAIT_HEIGHT : LANDSCAPE_HEIGHT;
             int durationSeconds = explicitDurationSeconds > 0
                     ? Math.max(SCRIPT_MIN_DURATION_SEC, Math.min(SCRIPT_MAX_DURATION_SEC, explicitDurationSeconds))
                     : estimateDurationSeconds(script);
             List<SceneText> scenes = buildScenesFromScript(script, durationSeconds);
             return new Config(durationSeconds, portrait ? "9:16" : "16:9",
-                    resolution == null ? "360p" : resolution, w, h, scenes);
+                    resolution == null ? "720p" : resolution, w, h, scenes);
         }
 
         /**
@@ -126,8 +133,8 @@ public final class HenryEmbeddedVideoEngine {
          */
         public static Config fromPhotos(List<Bitmap> photos, List<String> captions, String aspectRatio, String resolution) {
             boolean portrait = "9:16".equals(aspectRatio);
-            int w = portrait ? 360 : 640;
-            int h = portrait ? 640 : 360;
+            int w = portrait ? PORTRAIT_WIDTH : LANDSCAPE_WIDTH;
+            int h = portrait ? PORTRAIT_HEIGHT : LANDSCAPE_HEIGHT;
             int count = Math.max(1, photos.size());
             int durationSeconds = Math.max(SCRIPT_MIN_DURATION_SEC, Math.min(SCRIPT_MAX_DURATION_SEC, count * 5));
             List<SceneText> scenes = new ArrayList<>();
@@ -139,7 +146,7 @@ public final class HenryEmbeddedVideoEngine {
                 scenes.add(new SceneText(caption, start, end, i % SCENE_PALETTE.length, photos.get(i)));
             }
             return new Config(durationSeconds, portrait ? "9:16" : "16:9",
-                    resolution == null ? "360p" : resolution, w, h, scenes);
+                    resolution == null ? "720p" : resolution, w, h, scenes);
         }
     }
 
@@ -386,6 +393,12 @@ public final class HenryEmbeddedVideoEngine {
         return scenes.get(scenes.size() - 1);
     }
 
+    /** Returns the scene immediately after the given one in the list, or null if it's the last. */
+    private static SceneText findNextScene(List<SceneText> scenes, SceneText current) {
+        int idx = scenes.indexOf(current);
+        return (idx >= 0 && idx < scenes.size() - 1) ? scenes.get(idx + 1) : null;
+    }
+
     private static float smoothstep(float edge0, float edge1, float x) {
         float v = Math.max(0f, Math.min(1f, (x - edge0) / Math.max(0.0001f, edge1 - edge0)));
         return v * v * (3 - 2 * v);
@@ -399,32 +412,45 @@ public final class HenryEmbeddedVideoEngine {
         float fadeWindow = Math.min(0.5f, span * 0.25f) / span;
         float alphaIn = smoothstep(0f, fadeWindow, local);
         float alphaOut = 1f - smoothstep(1f - fadeWindow, 1f, local);
-        float alpha = Math.min(alphaIn, alphaOut);
+        float textAlpha = Math.min(alphaIn, alphaOut);
         float scale = 1f + 0.06f * local;
+
+        // Crossfade the BACKGROUND into the next scene during the closing part of this
+        // scene's duration, instead of hard-cutting on the frame boundary — this is what
+        // actually makes consecutive AI illustrations (or photos) feel like one continuous
+        // video rather than a slideshow of abrupt jump-cuts.
+        SceneText next = findNextScene(cfg.scenes, scene);
+        float crossfadeStart = 1f - fadeWindow;
+        float crossfadeProgress = (next != null) ? smoothstep(crossfadeStart, 1f, local) : 0f;
 
         c.save();
         c.translate(w / 2f, h / 2f);
         c.scale(scale, scale);
         c.translate(-w / 2f, -h / 2f);
+        drawSceneBackground(c, p, scene, w, h, 255, t);
+        c.restore();
 
-        if (scene.background != null) {
-            drawCenterCropped(c, p, scene.background, w, h);
-            // Bottom scrim so the caption stays legible over any photo brightness.
+        if (next != null && crossfadeProgress > 0f) {
+            c.save();
+            c.translate(w / 2f, h / 2f);
+            c.scale(1f, 1f); // incoming scene starts its own zoom once it officially begins
+            c.translate(-w / 2f, -h / 2f);
+            drawSceneBackground(c, p, next, w, h, (int) (crossfadeProgress * 255), t);
+            c.restore();
+        }
+
+        // Bottom scrim so captions stay legible over any photo/illustration brightness —
+        // drawn once, after both background layers, so it applies during transitions too.
+        if (scene.background != null || (next != null && next.background != null)) {
             p.setShader(new LinearGradient(0, h * 0.55f, 0, h,
                     0x00000000, 0xCC000000, Shader.TileMode.CLAMP));
             c.drawRect(0, h * 0.55f, w, h, p);
-            p.setShader(null);
-        } else {
-            int baseColor = SCENE_PALETTE[scene.colorIndex];
-            int nextColor = SCENE_PALETTE[(scene.colorIndex + 1) % SCENE_PALETTE.length];
-            p.setShader(new LinearGradient(0, 0, w, h, baseColor, nextColor, Shader.TileMode.CLAMP));
-            c.drawRect(0, 0, w, h, p);
             p.setShader(null);
         }
 
         if (scene.text != null && !scene.text.trim().isEmpty()) {
             TextPaint textPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
-            textPaint.setColor(Color.argb((int) (alpha * 255), 255, 255, 255));
+            textPaint.setColor(Color.argb((int) (textAlpha * 255), 255, 255, 255));
             textPaint.setTextSize(Math.max(16f, w * (scene.background != null ? 0.058f : 0.075f)));
             textPaint.setTextAlign(Paint.Align.LEFT);
 
@@ -438,10 +464,59 @@ public final class HenryEmbeddedVideoEngine {
             float verticalCenter = scene.background != null
                     ? h * 0.82f - layout.getHeight() / 2f  // near the bottom, over the scrim
                     : (h - layout.getHeight()) / 2f;         // vertically centered, script mode
+            c.save();
             c.translate((w - layoutWidth) / 2f, verticalCenter);
             layout.draw(c);
+            c.restore();
         }
-        c.restore();
+    }
+
+    /** Draws one scene's background (photo center-cropped, or animated gradient) at the given alpha [0-255]. */
+    private static void drawSceneBackground(Canvas c, Paint p, SceneText scene, float w, float h, int alpha, float t) {
+        p.setAlpha(255); // reset from any prior use before setting shader/alpha below
+        if (scene.background != null) {
+            p.setAlpha(alpha);
+            drawCenterCropped(c, p, scene.background, w, h);
+            p.setAlpha(255);
+        } else {
+            drawAnimatedGradientFallback(c, p, scene, w, h, alpha, t);
+        }
+    }
+
+    /**
+     * Coded fallback used whenever a scene has no fetched illustration (e.g. the image
+     * request failed or timed out). Rather than a flat static color, this draws a genuinely
+     * animated Lottie-style pattern — a moving gradient plus soft drifting glow shapes —
+     * so a failed fetch never leaves a scene looking like a broken placeholder.
+     */
+    private static void drawAnimatedGradientFallback(Canvas c, Paint p, SceneText scene, float w, float h, int alpha, float t) {
+        int baseColor = SCENE_PALETTE[scene.colorIndex];
+        int nextColor = SCENE_PALETTE[(scene.colorIndex + 1) % SCENE_PALETTE.length];
+
+        // Slowly drifting diagonal gradient (the angle itself animates) instead of a fixed one.
+        float drift = (float) Math.sin(t * 0.25f) * w * 0.3f;
+        p.setShader(new LinearGradient(0 + drift, 0, w + drift, h, baseColor, nextColor, Shader.TileMode.CLAMP));
+        p.setAlpha(alpha);
+        c.drawRect(0, 0, w, h, p);
+        p.setShader(null);
+
+        // 3 soft glow circles drifting at different speeds/radii — cheap, always-available
+        // procedural motion so the fallback still reads as an intentional animated scene.
+        int[] glowColors = { 0x33FFFFFF, 0x2200D9FF, 0x22FF7BD1 };
+        float[][] motion = { {0.6f, 0.35f, 0.18f}, {0.9f, 0.55f, 0.24f}, {1.3f, 0.7f, 0.14f} };
+        for (int i = 0; i < 3; i++) {
+            float speed = motion[i][0], phase = motion[i][1], radiusFrac = motion[i][2];
+            float cx = w * (0.5f + 0.38f * (float) Math.sin(t * speed * 0.4f + phase * 6f));
+            float cy = h * (0.5f + 0.32f * (float) Math.cos(t * speed * 0.3f + phase * 4f));
+            float r = Math.min(w, h) * radiusFrac;
+            android.graphics.RadialGradient glow = new android.graphics.RadialGradient(
+                    cx, cy, r, glowColors[i], 0x00000000, Shader.TileMode.CLAMP);
+            p.setShader(glow);
+            p.setAlpha(alpha);
+            c.drawCircle(cx, cy, r, p);
+        }
+        p.setShader(null);
+        p.setAlpha(255);
     }
 
     /** Scales+crops a bitmap to fill the target frame (like CSS background-size: cover). */

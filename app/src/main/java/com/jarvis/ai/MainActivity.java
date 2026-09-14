@@ -2515,9 +2515,21 @@ public class MainActivity extends AppCompatActivity {
             final String durationLabel = finalTargetSeconds % 60 == 0
                     ? (finalTargetSeconds / 60) + " minute" + (finalTargetSeconds == 60 ? "" : "s")
                     : finalTargetSeconds + " second" + (finalTargetSeconds == 1 ? "" : "s");
+
+            // Platform/orientation: "youtube", "landscape", "widescreen", or "horizontal" means
+            // 16:9. Everything else — including no mention at all — defaults to 9:16 portrait,
+            // since that's what TikTok, YouTube Shorts, Instagram Reels, and Facebook Reels all
+            // use, and is the far more common target for short-form social video today.
+            boolean landscape = userText.toLowerCase(Locale.US).matches(
+                    ".*\\b(youtube|landscape|widescreen|horizontal|16:9|16x9)\\b.*")
+                    && !userText.toLowerCase(Locale.US).matches(".*\\b(shorts|short)\\b.*");
+            final String finalAspectRatio = landscape ? "16:9" : "9:16";
+            final String formatLabel = landscape ? "Landscape (YouTube, 16:9)" : "Portrait (TikTok/Shorts/Reels, 9:16)";
+
             int totalClips = (int) Math.ceil(finalTargetSeconds / 8.0);
             String intro = "🎬 **HENRY Real Video Production**\n\n" +
                     "Target: **" + durationLabel + "**\n" +
+                    "Format: **" + formatLabel + "**\n" +
                     "Engine: **EMBEDDED FREE VIDEO ENGINE**\n" +
                     "Production: **" + totalClips + " local render segment" + (totalClips == 1 ? "**" : "s**") + "\n\n" +
                     "HENRY will render the requested duration directly on this device.\n\n" +
@@ -2525,7 +2537,7 @@ public class MainActivity extends AppCompatActivity {
             addJarvisMsg(intro);
             speak("Starting real video production, sir.", "excited");
 
-            HenryVideoProductionManager.generateFromScript(this, videoScript, finalTargetSeconds, "16:9", "720p", new HenryVideoProductionManager.Callback() {
+            HenryVideoProductionManager.generateFromScript(this, videoScript, finalTargetSeconds, finalAspectRatio, "720p", new HenryVideoProductionManager.Callback() {
                 @Override
                 public void onStatus(String status, int completed, int total) {
                     runOnUiThread(() -> {

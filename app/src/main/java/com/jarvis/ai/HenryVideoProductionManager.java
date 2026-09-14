@@ -64,7 +64,7 @@ public final class HenryVideoProductionManager {
                     HenryEmbeddedVideoEngine.SceneText scene = config.scenes.get(i);
                     callback.onStatus("EMBEDDED VIDEO ENGINE: generating visual " + (i + 1) + "/" + totalScenes + "…",
                             (int) (((i) * 40.0) / Math.max(1, totalScenes)), 100);
-                    Bitmap illustration = fetchIllustration(scene.text);
+                    Bitmap illustration = fetchIllustration(scene.text, aspectRatio);
                     if (illustration != null) {
                         scene.setBackground(illustration);
                         fetchedForCleanup.add(illustration);
@@ -88,11 +88,17 @@ public final class HenryVideoProductionManager {
         }, "henry-script-video-production").start();
     }
 
-    /** Fetches a Pollinations illustration for one scene's sentence, downscaled for the renderer. */
-    private static Bitmap fetchIllustration(String scenePrompt) {
+    /**
+     * Fetches a Pollinations illustration for one scene's sentence, downscaled for the renderer.
+     * Uses the flux model (noticeably better quality than the sana default) at dimensions that
+     * already match the target orientation, instead of a fixed square that then loses detail
+     * being stretched/cropped to fit a 9:16 or 16:9 frame.
+     */
+    private static Bitmap fetchIllustration(String scenePrompt, String aspectRatio) {
         HttpURLConnection conn = null;
         try {
-            String urlStr = ImageGenerator.buildImageUrl(scenePrompt);
+            boolean portrait = "9:16".equals(aspectRatio);
+            String urlStr = buildSceneImageUrl(scenePrompt, portrait);
             conn = (HttpURLConnection) new URL(urlStr).openConnection();
             conn.setConnectTimeout(IMAGE_CONNECT_TIMEOUT_MS);
             conn.setReadTimeout(IMAGE_READ_TIMEOUT_MS);
@@ -116,6 +122,21 @@ public final class HenryVideoProductionManager {
             return null;
         } finally {
             if (conn != null) conn.disconnect();
+        }
+    }
+
+    /** Pollinations request tuned for scene illustrations: flux model, orientation-matched size. */
+    private static String buildSceneImageUrl(String prompt, boolean portrait) {
+        try {
+            String clean = prompt.replaceAll("\\s+", " ").trim();
+            if (clean.length() > 200) clean = clean.substring(0, 200);
+            long seed = (long) (Math.random() * 9000000) + 1000000;
+            int w = portrait ? 768 : 1344;
+            int h = portrait ? 1344 : 768;
+            return "https://image.pollinations.ai/prompt/" + java.net.URLEncoder.encode(clean, "UTF-8") +
+                    "?model=flux&seed=" + seed + "&width=" + w + "&height=" + h + "&nologo=true";
+        } catch (Exception e) {
+            return "https://image.pollinations.ai/prompt/cinematic+scene?model=flux&width=1344&height=768&nologo=true";
         }
     }
 

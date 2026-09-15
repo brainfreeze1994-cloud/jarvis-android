@@ -129,14 +129,21 @@ public final class HenryVideoProductionManager {
     private static String buildSceneImageUrl(String prompt, boolean portrait) {
         try {
             String clean = prompt.replaceAll("\\s+", " ").trim();
-            if (clean.length() > 200) clean = clean.substring(0, 200);
+            if (clean.length() > 160) clean = clean.substring(0, 160);
+            // Without this, image models frequently render the sentence itself as literal
+            // on-screen text/typography instead of an actual photographic scene — exactly
+            // the "caption card" look that made rendered scenes look like static graphics
+            // instead of illustrations. "no watermark/logo" is a second layer of defense
+            // since the nologo=true param below isn't honored by every model.
+            String styled = clean + ", cinematic photograph, no text, no words, no caption, " +
+                    "no typography, no watermark, no logo, no signature";
             long seed = (long) (Math.random() * 9000000) + 1000000;
             int w = portrait ? 768 : 1344;
             int h = portrait ? 1344 : 768;
-            return "https://image.pollinations.ai/prompt/" + java.net.URLEncoder.encode(clean, "UTF-8") +
+            return "https://image.pollinations.ai/prompt/" + java.net.URLEncoder.encode(styled, "UTF-8") +
                     "?model=flux&seed=" + seed + "&width=" + w + "&height=" + h + "&nologo=true";
         } catch (Exception e) {
-            return "https://image.pollinations.ai/prompt/cinematic+scene?model=flux&width=1344&height=768&nologo=true";
+            return "https://image.pollinations.ai/prompt/cinematic+photograph+no+text?model=flux&width=1344&height=768&nologo=true";
         }
     }
 

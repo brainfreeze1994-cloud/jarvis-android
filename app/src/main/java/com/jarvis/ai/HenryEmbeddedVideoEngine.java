@@ -413,7 +413,18 @@ public final class HenryEmbeddedVideoEngine {
         float alphaIn = smoothstep(0f, fadeWindow, local);
         float alphaOut = 1f - smoothstep(1f - fadeWindow, 1f, local);
         float textAlpha = Math.min(alphaIn, alphaOut);
-        float scale = 1f + 0.06f * local;
+
+        // Real, clearly-visible Ken Burns motion: an eased push-in up to 24% zoom, combined
+        // with a slow pan whose direction is deterministic per scene (so consecutive scenes
+        // don't all drift the same way) — a pure 6%-zoom-only version was imperceptible,
+        // especially on short or single-scene videos.
+        float zoomProgress = smoothstep(0f, 1f, local);
+        float scale = 1f + 0.24f * zoomProgress;
+        int panSeed = (scene.text != null ? scene.text.hashCode() : scene.colorIndex);
+        float panDirX = (panSeed % 2 == 0) ? 1f : -1f;
+        float panDirY = ((panSeed / 2) % 2 == 0) ? 1f : -1f;
+        float panX = w * 0.06f * panDirX * zoomProgress;
+        float panY = h * 0.05f * panDirY * zoomProgress;
 
         // Crossfade the BACKGROUND into the next scene during the closing part of this
         // scene's duration, instead of hard-cutting on the frame boundary — this is what
@@ -424,7 +435,7 @@ public final class HenryEmbeddedVideoEngine {
         float crossfadeProgress = (next != null) ? smoothstep(crossfadeStart, 1f, local) : 0f;
 
         c.save();
-        c.translate(w / 2f, h / 2f);
+        c.translate(w / 2f + panX, h / 2f + panY);
         c.scale(scale, scale);
         c.translate(-w / 2f, -h / 2f);
         drawSceneBackground(c, p, scene, w, h, 255, t);

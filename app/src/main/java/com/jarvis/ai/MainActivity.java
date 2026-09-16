@@ -2598,7 +2598,7 @@ public class MainActivity extends AppCompatActivity {
             setState(OrbView.OrbState.THINKING);
             addJarvisMsg("🎨 Generating image: " + ImageGenerator.extractPrompt(userText) + "...");
             speak("Synthesizing image tokens, sir.", "neutral");
-            HenryImagePipeline.generateImage(this, userText, false, new HenryImagePipeline.ImageCallback() {
+            HenryImagePipeline.generateImage(this, userText, new HenryImagePipeline.ImageCallback() {
                 @Override
                 public void onStateChanged(HenryImagePipeline.ImageState state, String message) {
                     runOnUiThread(() -> {

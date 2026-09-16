@@ -29,6 +29,7 @@ public class HenryIntentRouter {
         AUTO_REPAIR(0.95f),
         BRAIN_MAP(0.95f),
         IMAGE_GENERATION(0.92f),
+        ITEM_SEARCH(0.93f),
         SPORTS_LIVE(0.85f),
         FINANCE_PRICES(0.85f),
         NEWS(0.80f),
@@ -161,6 +162,15 @@ public class HenryIntentRouter {
             return new TaskGraph(new ClassifiedIntent(IntentType.MATH_SOLVE, 0.97f, raw, null), null);
         }
 
+        // ── 11b. Item / Product Identification from a photo ───────────────────
+        // "What is this?", "identify this item", "what phone is this", "search this product"
+        // — only meaningful with an attached photo, so MainActivity additionally requires
+        // images to be present before actually routing here (same pattern as the guards on
+        // OPINION_COMPARISON and WITTY_RESPONSE below).
+        if (isItemSearchRequest(lower)) {
+            return new TaskGraph(new ClassifiedIntent(IntentType.ITEM_SEARCH, 0.93f, raw, null), null);
+        }
+
         // ── 12. Opinion & Direct Comparison Engine ────────────────────────────
         // "Which is better?", "Compare iPhone and Samsung", "What's your take?", "Who wins?"
         if (HenryOpinionEngine.isOpinionQuery(raw)) {
@@ -247,6 +257,15 @@ public class HenryIntentRouter {
         if (t.matches(".*\\b(write|create|generate)\\s+(a|an)?\\s*(youtube script|video script|movie script|documentary script|horror script|comedy script|short film script|podcast script|voice over script).*")) return true;
         if (t.contains("three-act structure") || t.contains("3-act structure") || t.contains("save the cat")) return true;
         return false;
+    }
+
+    /** Recognizes a request to identify/describe an item or product from an attached photo. */
+    private static boolean isItemSearchRequest(String t) {
+        return t.matches(".*\\b(what is this|what's this|whats this|identify this|what item is this|" +
+                "what product is this|what phone is this|what device is this|what brand is this|" +
+                "what model is this|search this item|search this product|search for this item|" +
+                "search for this product|look up this item|look up this product|what am i looking at|" +
+                "what is in this (photo|picture|image)|can you identify this)\\b.*");
     }
 
     private static boolean isVideoStudioRequest(String t) {

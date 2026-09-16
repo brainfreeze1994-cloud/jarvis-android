@@ -288,6 +288,34 @@ function generateWitCandidates(userMsg, analysis, options = {}) {
     return candidates;
   }
 
+  // FILIPINO CHRISTMAS & HOLIDAY BANTER / JOKES
+  if (/\bhamon\b/i.test(m) && /\b(star|christmas tree|pasko|ipatong|itaas|ilagay|isabit)\b/i.test(m)) {
+    candidates.push({
+      id: 'CHRISTMAS_HAM_STAR',
+      type: 'FILIPINO_HOLIDAY_WIT',
+      technique: 'Contrast Christmas star symbolism with glorious greasy reality of pork ham on branches',
+      punchline: `Kung ipapatong mo ang hamon sa tuktok ng Christmas tree, baka bago pa mag-Noche Buena, tinuka na ng pusa o bumagsak ang buong puno sa sobrang bigat ng pinausukang taba! 😂🍖\n\nAng star ng Pasko nagliliwanag, ang hamon nagmamantika. Pero kung gusto mong mag-amoy fiesta at pineapple glaze ang buong sala niyo habang may sumasabit na queso de bola, go lang, suportado kita! 🎄✨`,
+      score: 99,
+      naturalness: 99,
+      surprise: 98
+    });
+    return candidates;
+  }
+
+  // GENERAL FILIPINO CHRISTMAS & HOLIDAY BANAT
+  if (/\b(regalo|aguinaldo|aginaldo|13th month|ninong|ninang|noche buena|monito|monita)\b/i.test(m) && /\b(asan|nasaan|bigyan|hingi|pahingi|wala|meron|ubos|scam)\b/i.test(m)) {
+    candidates.push({
+      id: 'HOLIDAY_FINANCIAL_REALITY',
+      type: 'CONTRAST',
+      technique: 'Contrast holiday generosity expectations with vanishing December savings',
+      punchline: `Ang 13th month pay at aginaldo, parang multo sa ancestral house—naramdaman mo sandali bago pumasok ang Shopee/Lazada notifications, tapos biglang naglaho nang walang bakas. 😭💸 Ingat sa mga inaanak na biglang mag-cha-chat sa December 24!`,
+      score: 96,
+      naturalness: 97,
+      surprise: 95
+    });
+    return candidates;
+  }
+
   // TOPIC DIVERSITY COMPLAINT: "Bakit puro love life?"
   if (/\bpuro love life\b/i.test(m) || /\bwalang ibang topic\b/i.test(m) || /\bstop talking about dating\b/i.test(m)) {
     candidates.push({

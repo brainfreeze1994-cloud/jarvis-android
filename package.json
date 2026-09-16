@@ -4,6 +4,8 @@
   "private": true,
   "description": "H·E·N·R·Y™ - Hyperintelligence Engine Neural Reasoning Yield",
   "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
     "build": "node -e 'console.log(\"Build ready\")'",
     "lint": "node -e 'console.log(\"Lint passed\")'"
   }

@@ -289,6 +289,7 @@ public class ChatAdapter extends RecyclerView.Adapter<ChatAdapter.MsgVH> {
             // Strip emotion tags
             .replaceAll("(?i)\\[emotion:[^\\]]*\\]\\s*", "")
             .replaceAll("(?i)\\[emotion[^\\]]*\\]\\s*", "")
+            .replaceAll("(?i)^\\[(neutral|warm|concerned|excited|amused|serious|proud|playful|curious|thoughtful|empathetic|sarcastic|surprised|determined|friendly|happy|sad|analytical|mysterious|reverent|witty)\\]\\s*", "")
             // Code blocks (```...```) - preserve code contents intact!
             .replaceAll("(?m)^```[a-zA-Z0-9_-]*\\s*$", "")
             .replaceAll("```", "")

@@ -175,6 +175,7 @@ public class MainActivity extends AppCompatActivity {
     // made, read once the real reply comes back so we can (a) parse per-photo verdicts
     // and (b) turn the actual uploaded photos into a real slideshow video.
     private boolean isPartyGameTurn = false;
+    private boolean isItemSearchTurn = false;
     private List<Uri> partyGamePhotoUris = new ArrayList<>();
 
     private TextToSpeech tts;
@@ -2452,6 +2453,17 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        // 3b. ITEM / PRODUCT IDENTIFICATION FROM A PHOTO
+        // Only meaningful with an attached photo — "what is this" with no image attached
+        // just falls through to normal conversation instead. Multiple photos are supported:
+        // one identification + description per photo, reusing the same real vision call
+        // already used for general image analysis and the Kiss/Marry/Date game.
+        if (primary.type == HenryIntentRouter.IntentType.ITEM_SEARCH && !pendingImagesBase64.isEmpty()) {
+            isItemSearchTurn = true;
+            // Falls through — the real vision call further below in this method runs with
+            // the substituted prompt (via effectiveUserText) and the attached photos.
+        }
+
         // 4. WITTY BANTER / ROAST / COMEDY ENGINE
         // Skipped when images are attached: a request like "analyze these images,
         // provide a witty synthesis" legitimately contains the word "witty" but is
@@ -2586,8 +2598,7 @@ public class MainActivity extends AppCompatActivity {
             setState(OrbView.OrbState.THINKING);
             addJarvisMsg("🎨 Generating image: " + ImageGenerator.extractPrompt(userText) + "...");
             speak("Synthesizing image tokens, sir.", "neutral");
-            boolean isAnim = userText.toLowerCase(Locale.US).contains("animate") || userText.toLowerCase(Locale.US).contains("gif");
-            HenryImagePipeline.generateImage(this, userText, isAnim, new HenryImagePipeline.ImageCallback() {
+            HenryImagePipeline.generateImage(this, userText, false, new HenryImagePipeline.ImageCallback() {
                 @Override
                 public void onStateChanged(HenryImagePipeline.ImageState state, String message) {
                     runOnUiThread(() -> {
@@ -4679,23 +4690,6 @@ public class MainActivity extends AppCompatActivity {
             speak(clean, "proud"); saveHistory(); return;
         }
 
-        // ── [v17] AI Image & Animation Generation ─────────────────────────────
-        if (ImageGenerator.isImageCommand(userText)) {
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            setState(OrbView.OrbState.THINKING);
-            String prompt = ImageGenerator.extractPrompt(userText);
-            boolean isMotion = lower.contains("animate") || lower.contains("animation") || lower.contains("video");
-            String imgUrl = isMotion ? ImageGenerator.buildAnimationUrl(prompt) : ImageGenerator.buildImageUrl(prompt);
-            speak("Generating your " + (isMotion ? "animation" : "image") + " now, sir.", "excited");
-            // Show image inline as URL image with descriptive caption
-            String caption = (isMotion ? "🎬 Animated Motion: " : "🎨 Generated: ") + prompt;
-            messages.add(new Message(Message.TYPE_URL_IMAGE, caption, null, imgUrl));
-            adapter.notifyItemInserted(messages.size() - 1);
-            scrollToBottom();
-            history.add(new HistoryItem("model", caption));
-            setState(OrbView.OrbState.IDLE); saveHistory(); return;
-        }
-
         // ── [v28] Lottie Vector Animation Component & Showcase ────────────────
         if (lower.contains("lottie") || (lower.contains("animation") && (lower.contains("show") || lower.contains("test") || lower.contains("demo") || lower.contains("open") || lower.contains("view") || lower.contains("component")))) {
             history.add(new HistoryItem("user", userText)); addUserMsg(userText);
@@ -5241,6 +5235,15 @@ public class MainActivity extends AppCompatActivity {
             effectiveUserText = HenryWittyEngine.buildPartyGameVisionPrompt(photoCountForPrompt);
         }
 
+        // ── Item/product identification vision prompt substitution ─────────────
+        // Replaces "what is this" / "identify this item" with a structured prompt so
+        // multiple attached photos each get their own clear identification + description.
+        if (isItemSearchTurn) {
+            int photoCountForPrompt = pendingImagesBase64.isEmpty()
+                    ? lastAnalyzedImagesBase64.size() : pendingImagesBase64.size();
+            effectiveUserText = HenryItemSearchEngine.buildItemSearchPrompt(photoCountForPrompt);
+        }
+
         // ── Default: send to AI backend ────────────────────────────────────────
         List<String> attachedUris = new ArrayList<>();
         for (Uri u : pendingImagesUris) {
@@ -5490,6 +5493,8 @@ public class MainActivity extends AppCompatActivity {
                         speak(toShow, emotion);
                     }
 
+                    isItemSearchTurn = false;
+
                     // Party-game (Kiss/Marry/Date) follow-up: turn the real per-photo
                     // verdict into an actual slideshow video using the same photos.
                     if (isPartyGameTurn) {
@@ -5567,7 +5572,25 @@ public class MainActivity extends AppCompatActivity {
             @Override 
             public void onError(String error) {
                 mainHandler.post(() -> hideTyping());
+                isItemSearchTurn = false;
+                boolean wasPartyGameTurn = isPartyGameTurn;
+                int partyPhotoCount = partyGamePhotoUris.size();
                 isPartyGameTurn = false;
+
+                if (wasPartyGameTurn) {
+                    // The real vision call failed mid-game — fall back to the offline
+                    // party-game template instead of a generic, game-unaware offline reply.
+                    String fallback = HenryWittyEngine.generatePartyGame(MainActivity.this, partyPhotoCount);
+                    mainHandler.post(() -> {
+                        history.add(new HistoryItem("model", fallback));
+                        addJarvisMsg(fallback);
+                        speak("Here is my offline best guess, sir — the network vision call did not come through.", "neutral");
+                        saveHistory();
+                        if (btnSend != null) btnSend.setEnabled(true);
+                        updateMoodOrb();
+                    });
+                    return;
+                }
 
                 new Thread(() -> {
                     // Check Room cached AI responses first for offline-first experience

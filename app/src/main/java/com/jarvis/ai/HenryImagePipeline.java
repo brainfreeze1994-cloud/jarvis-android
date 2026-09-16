@@ -55,14 +55,14 @@ public class HenryImagePipeline {
     /**
      * Executes generation with 25-second timeout and file persistence.
      */
-    public static void generateImage(Context context, String rawPrompt, boolean isAnimation, ImageCallback callback) {
+    public static void generateImage(Context context, String rawPrompt, ImageCallback callback) {
         cancelActiveGeneration();
 
         final Context appContext = context.getApplicationContext();
         callback.onStateChanged(ImageState.PREPARING_PROMPT, "Refining prompt and lighting parameters...");
 
         String cleanPrompt = ImageGenerator.extractPrompt(rawPrompt);
-        String imageUrl = isAnimation ? ImageGenerator.buildAnimationUrl(cleanPrompt) : ImageGenerator.buildImageUrl(cleanPrompt);
+        String imageUrl = ImageGenerator.buildImageUrl(cleanPrompt);
 
         currentTask = executor.submit(() -> {
             mainHandler.post(() -> callback.onStateChanged(ImageState.GENERATING, "Synthesizing visual tokens via neural renderer..."));

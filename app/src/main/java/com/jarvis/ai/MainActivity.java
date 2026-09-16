@@ -5494,48 +5494,7 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                     isItemSearchTurn = false;
-
-                    // Party-game (Kiss/Marry/Date) follow-up: turn the real per-photo
-                    // verdict into an actual slideshow video using the same photos.
-                    if (isPartyGameTurn) {
-                        isPartyGameTurn = false;
-                        List<Uri> photosForVideo = new ArrayList<>(partyGamePhotoUris);
-                        List<String[]> parsed = HenryWittyEngine.parsePartyGameLines(cleanReply);
-                        if (!photosForVideo.isEmpty() && !parsed.isEmpty()) {
-                            List<String> captionsInPhotoOrder = new ArrayList<>();
-                            for (int i = 0; i < photosForVideo.size(); i++) {
-                                String caption = "";
-                                for (String[] line : parsed) {
-                                    try {
-                                        if (Integer.parseInt(line[0]) == i + 1) {
-                                            caption = line[1].toUpperCase(Locale.US) + " — " + line[2];
-                                            break;
-                                        }
-                                    } catch (NumberFormatException ignored) {}
-                                }
-                                captionsInPhotoOrder.add(caption);
-                            }
-                            addJarvisMsg("🎬 Turning this into a slideshow video with your photos…");
-                            HenryVideoProductionManager.generateFromPhotos(MainActivity.this, photosForVideo, captionsInPhotoOrder,
-                                    "9:16", "480p", new HenryVideoProductionManager.Callback() {
-                                @Override
-                                public void onStatus(String status, int completed, int total) {
-                                    runOnUiThread(() -> { if (tvOrbHint != null) tvOrbHint.setText(status); });
-                                }
-                                @Override
-                                public void onSuccess(java.io.File finalVideo, int completedClips) {
-                                    runOnUiThread(() -> {
-                                        addJarvisMsg("✅ Slideshow video ready (" + (finalVideo.length() / 1024) + " KB).");
-                                        openGeneratedVideo(finalVideo);
-                                    });
-                                }
-                                @Override
-                                public void onError(String error) {
-                                    runOnUiThread(() -> addJarvisMsg("⚠️ Could not render the slideshow video: " + error));
-                                }
-                            });
-                        }
-                    }
+                    isPartyGameTurn = false;
 
                     // [v20] Transit action buttons
                     if (isTransit) {

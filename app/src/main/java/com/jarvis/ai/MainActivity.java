@@ -176,6 +176,7 @@ public class MainActivity extends AppCompatActivity {
     // and (b) turn the actual uploaded photos into a real slideshow video.
     private boolean isPartyGameTurn = false;
     private boolean isItemSearchTurn = false;
+    private boolean isWittyTurn = false;
     private List<Uri> partyGamePhotoUris = new ArrayList<>();
 
     private TextToSpeech tts;
@@ -2336,6 +2337,18 @@ public class MainActivity extends AppCompatActivity {
     private void askHenry(String userText) {
         if (userText == null || userText.trim().isEmpty()) return;
 
+        // ── Witty intensity/personality settings command ────────────────────────
+        // Checked before intent routing so "set witty intensity to SAVAGE" is treated
+        // as a settings change, not classified as a joke/roast request itself.
+        String wittySettingsReply = HenryWittySettings.tryHandleCommand(this, userText);
+        if (wittySettingsReply != null) {
+            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
+            history.add(new HistoryItem("model", wittySettingsReply)); addJarvisMsg(wittySettingsReply);
+            speak(wittySettingsReply, "neutral");
+            saveHistory();
+            return;
+        }
+
         // ══════════════════════════════════════════════════════════════════════
         // DETERMINISTIC INTENT ROUTING LAYER (HenryIntentRouter)
         // High-confidence deterministic dispatching for Game, Math, Ultra, Witty, Opinion, etc.
@@ -2465,17 +2478,17 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // 4. WITTY BANTER / ROAST / COMEDY ENGINE
-        // Skipped when images are attached: a request like "analyze these images,
-        // provide a witty synthesis" legitimately contains the word "witty" but is
-        // a real vision-analysis request, not a joke/roast request — it must fall
-        // through to the real image-analysis pipeline below, not this canned engine.
-        if (primary.type == HenryIntentRouter.IntentType.WITTY_RESPONSE && pendingImagesBase64.isEmpty()) {
-            String wittyResponse = HenryWittyEngine.generateWittyResponse(this, userText);
-            history.add(new HistoryItem("user", userText)); addUserMsg(userText);
-            String clean = stripEmotionTag(wittyResponse);
-            history.add(new HistoryItem("model", clean)); addJarvisMsg(clean);
-            speak(clean, "witty"); saveHistory();
-            return;
+        // This used to answer locally with HenryWittyEngine's generic Java one-liners —
+        // a second, much weaker witty implementation that never saw the real Tagalog
+        // wordplay/double-meaning lexicon (bangus, matinik, himay, etc.) that lives in
+        // api/witty_engine.js. That engine is now the single authoritative witty
+        // implementation: this just flags the turn and falls through to the real
+        // network call below, which invokes it. HenryWittyEngine.generateWittyResponse
+        // is kept only as an offline fallback for when that network call fails.
+        if (primary.type == HenryIntentRouter.IntentType.WITTY_RESPONSE) {
+            isWittyTurn = true;
+            // Falls through — the real backend witty engine runs as part of the normal
+            // chat call further below in this method.
         }
 
         // 5. DECISIVE OPINION & COMPARISON ENGINE
@@ -5495,6 +5508,7 @@ public class MainActivity extends AppCompatActivity {
 
                     isItemSearchTurn = false;
                     isPartyGameTurn = false;
+                    isWittyTurn = false;
 
                     // [v20] Transit action buttons
                     if (isTransit) {
@@ -5535,6 +5549,8 @@ public class MainActivity extends AppCompatActivity {
                 boolean wasPartyGameTurn = isPartyGameTurn;
                 int partyPhotoCount = partyGamePhotoUris.size();
                 isPartyGameTurn = false;
+                boolean wasWittyTurn = isWittyTurn;
+                isWittyTurn = false;
 
                 if (wasPartyGameTurn) {
                     // The real vision call failed mid-game — fall back to the offline
@@ -5544,6 +5560,22 @@ public class MainActivity extends AppCompatActivity {
                         history.add(new HistoryItem("model", fallback));
                         addJarvisMsg(fallback);
                         speak("Here is my offline best guess, sir — the network vision call did not come through.", "neutral");
+                        saveHistory();
+                        if (btnSend != null) btnSend.setEnabled(true);
+                        updateMoodOrb();
+                    });
+                    return;
+                }
+
+                if (wasWittyTurn) {
+                    // The real witty engine (api/witty_engine.js) is network-only — this
+                    // local Java one-liner generator is its offline fallback, not a
+                    // parallel primary implementation.
+                    String fallback = stripEmotionTag(HenryWittyEngine.generateWittyResponse(MainActivity.this, offlineQueryText));
+                    mainHandler.post(() -> {
+                        history.add(new HistoryItem("model", fallback));
+                        addJarvisMsg(fallback);
+                        speak(fallback, "witty");
                         saveHistory();
                         if (btnSend != null) btnSend.setEnabled(true);
                         updateMoodOrb();

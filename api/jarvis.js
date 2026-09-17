@@ -42,6 +42,8 @@ const handler = async function(req, res) {
     memoryFacts      = [],
     emotionState,
     relationshipContext,
+    wittyIntensity,
+    wittyPersonality,
     enableChainThinking,
     systemPrompt,
     systemOverride
@@ -71,7 +73,16 @@ const handler = async function(req, res) {
       const sys = buildSystemPrompt(now, responseMode, userProfile, memoryFacts, emotion, mood, relationshipContext, systemOverride || systemPrompt);
 
       if (GROQ_KEY) {
-        for (const model of ['meta-llama/llama-4-scout-17b-16e-instruct','llama-3.2-11b-vision-preview','llama-3.2-90b-vision-preview']) {
+        // Prompts built by HenryWittyEngine/HenryItemSearchEngine explicitly say
+        // "Reply with exactly N ..." and require one "Photo N: ..." line per attached
+        // image. A model sometimes stops after the first line instead of continuing —
+        // that's still a non-empty, syntactically valid response, so without this check
+        // it gets accepted as-is and the remaining photos silently get no line at all.
+        const requiresPerPhotoLines = /reply with exactly/i.test(q) && allImages.length > 1;
+        let bestIncomplete = null;
+        let bestLineCount = -1;
+
+        for (const model of ['llama-3.2-90b-vision-preview','meta-llama/llama-4-scout-17b-16e-instruct','llama-3.2-11b-vision-preview']) {
           try {
             const userContent = [];
             for (let i = 0; i < allImages.length; i++) {
@@ -83,7 +94,7 @@ const handler = async function(req, res) {
 
             let visionInstruction = q;
             if (allImages.length > 1) {
-              visionInstruction += `\n\n[CRITICAL DIRECTIVE]: The user provided ${allImages.length} attached images. Analyze and distinguish every image. If the user asks for a comparison, choice, witty roast, or recommendation, evaluate each image with charming, sharp, and charismatic human humor and insight. For a Kiss/Marry/Date or Kiss/Marry/Kill game, assign ALL categories in one response, label each picture (Image 1, Image 2, etc.), add a brief playful reason for every selection, and never answer with only one category. Do not add emotion tags or honorifics.`;
+              visionInstruction += `\n\n[CRITICAL DIRECTIVE]: The user provided ${allImages.length} attached images. Look at each one separately before responding. Analyze and distinguish every image — each must get its own distinct description referencing details unique to that photo (different clothing, background, pose, expression). Never reuse the same sentence, or a sentence with only a label swapped, across two different images. If the user asks for a comparison, choice, witty roast, or recommendation, evaluate each image with charming, sharp, and charismatic human humor and insight. For a Kiss/Marry/Date or Kiss/Marry/Kill game, assign ALL categories in one response, label each picture (Image 1, Image 2, etc.), add a brief playful reason for every selection grounded in what is actually visible in that specific photo, and never answer with only one category. You MUST include one line for every single attached image — stopping after the first is an incomplete, unusable response. Do not add emotion tags or honorifics.`;
             } else {
               visionInstruction += '\n\nRespond as H.E.N.R.Y. Be witty, human, insightful, and charismatic. Do not add emotion tags or honorifics.';
             }
@@ -110,9 +121,23 @@ const handler = async function(req, res) {
             const d = await tryJson(r);
             if (r.ok && d?.choices?.[0]?.message?.content) {
               const c = d.choices[0].message.content.trim();
-              if (c.length > 0) return res.status(200).json(parseResponse(c));
+              if (c.length > 0) {
+                if (requiresPerPhotoLines) {
+                  const lineCount = (c.match(/Photo\s+\d+\s*:/gi) || []).length;
+                  if (lineCount < allImages.length) {
+                    if (lineCount > bestLineCount) { bestLineCount = lineCount; bestIncomplete = c; }
+                    continue; // incomplete — try the next model instead of accepting this
+                  }
+                }
+                return res.status(200).json(parseResponse(c));
+              }
             }
           } catch(e) {}
+        }
+        // Every model came back incomplete — return the most-complete attempt rather
+        // than silently falling through to a generic, image-unaware fallback below.
+        if (requiresPerPhotoLines && bestIncomplete) {
+          return res.status(200).json(parseResponse(bestIncomplete));
         }
       }
 
@@ -606,9 +631,15 @@ const handler = async function(req, res) {
       return res.status(200).json(parseResponse(reply));
     }
 
-    const witRes = wittyEngine.resolveWittyHumor(lastMsg, {
+    const witRes = await wittyEngine.resolveWittyHumor(lastMsg, {
       seriousness: ci.detectSeriousness(lastMsg),
-      intensity: (responseMode === 'brutally_honest') ? 'BRUTAL' : 'NORMAL'
+      intensity: wittyIntensity || (responseMode === 'brutally_honest' ? 'BRUTAL' : 'NORMAL'),
+      personality: wittyPersonality || 'PLAYFUL',
+      groqKey: GROQ_KEY,
+      recentDialog: messages.slice(-5, -1).map(m => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.text || m.content || ''
+      }))
     });
 
     if (witRes && witRes.handled) {

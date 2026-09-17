@@ -181,6 +181,8 @@ public class JarvisApi {
                 body.put("persona",      "HENRY_HYPERINTELLIGENT_WITTY");
                 body.put("systemPrompt", DEFAULT_HENRY_PERSONA_PROMPT);
                 body.put("systemOverride", DEFAULT_HENRY_PERSONA_PROMPT);
+                body.put("wittyIntensity", HenryWittySettings.getIntensity(memCtx));
+                body.put("wittyPersonality", HenryWittySettings.getPersonality(memCtx));
 
                 if (imageBase64 != null && !imageBase64.isEmpty())
                     body.put("imageBase64", imageBase64);
@@ -303,6 +305,8 @@ public class JarvisApi {
                 body.put("persona",      "HENRY_HYPERINTELLIGENT_WITTY");
                 body.put("systemPrompt", DEFAULT_HENRY_PERSONA_PROMPT);
                 body.put("systemOverride", DEFAULT_HENRY_PERSONA_PROMPT);
+                body.put("wittyIntensity", HenryWittySettings.getIntensity(memCtx));
+                body.put("wittyPersonality", HenryWittySettings.getPersonality(memCtx));
 
                 String primaryImage = imageBase64;
                 if (imagesBase64 != null && !imagesBase64.isEmpty()) {

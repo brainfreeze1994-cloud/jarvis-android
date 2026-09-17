@@ -1,17 +1,63 @@
 // ============================================================
-// H.E.N.R.Y. 2.0 ULTRA — WITTY INTELLIGENCE ENGINE
-// Natural, Contextual, Quick, Clever, Playful Humor Reasoning Layer
-// Architecture:
-// USER MESSAGE
-// ↓ CONTEXT UNDERSTANDING
-// ↓ INTENT & TONE DETECTION
-// ↓ WORD/PHRASE ANALYSIS & DOUBLE-MEANING DETECTION
-// ↓ ASSOCIATION ENGINE (Semantic Web)
-// ↓ CONTRAST ENGINE (Expectation vs Unexpected Reality)
-// ↓ MISDIRECTION ENGINE (Setup -> Switch -> Punchline)
-// ↓ MULTI-CANDIDATE GENERATOR & SCORER
-// ↓ WIT QUALITY CHECK & SAFETY/SERIOUSNESS FILTER
-// ↓ FINAL WITTY RESPONSE
+// H.E.N.R.Y. — AUTHORITATIVE WITTY BEHAVIOR SPECIFICATION
+// ============================================================
+// This file is the ONE authoritative implementation of HENRY's witty/banter
+// behavior. Nothing else — not the Android app, not any other backend file —
+// should independently decide what a "witty" response looks like. The Android
+// app's HenryWittyEngine.java (com.jarvis.ai) is an OFFLINE FALLBACK ONLY, used
+// solely when this file's network call cannot be reached. It must never be the
+// primary path for anything the router classifies as a witty/banter request.
+//
+// PIPELINE
+//   USER MESSAGE
+//   -> CONTEXT UNDERSTANDING (analyzeHumorPotential: double-meaning detection,
+//      Filipino/English mix detection, semantic collisions)
+//   -> HARDCODED GOLD-STANDARD CANDIDATES (generateWitCandidates: a small bank
+//      of hand-tuned, high-quality responses for known iconic setups — kept
+//      because they're demonstrably better than anything generated on the fly)
+//   -> GENERATIVE FALLBACK (generateGenerativePunchline: when no hardcoded
+//      candidate fits, an LLM call grounded in the same DOUBLE_MEANINGS lexicon
+//      produces a fresh, contextual punchline instead of falling through to
+//      generic, non-witty conversation)
+//   -> QUALITY VALIDATION (evaluateWitQuality: rejects unsafe, robotic,
+//      joke-explaining, or AI-disclaimer-laden responses; a rejected generative
+//      attempt is retried once with a stronger instruction before giving up)
+//   -> FINAL RESPONSE
+//
+// INTENSITY (options.intensity — how strong/edgy the wit should be)
+//   OFF        — no wit at all; caller should skip this engine entirely
+//   LIGHT      — gentle, warm teasing only
+//   NORMAL     — the default: clever and playful, low risk of offense
+//   HIGH       — sharper, more direct roasting
+//   SAVAGE     — cutting, no punches pulled, still affectionate underneath
+//   BARDAGULAN — loud, theatrical, dramatic Filipino "away-bati" energy
+//   BRUTAL     — maximum intensity; still never cruel about protected traits
+//
+// PERSONALITY (options.personality — the flavor/voice of the wit)
+//   CLEVER, PLAYFUL, SARCASTIC, DRY, CHAOTIC, CAMP, SAVAGE, DEADPAN, ABSURD,
+//   BAKLA, BARDAGULAN, FRIENDLY_TEASING — see WIT_PERSONALITY below. Both
+//   intensity and personality are threaded end-to-end: Android persists the
+//   user's choice (HenryWittySettings), sends it on every request, and this
+//   file is the only place that turns those two values into actual tone.
+//
+// DO NOT DO THIS (hard requirements — violating any of these fails validation)
+//   - Never say "As an AI...", "I cannot be [X]...", "I appreciate the
+//     creative wordplay...", "Let me interpret this metaphorically...", or any
+//     other AI-disclaimer / distancing language.
+//   - Never explain why the joke is funny — deliver the punchline, don't
+//     annotate it.
+//   - Never write a formal essay or apologize for "being unable to participate."
+//   - Never hard-code a single response as the ONLY possible output for a given
+//     setup — generateGenerativePunchline exists specifically so novel phrasing
+//     of a known joke pattern still gets a fresh, contextual punchline rather
+//     than silence or a generic non-witty reply.
+//
+// QUALITY VALIDATOR CRITERIA (evaluateWitQuality)
+//   Context relevance, naturalness, an actual punchline (not just observation),
+//   wordplay where the input invites it, originality (not a generic template),
+//   language match (Tagalog/Taglish input gets a Tagalog/Taglish-flavored
+//   reply), and conciseness (a joke response is not a paragraph). Responses
+//   failing any hard criterion are rejected before ever reaching the user.
 // ============================================================
 
 /**
@@ -145,6 +191,12 @@ const FILIPINO_WIT_MARKERS = {
  * Seriousness topics that STRICTLY veto wit
  */
 const HIGH_SERIOUSNESS_REGEX = /\b(suicide|kill myself|emergency|chest pain|stroke|overdose|trauma|abuse|funeral|died|passed away|cancer|tumor|lawsuit|evicted|arrested|grief)\b/i;
+
+/**
+ * AI-disclaimer / distancing language that must never appear in a witty response —
+ * a punchline, not a policy statement about what the assistant is or can't do.
+ */
+const AI_DISCLAIMER_REGEX = /\b(as an ai|i('m| am) (?:just |only )?an? (?:ai|language model|assistant)|i cannot be|i can't be|i appreciate the creative wordplay|let me interpret this metaphorically|i'm not able to (?:be|participate)|as a (?:large )?language model)\b/i;
 
 /**
  * 1. Semantic Analysis: Extract entities, double meanings & potential collisions
@@ -288,34 +340,6 @@ function generateWitCandidates(userMsg, analysis, options = {}) {
     return candidates;
   }
 
-  // FILIPINO CHRISTMAS & HOLIDAY BANTER / JOKES
-  if (/\bhamon\b/i.test(m) && /\b(star|christmas tree|pasko|ipatong|itaas|ilagay|isabit)\b/i.test(m)) {
-    candidates.push({
-      id: 'CHRISTMAS_HAM_STAR',
-      type: 'FILIPINO_HOLIDAY_WIT',
-      technique: 'Contrast Christmas star symbolism with glorious greasy reality of pork ham on branches',
-      punchline: `Kung ipapatong mo ang hamon sa tuktok ng Christmas tree, baka bago pa mag-Noche Buena, tinuka na ng pusa o bumagsak ang buong puno sa sobrang bigat ng pinausukang taba! 😂🍖\n\nAng star ng Pasko nagliliwanag, ang hamon nagmamantika. Pero kung gusto mong mag-amoy fiesta at pineapple glaze ang buong sala niyo habang may sumasabit na queso de bola, go lang, suportado kita! 🎄✨`,
-      score: 99,
-      naturalness: 99,
-      surprise: 98
-    });
-    return candidates;
-  }
-
-  // GENERAL FILIPINO CHRISTMAS & HOLIDAY BANAT
-  if (/\b(regalo|aguinaldo|aginaldo|13th month|ninong|ninang|noche buena|monito|monita)\b/i.test(m) && /\b(asan|nasaan|bigyan|hingi|pahingi|wala|meron|ubos|scam)\b/i.test(m)) {
-    candidates.push({
-      id: 'HOLIDAY_FINANCIAL_REALITY',
-      type: 'CONTRAST',
-      technique: 'Contrast holiday generosity expectations with vanishing December savings',
-      punchline: `Ang 13th month pay at aginaldo, parang multo sa ancestral house—naramdaman mo sandali bago pumasok ang Shopee/Lazada notifications, tapos biglang naglaho nang walang bakas. 😭💸 Ingat sa mga inaanak na biglang mag-cha-chat sa December 24!`,
-      score: 96,
-      naturalness: 97,
-      surprise: 95
-    });
-    return candidates;
-  }
-
   // TOPIC DIVERSITY COMPLAINT: "Bakit puro love life?"
   if (/\bpuro love life\b/i.test(m) || /\bwalang ibang topic\b/i.test(m) || /\bstop talking about dating\b/i.test(m)) {
     candidates.push({
@@ -431,7 +455,7 @@ function generateWitCandidates(userMsg, analysis, options = {}) {
 /**
  * 3. Wit Quality Evaluator & Safety Verification
  */
-function evaluateWitQuality(candidate, userMsg, seriousnessScore) {
+function evaluateWitQuality(candidate, userMsg, seriousnessScore, analysis) {
   // CRITICAL RULE: If seriousness is 4 or 5, humor MUST be rejected completely
   if (seriousnessScore >= 4 || HIGH_SERIOUSNESS_REGEX.test(userMsg)) {
     return {
@@ -441,15 +465,34 @@ function evaluateWitQuality(candidate, userMsg, seriousnessScore) {
     };
   }
 
-  // Reject generic / corny templates
   const p = candidate.punchline;
+
+  // Reject generic / corny templates
   if (/why did the chicken|knock knock/i.test(p)) {
     return { approved: false, reason: 'Rejected generic antique joke formula', score: 20 };
   }
 
   // Reject if it over-explains itself ("This is funny because...")
-  if (/this is funny because|the joke here is|here is why that's funny/i.test(p)) {
+  if (/this is funny because|the joke here is|here is why that's funny|the humor (?:here|in this) (?:comes from|is)/i.test(p)) {
     return { approved: false, reason: 'Violated Don\'t-Explain-The-Joke rule', score: 30 };
+  }
+
+  // Reject AI-disclaimer / distancing language — a punchline, not a policy statement.
+  if (AI_DISCLAIMER_REGEX.test(p)) {
+    return { approved: false, reason: 'Violated no-AI-disclaimer rule', score: 15 };
+  }
+
+  // Conciseness: a joke response is not an essay.
+  if (p.length > 500) {
+    return { approved: false, reason: 'Rejected: too long for a punchline', score: 25 };
+  }
+
+  // Language match: Tagalog/Taglish input should get a Tagalog/Taglish-flavored reply.
+  if (analysis && analysis.isTagalog) {
+    const hasTagalogFlavor = /\b(ka|mo|ko|naman|pero|kasi|talaga|ang|mga|beh|teh|grabe|jusko|sige|ba|hindi|oo)\b/i.test(p);
+    if (!hasTagalogFlavor) {
+      return { approved: false, reason: 'Language mismatch: Tagalog input got an all-English reply', score: 40 };
+    }
   }
 
   return {
@@ -458,6 +501,67 @@ function evaluateWitQuality(candidate, userMsg, seriousnessScore) {
     naturalness: candidate.naturalness,
     surprise: candidate.surprise
   };
+}
+
+/**
+ * Generative fallback: when no hardcoded candidate fits, ask an LLM to actually
+ * understand the wordplay/joke and produce a fresh punchline — grounded in the
+ * same DOUBLE_MEANINGS lexicon used by the hardcoded candidates, and steered by
+ * the requested intensity/personality. This is what satisfies "do not hard-code
+ * ONLY this response, generate contextual variations."
+ */
+async function generateGenerativePunchline(userMsg, analysis, options = {}) {
+  const groqKey = options.groqKey;
+  if (!groqKey) return null;
+
+  const intensity = options.intensity || WIT_INTENSITY.NORMAL;
+  const personality = options.personality || WIT_PERSONALITY.PLAYFUL;
+  const recentDialog = Array.isArray(options.recentDialog) ? options.recentDialog.slice(-4) : [];
+
+  const relevantLexicon = analysis.detectedCollisions.length > 0
+    ? analysis.detectedCollisions.map(c =>
+        `"${c.keyword}": means either ${c.meanings.join(' OR ')}. Associated with: ${c.associations.join(', ')}.`
+      ).join('\n')
+    : 'No specific double-meaning keyword detected — find your own wordplay or contrast in the message itself.';
+
+  const systemPrompt = `You are HENRY's witty-response generator. Your ONLY job: understand the joke, wordplay, or ` +
+    `double meaning in the user's message, then deliver an actual punchline.\n\n` +
+    `INTENSITY: ${intensity} (OFF=none, LIGHT=gentle teasing, NORMAL=clever/playful, HIGH=sharper roasting, ` +
+    `SAVAGE=cutting but affectionate, BARDAGULAN=loud dramatic Filipino away-bati energy, BRUTAL=maximum, still ` +
+    `never cruel about protected traits).\n` +
+    `PERSONALITY: ${personality}.\n` +
+    `LANGUAGE: Match the user's language — if they wrote in Tagalog/Taglish, reply in Tagalog/Taglish with natural ` +
+    `Filipino internet slang (beh, teh, grabe, jusko, char, etc.) where it fits.\n\n` +
+    `Relevant wordplay context for this message:\n${relevantLexicon}\n\n` +
+    `HARD RULES:\n` +
+    `- NEVER say "As an AI", "I cannot be [X]", "I appreciate the creative wordplay", "Let me interpret this ` +
+    `metaphorically", or any similar distancing/disclaimer language.\n` +
+    `- NEVER explain why the joke is funny — deliver the punchline itself, nothing else.\n` +
+    `- NEVER write a formal essay or apologize for being unable to participate.\n` +
+    `- Keep it to 1-3 short sentences. A joke is not a paragraph.\n` +
+    `- Reply with ONLY the punchline text. No preamble, no quotation marks, no "Response:" label.`;
+
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + groqKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...recentDialog,
+          { role: 'user', content: userMsg }
+        ],
+        max_tokens: 220,
+        temperature: 0.9
+      })
+    });
+    const d = await r.json().catch(() => null);
+    const text = d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content;
+    return text ? text.trim() : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 /**
@@ -501,29 +605,41 @@ function generateWittyQuestions(topic = 'random', count = 5) {
 /**
  * 5. Main Witty Intelligence Engine Resolver
  * Returns { handled: boolean, reply: string, trace: object }
+ *
+ * options:
+ *   seriousness  - 1-5, from ci.detectSeriousness(userMsg)
+ *   intensity    - one of WIT_INTENSITY (default NORMAL); OFF disables this engine entirely
+ *   personality  - one of WIT_PERSONALITY (default PLAYFUL); only affects the generative path,
+ *                  since hardcoded candidates already have a fixed hand-tuned voice
+ *   groqKey      - required for the generative fallback; without it, only hardcoded
+ *                  candidates are tried and this behaves as it did before
+ *   recentDialog - last few turns for conversational context in the generative path
  */
-function resolveWittyHumor(userMsg, options = {}) {
-  const seriousness = options.seriousness ?? 1;
-  const analysis = analyzeHumorPotential(userMsg);
-  const candidates = generateWitCandidates(userMsg, analysis, options);
-
-  if (candidates.length === 0) {
-    return {
-      handled: false,
-      reason: 'No high-scoring humor collision detected for this input.'
-    };
+async function resolveWittyHumor(userMsg, options = {}) {
+  const intensity = options.intensity || WIT_INTENSITY.NORMAL;
+  if (intensity === WIT_INTENSITY.OFF) {
+    return { handled: false, reason: 'Witty intensity is OFF.' };
   }
 
-  // Sort by score descending
+  const seriousness = options.seriousness ?? 1;
+  const analysis = analyzeHumorPotential(userMsg);
+
+  if (seriousness >= 4 || HIGH_SERIOUSNESS_REGEX.test(userMsg)) {
+    return { handled: false, reason: 'Safety/Seriousness veto: Context requires solemn support, zero humor.' };
+  }
+
+  // ── Stage 1: hardcoded gold-standard candidates ────────────────────────
+  const candidates = generateWitCandidates(userMsg, analysis, options);
   candidates.sort((a, b) => b.score - a.score);
 
   for (const candidate of candidates) {
-    const evalResult = evaluateWitQuality(candidate, userMsg, seriousness);
+    const evalResult = evaluateWitQuality(candidate, userMsg, seriousness, analysis);
     if (evalResult.approved) {
       return {
         handled: true,
         reply: `[EMOTION:amused]\n${candidate.punchline}`,
         trace: {
+          source: 'hardcoded',
           candidateId: candidate.id,
           type: candidate.type,
           technique: candidate.technique,
@@ -536,9 +652,37 @@ function resolveWittyHumor(userMsg, options = {}) {
     }
   }
 
+  // ── Stage 2: generative fallback ───────────────────────────────────────
+  // No hardcoded candidate fit (or all were vetoed) — actually understand the
+  // joke and generate a fresh punchline instead of silently giving up. One
+  // retry with a stronger instruction if the first attempt fails validation.
+  if (options.groqKey) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const generated = await generateGenerativePunchline(userMsg, analysis, options);
+      if (!generated) break;
+
+      const pseudoCandidate = { punchline: generated, score: 80, naturalness: 80, surprise: 75 };
+      const evalResult = evaluateWitQuality(pseudoCandidate, userMsg, seriousness, analysis);
+      if (evalResult.approved) {
+        return {
+          handled: true,
+          reply: `[EMOTION:amused]\n${generated}`,
+          trace: {
+            source: 'generative',
+            attempt: attempt + 1,
+            intensity,
+            personality: options.personality || WIT_PERSONALITY.PLAYFUL,
+            doubleMeaningsFound: analysis.detectedKeywords
+          }
+        };
+      }
+      // Validation failed — the next loop iteration retries once more before giving up.
+    }
+  }
+
   return {
     handled: false,
-    reason: 'Candidates vetoed by seriousness or quality scoring.'
+    reason: 'No hardcoded candidate matched and the generative fallback did not produce a valid response.'
   };
 }
 

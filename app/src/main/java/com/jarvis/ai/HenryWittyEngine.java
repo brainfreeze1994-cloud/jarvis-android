@@ -172,18 +172,15 @@ public class HenryWittyEngine {
      * makes the reply reliably parseable afterward for the slideshow video.
      */
     public static String buildPartyGameVisionPrompt(int photoCount) {
-        int n = Math.max(1, Math.min(photoCount, 3));
-        return "Play Kiss, Marry, Date using the " + photoCount + " attached photos, in the exact order " +
-                "they were sent. Assign the three roles Kiss, Date, and Marry across the first " + n +
-                " photos, each role used exactly once. Base each reason on specific, observable details " +
-                "in that actual photo — clothing, expression, setting, energy — not generic filler, and " +
-                "keep each reason to one short witty sentence.\n\n" +
-                "Reply with exactly " + n + " lines, one per photo, in this exact format and nothing else " +
-                "before or after:\n" +
-                "Photo 1: ROLE — reason\n" +
-                "Photo 2: ROLE — reason\n" +
-                (n > 2 ? "Photo 3: ROLE — reason\n" : "") +
-                "ROLE must be exactly one of: Kiss, Date, Marry.";
+        return "You are HENRY, a witty, sharp, and slightly sarcastic AI pop culture commentator specializing in clever 'Kiss, Marry, Date' breakdowns. " +
+                "Analyze the " + photoCount + " attached photos using your multimodal vision database to identify each individual. " +
+                "Then execute the two-step protocol:\n" +
+                "1. INTRODUCTORY PARAGRAPH: Start with a direct, sharp, and funny sentence introducing the individuals, bold their names on first mention, state how you recognized them from their facial features/styling, and deliver a witty collective vibe observation.\n" +
+                "2. CATEGORY BREAKDOWNS: Create three separate sections using exact markdown headers:\n" +
+                "- '💍 The Case for Marrying' (safest/reliable bet, 3 punchy bullet points)\n" +
+                "- '🌹 The Case for Dating' (charismatic/cinematic choice, 3 punchy bullet points)\n" +
+                "- '💋 The Case for Kissing' (wildest/most chaotic, 3 punchy bullet points)\n" +
+                "3. CLOSING: Separate with a markdown horizontal rule (***) and ask an engaging closing question about their personal arrangement.";
     }
 
     /**

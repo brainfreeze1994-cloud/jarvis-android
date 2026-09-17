@@ -13,6 +13,116 @@ const videoStudio = require('./video_studio_engine.js');
 const wittyEngine = require('./witty_engine.js');
 const HENRY_OPERATOR_PROMPT = require('./henry_operator_prompt.js');
 
+const HENRY_KISS_MARRY_DATE_PROMPT = `You are HENRY, a witty, sharp, and slightly sarcastic AI pop culture commentator specializing in clever "Kiss, Marry, Date" breakdowns. You possess advanced multimodal vision capabilities, allowing you to instantly identify celebrities, fictional characters, or public figures from uploaded images.
+
+When a user uploads up to three images or names three individuals, execute the following two-step protocol.
+
+STEP 1: MULTIMODAL IDENTIFICATION (Internal Logic)
+- Analyze the facial features, styling, and visual context of the uploaded images using your vision database to accurately identify the individuals. 
+- If the user provides text names instead of images, proceed directly to Step 2.
+- If the image quality is too low or unidentifiable, politely and wittily ask the user for a clearer picture.
+
+STEP 2: THE "KISS, MARRY, DATE" RESPONSE STRUCTURE
+Assign each identified individual to one unique category (Kiss, Marry, or Date) without repeating categories. Follow these strict formatting rules:
+
+1. INTRODUCTORY PARAGRAPH
+- Start with a direct, sharp, and funny sentence introducing the three individuals.
+- Bold the names of the individuals on their first mention.
+- Explicitly call out how you recognized them from the images (e.g., "Looking at these photos, I instantly clocked the iconic trio of...").
+- Deliver a witty observation about their collective vibe or current cultural status.
+
+2. CATEGORY BREAKDOWNS (Use Markdown Headers: 💍, 🌹, 💋)
+Create three separate sections—one for each choice—using the exact archetypes below to justify your decisions with humorous conviction:
+- "💍 The Case for Marrying": Assign this to the safest, most reliable bet. Frame them as the one who will actually remember to take out the trash, has a solid credit score, or provides the emotional tax shelter you need.
+- "🌹 The Case for Dating": Assign this to the high-maintenance, deeply charismatic, or cinematic choice. Frame this as the fun, status-boosting phase where the lighting is always perfect but you secretly know it's a phase.
+- "💋 The Case for Kissing": Assign this to the wildest, most chaotic, or purely aesthetic choice. Frame this as a high-voltage, low-commitment scenario—great for a plot twist, terrible for a long-term contract.
+
+3. WRITING STYLE WITHIN THE BULLETS
+- Under each category header, use exactly 3 highly scannable, punchy bullet points.
+- Start each bullet point with a bolded, witty phrase or the individual's name.
+- Write with sharp, peer-to-peer humor. Use clever metaphors, playful roasts, and light skepticism instead of generic praise.
+- Keep sentences short, active, and focused on delivering a punchline or sharp insight.
+
+4. ENGAGING CLOSING
+- Separate the main content with a markdown horizontal rule (***).
+- End with a single, highly engaging question asking the user for their personal arrangement or offering to swap out specific individuals for others in the same niche.`;
+
+async function callGeminiVision(images, userPrompt, systemInstruction) {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) return null;
+  const parts = [];
+  for (const img of images) {
+    if (!img) continue;
+    let cleanB64 = img;
+    let mimeType = 'image/jpeg';
+    const match = img.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/);
+    if (match) {
+      mimeType = match[1];
+      cleanB64 = match[2];
+    }
+    parts.push({
+      inline_data: {
+        mime_type: mimeType,
+        data: cleanB64
+      }
+    });
+  }
+  parts.push({ text: userPrompt });
+
+  const body = {
+    contents: [{ role: 'user', parts }]
+  };
+  if (systemInstruction) {
+    body.systemInstruction = { parts: [{ text: systemInstruction }] };
+  }
+
+  for (const model of ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-flash-latest']) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30000)
+      });
+      const d = await tryJson(r);
+      if (r.ok && d?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        return d.candidates[0].content.parts[0].text.trim();
+      }
+    } catch(e) {
+      console.warn(`[Gemini Vision] Model ${model} failed, trying fallback:`, e.message);
+    }
+  }
+  return null;
+}
+
+async function callGeminiText(userPrompt, systemInstruction) {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) return null;
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: userPrompt }] }]
+  };
+  if (systemInstruction) {
+    body.systemInstruction = { parts: [{ text: systemInstruction }] };
+  }
+  for (const model of ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-flash-latest']) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(20000)
+      });
+      const d = await tryJson(r);
+      if (r.ok && d?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        return d.candidates[0].content.parts[0].text.trim();
+      }
+    } catch(e) {}
+  }
+  return null;
+}
+
 const handler = async function(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -71,6 +181,29 @@ const handler = async function(req, res) {
     if (allImages.length > 0) {
       const q   = lastMsg || 'Describe the attached image(s) in detail.';
       const sys = buildSystemPrompt(now, responseMode, userProfile, memoryFacts, emotion, mood, relationshipContext, systemOverride || systemPrompt);
+
+      const isPartyGame = /kiss.*marry|marry.*kiss|kiss\s*,?\s*marry\s*,?\s*(date|kill)|kmd/i.test(q)
+        || /play kiss, marry, date/i.test(q)
+        || /\b(kiss|marry|date)\b/i.test(q)
+        || allImages.length === 3
+        || /who (would you|to) (kiss|marry|date|choose)/i.test(q)
+        || (q.toLowerCase().includes('kiss') && q.toLowerCase().includes('marry'));
+
+      // 1. Primary Engine: Gemini Flash Multimodal Vision
+      if (process.env.GEMINI_API_KEY) {
+        try {
+          const effectivePrompt = isPartyGame
+            ? `${q}\n\nExecute the two-step Kiss, Marry, Date protocol. STEP 1: MULTIMODAL IDENTIFICATION (Internal Logic) - identify the individuals from facial features, styling, and visual context. STEP 2: THE "KISS, MARRY, DATE" RESPONSE STRUCTURE with introductory paragraph (bold names on first mention, call out how you recognized them from images, deliver witty observation about collective vibe), followed by exact category headers 💍 The Case for Marrying, 🌹 The Case for Dating, 💋 The Case for Kissing (exactly 3 punchy, scannable bullet points each starting with bolded phrase/name), followed by markdown horizontal rule (***) and single engaging closing question.`
+            : `${q}\n\nInspect the attached photo(s) in complete detail. Accurately identify and describe what you see (people, styling, devices, settings, context) as HENRY with charismatic, witty insight.`;
+          const effectiveSys = isPartyGame ? HENRY_KISS_MARRY_DATE_PROMPT : sys;
+          const geminiVisionReply = await callGeminiVision(allImages, effectivePrompt, effectiveSys);
+          if (geminiVisionReply && geminiVisionReply.trim().length > 0) {
+            return res.status(200).json(parseResponse(geminiVisionReply));
+          }
+        } catch(geminiErr) {
+          console.warn('[Gemini Vision Error]:', geminiErr.message);
+        }
+      }
 
       if (GROQ_KEY) {
         // Prompts built by HenryWittyEngine/HenryItemSearchEngine explicitly say
@@ -159,6 +292,28 @@ const handler = async function(req, res) {
       const conv2 = buildConvMessages([...messages.slice(-3), {role:'user',text: q || 'The user sent an image. Please provide a witty, perceptive response.'}], sys2, 4);
       const r2    = await callLLM(GROQ_KEY, ACCOUNT_ID, API_TOKEN, conv2);
       return res.status(200).json(parseResponse(r2));
+    }
+
+    // ══════════════════════════════════════════════════════
+    // KISS, MARRY, DATE (PARTY GAME & POP CULTURE)
+    // ══════════════════════════════════════════════════════
+    const isPartyGameText = /kiss.*marry|marry.*kiss|kiss\s*,?\s*marry\s*,?\s*(date|kill)|kmd\b/i.test(lastMsg)
+      || /kiss\s*,?\s*marry\s*,?\s*or\s*date/i.test(lastMsg)
+      || (lower.includes('kiss') && (lower.includes('marry') || lower.includes('date')))
+      || (lower.includes('marry') && lower.includes('date'))
+      || (/\b(kiss|marry|date)\b/i.test(lastMsg) && (lastMsg.includes(',') || /\band\b/i.test(lastMsg)));
+
+    if (isPartyGameText) {
+      if (process.env.GEMINI_API_KEY) {
+        try {
+          const kmdReply = await callGeminiText(lastMsg, HENRY_KISS_MARRY_DATE_PROMPT);
+          if (kmdReply && kmdReply.trim().length > 0) {
+            return res.status(200).json(parseResponse(kmdReply));
+          }
+        } catch (e) {
+          console.warn('[Gemini KMD Text Error]:', e.message);
+        }
+      }
     }
 
     // ══════════════════════════════════════════════════════
@@ -265,9 +420,9 @@ const handler = async function(req, res) {
     // ══════════════════════════════════════════════════════
     // v26 — NASA & SPACE INTELLIGENCE
     // ══════════════════════════════════════════════════════
-    if (/nasa|iss|space station|asteroid|comet|planet|galaxy|universe|cosmos|mars|moon|solar|telescope|hubble|webb|spacecraft|rocket|orbit/i.test(lastMsg)) {
+    if (/\b(nasa|iss|space station|asteroid|comet|planet|galaxy|universe|cosmos|mars|moon|solar system|telescope|hubble|webb|spacecraft|rocket)\b/i.test(lastMsg)) {
       // ISS position
-      if (/iss|space station|where is|location/i.test(lastMsg)) {
+      if (/\b(iss|space station)\b/i.test(lastMsg)) {
         try {
           const r = await fetch('http://api.open-notify.org/iss-now.json', { signal: AbortSignal.timeout(5000) });
           const d = await tryJson(r);
@@ -938,6 +1093,33 @@ async function callCompound(groqKey, conv) {
 }
 
 async function callLLM(groqKey, accountId, apiToken, messages) {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey) {
+    try {
+      const sys = messages.find(m => m.role === 'system')?.content || '';
+      const conv = messages.filter(m => m.role !== 'system').map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content || '' }]
+      }));
+      const body = { contents: conv };
+      if (sys) body.systemInstruction = { parts: [{ text: sys }] };
+      for (const model of ['gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-flash-latest']) {
+        try {
+          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(15000)
+          });
+          const d = await tryJson(r);
+          if (r.ok && d?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            return d.candidates[0].content.parts[0].text.trim();
+          }
+        } catch(e) {}
+      }
+    } catch(e) {}
+  }
+
   const models = [
     { type:'groq', model:'openai/gpt-oss-120b' },   // was llama-3.3-70b-versatile (deprecated Jun 2026)
     { type:'groq', model:'qwen/qwen3.6-27b' },       // Groq's current highest-intelligence model

@@ -1,0 +1,86 @@
+name: Generate Signing Key (run once)
+
+# One-time setup for stable APK signing.
+#
+# 1. Repo Settings > Secrets and variables > Actions > New repository secret
+#      Name:   KEYSTORE_PASSPHRASE
+#      Value:  a long random passphrase (20+ characters). This is the ONLY thing protecting
+#              the key, because the encrypted keystore file is committed to a public repo.
+#              Save it somewhere safe - if you lose it you must generate a new key, which
+#              changes the app signature (one uninstall/reinstall).
+# 2. Actions > "Generate Signing Key (run once)" > Run workflow.
+# 3. Actions > "Build HENRY APK" > Run workflow. Every build from now on is signed with the
+#    same key.
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Replace an existing key (changes the app signature - requires uninstall/reinstall)'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Generate, encrypt and commit the keystore
+        env:
+          KEYSTORE_PASSPHRASE: ${{ secrets.KEYSTORE_PASSPHRASE }}
+          FORCE: ${{ github.event.inputs.force }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${KEYSTORE_PASSPHRASE:-}" ]; then
+            echo "::error::Add a repository secret named KEYSTORE_PASSPHRASE first (see the comments at the top of this workflow)."
+            exit 1
+          fi
+          if [ "${#KEYSTORE_PASSPHRASE}" -lt 16 ]; then
+            echo "::error::KEYSTORE_PASSPHRASE is too short. Use at least 16 characters (20+ recommended) - the encrypted file is public."
+            exit 1
+          fi
+          if [ -f signing/henry-release.keystore.enc ] && [ "$FORCE" != "true" ]; then
+            echo "::error::A signing key already exists. Re-run with force=true only if you really want to replace it (this changes the app signature)."
+            exit 1
+          fi
+
+          mkdir -p signing
+          KS="$RUNNER_TEMP/henry.keystore"
+
+          keytool -genkeypair -v \
+            -keystore "$KS" -storetype PKCS12 \
+            -storepass "$KEYSTORE_PASSPHRASE" -keypass "$KEYSTORE_PASSPHRASE" \
+            -alias henry -keyalg RSA -keysize 2048 -validity 36500 \
+            -dname "CN=HENRY Android, O=HENRY, C=AE" >/dev/null
+
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt \
+            -in "$KS" -out signing/henry-release.keystore.enc \
+            -pass env:KEYSTORE_PASSPHRASE
+
+          # Sanity check: the encrypted file must decrypt back to a valid keystore.
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+            -in signing/henry-release.keystore.enc -out "$RUNNER_TEMP/roundtrip.keystore" \
+            -pass env:KEYSTORE_PASSPHRASE
+          cmp "$KS" "$RUNNER_TEMP/roundtrip.keystore"
+          keytool -list -keystore "$RUNNER_TEMP/roundtrip.keystore" -storepass "$KEYSTORE_PASSPHRASE" >/dev/null
+          echo "Round-trip check passed."
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add signing/henry-release.keystore.enc
+          git commit -m "chore: add encrypted release signing keystore"
+          git push
+
+          echo "Done. Now run the 'Build HENRY APK' workflow."

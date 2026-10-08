@@ -2,6 +2,8 @@ package com.jarvis.ai;
 
 import android.animation.ValueAnimator;
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.DashPathEffect;
@@ -137,6 +139,106 @@ public class OrbView extends View {
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
+    // HENRY'S PORTRAIT — replaces the plain center-fill circle in every state below.
+    // Landmark fractions (of the bundled henry_portrait.png, a 430x430 head-and-shoulders
+    // crop) were measured once via face/eye/mouth detection on the source image — they are
+    // fixed because the portrait itself is fixed. If the portrait image is ever replaced,
+    // these four constants need re-measuring against the new image.
+    // ════════════════════════════════════════════════════════════════════════
+    private Bitmap portraitBitmap;
+    private final Paint pPortrait = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+    private long lastBlinkStart = 0;
+    private long nextBlinkAt = 1500;
+
+    private static final float EYE1_CX = 0.5547f, EYE1_CY = 0.3384f;
+    private static final float EYE2_CX = 0.4291f, EYE2_CY = 0.3547f;
+    private static final float EYE_W = 0.085f, EYE_H = 0.050f;
+    private static final float MOUTH_X = 0.4256f, MOUTH_Y = 0.4326f, MOUTH_W = 0.1791f, MOUTH_H = 0.0884f;
+    private static final int BLINK_DURATION_MS = 140;
+
+    private void ensurePortraitLoaded() {
+        if (portraitBitmap == null) {
+            try {
+                portraitBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.henry_portrait);
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    /** Draws HENRY's portrait in place of the old plain-color core fill, with a subtle
+     *  always-on breathing pulse, a periodic blink, and — only while SPEAKING — a mouth-wobble
+     *  effect built from the photo's own mouth pixels rather than a drawn-on shape, since the
+     *  latter tends to look mismatched against a photo rather than alive. */
+    private void drawPortraitCore(Canvas canvas, float cx, float cy, float r, float t, OrbState state) {
+        ensurePortraitLoaded();
+        if (portraitBitmap == null) {
+            pFill.setColor(currentCore);
+            canvas.drawCircle(cx, cy, r, pFill);
+            return;
+        }
+        int bw = portraitBitmap.getWidth(), bh = portraitBitmap.getHeight();
+        // Wall-clock based (not the shared 't' animator) so breathing/mouth-wobble frequency
+        // is exact regardless of how the pre-existing ring/dash animations use 't'.
+        float tSeconds = System.currentTimeMillis() / 1000f;
+        float breathe = 1f + 0.015f * (float) Math.sin(tSeconds * Math.PI * 2 * 0.25);
+
+        canvas.save();
+        canvas.scale(breathe, breathe, cx, cy);
+
+        // Circular-cropped base portrait, centered to fill the core radius.
+        float left = cx - r, top = cy - r, scale = (2 * r) / Math.min(bw, bh);
+        canvas.save();
+        android.graphics.Path clip = new android.graphics.Path();
+        clip.addCircle(cx, cy, r, android.graphics.Path.Direction.CW);
+        canvas.clipPath(clip);
+        android.graphics.RectF dst = new android.graphics.RectF(
+                cx - bw * scale / 2f, cy - bh * scale / 2f, cx + bw * scale / 2f, cy + bh * scale / 2f);
+        canvas.drawBitmap(portraitBitmap, null, dst, pPortrait);
+        canvas.restore();
+
+        // Mouth wobble while speaking — redraws the real mouth pixels, vertically squashed
+        // and stretched on a sine wave, instead of overlaying an artificial mouth shape.
+        if (state == OrbState.SPEAKING) {
+            float mouthWobble = 0.7f + 0.55f * (float) Math.abs(Math.sin(tSeconds * Math.PI * 2 * 3.2));
+            drawFacialRegionScaled(canvas, MOUTH_X, MOUTH_Y, MOUTH_W, MOUTH_H, bw, bh, left, top, scale, 1f, mouthWobble);
+        }
+
+        // Blink — periodic, both eyes, using the real eye pixels squashed thin.
+        long now = System.currentTimeMillis();
+        if (now > nextBlinkAt) {
+            lastBlinkStart = now;
+            nextBlinkAt = now + 2800 + (long) (Math.random() * 3200);
+        }
+        long sinceBlink = now - lastBlinkStart;
+        if (sinceBlink >= 0 && sinceBlink < BLINK_DURATION_MS) {
+            float phase = sinceBlink / (float) BLINK_DURATION_MS; // 0..1 across the blink
+            float closeAmount = 1f - (float) Math.sin(phase * Math.PI); // 1 -> ~0 -> 1
+            float eyeScaleY = Math.max(0.08f, closeAmount);
+            drawFacialRegionScaled(canvas, EYE1_CX - EYE_W / 2, EYE1_CY - EYE_H / 2, EYE_W, EYE_H, bw, bh, left, top, scale, 1f, eyeScaleY);
+            drawFacialRegionScaled(canvas, EYE2_CX - EYE_W / 2, EYE2_CY - EYE_H / 2, EYE_W, EYE_H, bw, bh, left, top, scale, 1f, eyeScaleY);
+        }
+
+        canvas.restore();
+    }
+
+    /** Redraws one rectangular region of the source bitmap (given as fractions of bitmap size)
+     *  at its same display position, but scaled vertically/horizontally around its own center —
+     *  the technique behind both the mouth wobble and the blink, reusing real photo pixels
+     *  instead of drawing a synthetic shape on top. */
+    private void drawFacialRegionScaled(Canvas canvas, float fx, float fy, float fw, float fh,
+                                         int bw, int bh, float dstLeft, float dstTop, float scale,
+                                         float scaleX, float scaleY) {
+        android.graphics.Rect src = new android.graphics.Rect(
+                (int) (fx * bw), (int) (fy * bh), (int) ((fx + fw) * bw), (int) ((fy + fh) * bh));
+        float cx2 = dstLeft + (src.left + src.right) / 2f * scale;
+        float cy2 = dstTop + (src.top + src.bottom) / 2f * scale;
+        float halfW = (src.right - src.left) / 2f * scale * scaleX;
+        float halfH = (src.bottom - src.top) / 2f * scale * scaleY;
+        android.graphics.RectF dst = new android.graphics.RectF(cx2 - halfW, cy2 - halfH, cx2 + halfW, cy2 + halfH);
+        canvas.drawBitmap(portraitBitmap, src, dst, pPortrait);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     // IDLE — blue rotating dashed rings + tick marks + steady glow
     // ════════════════════════════════════════════════════════════════════════
     private void drawIdle(Canvas canvas, float cx, float cy, float r, float t) {
@@ -187,13 +289,7 @@ public class OrbView extends View {
         // Core glow
         drawGlow(canvas, cx, cy, r * 0.40f, currentAccent, (int)(80 + 40 * pulse));
 
-        // Core fill
-        pFill.setColor(currentCore);
-        canvas.drawCircle(cx, cy, r * 0.35f, pFill);
-
-        // Center dot
-        pFill.setColor(alpha(0xFFFFFFFF, (int)(190 + 65 * pulse)));
-        canvas.drawCircle(cx, cy, r * 0.07f, pFill);
+        drawPortraitCore(canvas, cx, cy, r * 0.35f, t, state);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -242,11 +338,7 @@ public class OrbView extends View {
 
         drawGlow(canvas, cx, cy, r * 0.42f, GOLD, 190);
 
-        pFill.setColor(currentCore);
-        canvas.drawCircle(cx, cy, r * 0.36f, pFill);
-
-        pFill.setColor(0xFFFFE980);
-        canvas.drawCircle(cx, cy, r * 0.08f, pFill);
+        drawPortraitCore(canvas, cx, cy, r * 0.36f, t, state);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -293,8 +385,7 @@ public class OrbView extends View {
 
         drawGlow(canvas, cx, cy, r * 0.40f, PURPLE, 165);
 
-        pFill.setColor(currentCore);
-        canvas.drawCircle(cx, cy, r * 0.35f, pFill);
+        drawPortraitCore(canvas, cx, cy, r * 0.35f, t, state);
 
         // Spinning inner cross
         canvas.save();
@@ -354,11 +445,7 @@ public class OrbView extends View {
 
         drawGlow(canvas, cx, cy, r * 0.42f, GREEN, 175);
 
-        pFill.setColor(currentCore);
-        canvas.drawCircle(cx, cy, r * 0.35f, pFill);
-
-        pFill.setColor(0xFFA7F3D0);
-        canvas.drawCircle(cx, cy, r * 0.08f, pFill);
+        drawPortraitCore(canvas, cx, cy, r * 0.35f, t, state);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -371,6 +458,11 @@ public class OrbView extends View {
         canvas.drawCircle(cx, cy, r * 0.88f, pStroke);
         canvas.drawCircle(cx, cy, r * 0.65f, pStroke);
         drawGlow(canvas, cx, cy, r * 0.30f, currentAccent, (int)(pulse * 0.4f * 255));
+
+        int savedAlpha = pPortrait.getAlpha();
+        pPortrait.setAlpha((int) (120 + pulse * 135));
+        drawPortraitCore(canvas, cx, cy, r * 0.35f, t, state);
+        pPortrait.setAlpha(savedAlpha);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

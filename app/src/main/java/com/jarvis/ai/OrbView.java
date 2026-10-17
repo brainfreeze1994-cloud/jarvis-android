@@ -289,7 +289,7 @@ public class OrbView extends View {
         // Core glow
         drawGlow(canvas, cx, cy, r * 0.40f, currentAccent, (int)(80 + 40 * pulse));
 
-        drawPortraitCore(canvas, cx, cy, r * 0.35f, t, state);
+        drawPortraitCore(canvas, cx, cy, r * 0.62f, t, state);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -338,7 +338,7 @@ public class OrbView extends View {
 
         drawGlow(canvas, cx, cy, r * 0.42f, GOLD, 190);
 
-        drawPortraitCore(canvas, cx, cy, r * 0.36f, t, state);
+        drawPortraitCore(canvas, cx, cy, r * 0.62f, t, state);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -385,7 +385,7 @@ public class OrbView extends View {
 
         drawGlow(canvas, cx, cy, r * 0.40f, PURPLE, 165);
 
-        drawPortraitCore(canvas, cx, cy, r * 0.35f, t, state);
+        drawPortraitCore(canvas, cx, cy, r * 0.62f, t, state);
 
         // Spinning inner cross
         canvas.save();
@@ -445,7 +445,7 @@ public class OrbView extends View {
 
         drawGlow(canvas, cx, cy, r * 0.42f, GREEN, 175);
 
-        drawPortraitCore(canvas, cx, cy, r * 0.35f, t, state);
+        drawPortraitCore(canvas, cx, cy, r * 0.62f, t, state);
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -461,7 +461,7 @@ public class OrbView extends View {
 
         int savedAlpha = pPortrait.getAlpha();
         pPortrait.setAlpha((int) (120 + pulse * 135));
-        drawPortraitCore(canvas, cx, cy, r * 0.35f, t, state);
+        drawPortraitCore(canvas, cx, cy, r * 0.62f, t, state);
         pPortrait.setAlpha(savedAlpha);
     }
 

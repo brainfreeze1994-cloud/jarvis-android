@@ -9,7 +9,7 @@ public class Message {
     public static final int TYPE_FILE_CARD = 5;  // Generated document/file card
 
     public final int    type;
-    public final String text;
+    public String text; // mutable: teleprompter reveals it progressively while speaking
     public final String imageUri;  // for TYPE_IMAGE (local uri)
     public final String imageUrl;  // for TYPE_URL_IMAGE (http url)
     public final String filePath;

@@ -32,7 +32,7 @@ public class ConnectivityManager {
 
     public enum ConnectionState {
         CONNECTED("ONLINE • Gemini Neural Link Active", true, true),
-        API_LOST("GEMINI CONNECTION LOST • Local Offline Brain Active", true, false),
+        API_LOST("HENRY SERVER UNREACHABLE • Local Offline Brain Active", true, false),
         OFFLINE("DEVICE OFFLINE • No Internet Connection", false, false),
         CHECKING("CHECKING LINK • Probing Gemini API...", false, false);
 
@@ -275,9 +275,19 @@ public class ConnectivityManager {
             if (!isSystemNetworkConnected()) {
                 updateState(ConnectionState.OFFLINE, ConnectionState.OFFLINE.defaultMessage);
             } else {
-                String msg = throwable != null && throwable.getMessage() != null
-                        ? "GEMINI API ERROR: " + throwable.getMessage()
-                        : ConnectionState.API_LOST.defaultMessage;
+                // This app talks to the HENRY backend, not Gemini — the old "GEMINI API ERROR"
+                // label was a leftover from an earlier version and sent debugging in the wrong
+                // direction. A 5xx here also means the phone DID reach the server (so mobile
+                // data / WiFi are fine) and the server itself failed, so say so.
+                String raw = throwable != null ? throwable.getMessage() : null;
+                String msg;
+                if (raw == null) {
+                    msg = ConnectionState.API_LOST.defaultMessage;
+                } else if (raw.matches(".*\\bHTTP 5\\d\\d\\b.*")) {
+                    msg = "HENRY SERVER ERROR: " + raw + " (server-side)";
+                } else {
+                    msg = "HENRY SERVER ERROR: " + raw;
+                }
                 updateState(ConnectionState.API_LOST, msg);
             }
         });

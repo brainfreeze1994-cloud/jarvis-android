@@ -177,6 +177,17 @@ public class MainActivity extends AppCompatActivity {
     private boolean isPartyGameTurn = false;
     private boolean isItemSearchTurn = false;
     private boolean isWittyTurn = false;
+
+    // Teleprompter: reveals the currently-spoken message's text progressively instead of
+    // showing it all at once, paced to match speech. Precise when the real audio duration is
+    // known (network TTS via MediaPlayer); estimated from word count for native TTS.
+    private Runnable teleprompterTicker;
+    private int teleprompterMsgIndex = -1;
+    private String teleprompterFullText = null;
+    // Set by speak(), read by playAudioBytes() so it can re-pace the reveal with the real
+    // audio duration without changing playAudioBytes' signature.
+    private int pendingSpeakMsgIndex = -1;
+    private String pendingSpeakDisplayText = null;
     private List<Uri> partyGamePhotoUris = new ArrayList<>();
 
     private TextToSpeech tts;
@@ -1546,6 +1557,49 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // ── Speak ─────────────────────────────────────────────────────────────────
+    /** ~2.5 words/sec, consistent with the pacing estimate used elsewhere (HenryEmbeddedVideoEngine). */
+    private long estimateSpeechDurationMs(String text) {
+        if (text == null || text.trim().isEmpty()) return 500;
+        int words = text.trim().split("\\s+").length;
+        return Math.max(500, (long) (words / 2.5 * 1000));
+    }
+
+    /** Starts (or re-paces) progressively revealing fullText into messages.get(msgIndex),
+     *  timed to finish in durationMs. Safe to call again on the same message with a more
+     *  precise duration once it's known — it restarts pacing from the current moment. */
+    private void startTeleprompterReveal(final int msgIndex, final String fullText, long durationMs) {
+        if (msgIndex < 0 || msgIndex >= messages.size() || fullText == null || fullText.isEmpty()) return;
+        if (teleprompterTicker != null) mainHandler.removeCallbacks(teleprompterTicker);
+        teleprompterMsgIndex = msgIndex;
+        teleprompterFullText = fullText;
+        final long startTime = System.currentTimeMillis();
+        final long safeDuration = Math.max(300, durationMs);
+        teleprompterTicker = new Runnable() {
+            @Override public void run() {
+                if (msgIndex != teleprompterMsgIndex || msgIndex >= messages.size()) return;
+                long elapsed = System.currentTimeMillis() - startTime;
+                float progress = Math.min(1f, elapsed / (float) safeDuration);
+                int revealChars = Math.max(1, (int) (fullText.length() * progress));
+                messages.get(msgIndex).text = fullText.substring(0, Math.min(revealChars, fullText.length()));
+                if (adapter != null) adapter.notifyItemChanged(msgIndex);
+                if (progress < 1f) mainHandler.postDelayed(this, 50);
+            }
+        };
+        mainHandler.post(teleprompterTicker);
+    }
+
+    /** Cancels any in-progress reveal and snaps its message to full text immediately, so
+     *  stopping/interrupting speech never leaves a message permanently truncated. */
+    private void finishTeleprompterReveal() {
+        if (teleprompterTicker != null) { mainHandler.removeCallbacks(teleprompterTicker); teleprompterTicker = null; }
+        if (teleprompterMsgIndex >= 0 && teleprompterMsgIndex < messages.size() && teleprompterFullText != null) {
+            messages.get(teleprompterMsgIndex).text = teleprompterFullText;
+            if (adapter != null) adapter.notifyItemChanged(teleprompterMsgIndex);
+        }
+        teleprompterMsgIndex = -1;
+        teleprompterFullText = null;
+    }
+
     private void speak(String text) { speak(text, "neutral"); }
 
     private void speak(final String rawText, final String emotion) {
@@ -1556,6 +1610,17 @@ public class MainActivity extends AppCompatActivity {
         setState(OrbView.OrbState.SPEAKING);
         // Apply emotion colour to orb
         if (orbView != null) orbView.setEmotion("neutral");
+
+        // Teleprompter: reveal the bubble's text progressively as HENRY speaks. Uses rawText
+        // (what addJarvisMsg displayed) rather than the TTS-cleaned copy. Starts with a
+        // word-count estimate; playAudioBytes re-paces it with the real duration if available.
+        // Established pattern in this file: addJarvisMsg(x) is called immediately before
+        // speak(x), so the bubble being spoken is the last one in the list.
+        pendingSpeakMsgIndex = messages.isEmpty() ? -1 : messages.size() - 1;
+        pendingSpeakDisplayText = rawText;
+        if (pendingSpeakMsgIndex >= 0 && messages.get(pendingSpeakMsgIndex).type != Message.TYPE_USER) {
+            startTeleprompterReveal(pendingSpeakMsgIndex, rawText, estimateSpeechDurationMs(rawText));
+        }
 
         new Thread(() -> {
             try {
@@ -1602,6 +1667,10 @@ public class MainActivity extends AppCompatActivity {
                 speakNative(fallbackText); return true;
             });
             ttsPlayer.prepare();
+            int realDurationMs = ttsPlayer.getDuration();
+            if (realDurationMs > 0 && pendingSpeakMsgIndex >= 0 && pendingSpeakDisplayText != null) {
+                startTeleprompterReveal(pendingSpeakMsgIndex, pendingSpeakDisplayText, realDurationMs);
+            }
             ttsPlayer.start();
         } catch (Exception e) { speakNative(fallbackText); }
     }
@@ -6117,17 +6186,22 @@ public class MainActivity extends AppCompatActivity {
     private void setState(OrbView.OrbState state) {
         currentState = state;
         if (state == OrbView.OrbState.SPEAKING) {
+            // HENRY's face (OrbView) must stay visible AND enter SPEAKING, otherwise his mouth
+            // can never animate. The old Lottie voice-wave overlay used to replace the orb
+            // while speaking; it would now cover his face, so it stays hidden.
             if (lottieSpeakingOrb != null) {
-                lottieSpeakingOrb.setVisibility(View.VISIBLE);
-                lottieSpeakingOrb.playPreset(HenryLottieAnimationView.Preset.VOICE_WAVE);
+                lottieSpeakingOrb.stopAndReset();
+                lottieSpeakingOrb.setVisibility(View.GONE);
             }
             if (orbView != null) {
-                orbView.setVisibility(View.INVISIBLE);
+                orbView.setVisibility(View.VISIBLE);
+                orbView.setState(state);
             }
             if (adapter != null && !messages.isEmpty()) {
                 adapter.setSpeakingPosition(messages.size() - 1);
             }
         } else {
+            finishTeleprompterReveal();
             if (adapter != null) {
                 adapter.setSpeakingPosition(-1);
             }

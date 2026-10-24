@@ -1529,7 +1529,9 @@ public class MainActivity extends AppCompatActivity {
         if (text == null) return "";
         return text.replaceAll("(?i)\\[emotion:[^\\]]*\\]\\s*", "")
                    .replaceAll("(?i)\\[emotion[^\\]]*\\]\\s*", "")
-                   .replaceAll("(?i)\\b(?:sir|ma'am|madam)\\b\\s*,?\\s*", "")
+                   .replaceAll("(?i)\\s*,\\s*\\b(?:sir|ma'am|madam)\\b", "")   // ", sir" goes WITH its comma (was leaving "Greetings,!")
+                   .replaceAll("(?i)\\b(?:sir|ma'am|madam)\\b\\s*,\\s*", "")   // leading "Sir, ..."
+                   .replaceAll("(?i)\\b(?:sir|ma'am|madam)\\b\\s*", "")
                    .replaceAll("\\s+([,.!?:;])", "$1")
                    .trim();
     }
@@ -1539,7 +1541,9 @@ public class MainActivity extends AppCompatActivity {
         return text
             .replaceAll("(?i)\\[emotion:[^\\]]*\\]\\s*", "")
             .replaceAll("(?i)\\[emotion[^\\]]*\\]\\s*", "")
-            .replaceAll("(?i)\\b(?:sir|ma'am|madam)\\b\\s*,?\\s*", "")
+            .replaceAll("(?i)\\s*,\\s*\\b(?:sir|ma'am|madam)\\b", "")   // ", sir" goes WITH its comma (was leaving "Greetings,!")
+                   .replaceAll("(?i)\\b(?:sir|ma'am|madam)\\b\\s*,\\s*", "")   // leading "Sir, ..."
+                   .replaceAll("(?i)\\b(?:sir|ma'am|madam)\\b\\s*", "")
             .replaceAll("\\s+([,.!?:;])", "$1")
             .replaceAll("```[\\s\\S]*?```", "")
             .replaceAll("`([^`]+)`", "$1")

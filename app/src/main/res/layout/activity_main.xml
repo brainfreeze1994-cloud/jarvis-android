@@ -190,36 +190,23 @@
             android:contentDescription="Retry Gemini API Connection" />
     </LinearLayout>
 
-    <!-- ── Scrollable content ── -->
-    <androidx.core.widget.NestedScrollView
-        android:id="@+id/scroll_main"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:fillViewport="true"
-        app:layout_constraintTop_toBottomOf="@id/banner_network_status"
-        app:layout_constraintBottom_toTopOf="@id/bottom_bar_line"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <!-- ── ORB SECTION ── -->
+            <!-- ── ORB SECTION — pinned above the chat so HENRY stays visible (and visibly talking) while you scroll the conversation below ── -->
             <LinearLayout
                 android:id="@+id/orb_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:paddingTop="28dp"
-                android:paddingBottom="4dp">
+                android:paddingTop="6dp"
+                android:paddingBottom="2dp"
+                app:layout_constraintTop_toBottomOf="@id/banner_network_status"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
 
                 <!-- Corner brackets + larger orb -->
                 <FrameLayout
-                    android:layout_width="220dp"
-                    android:layout_height="220dp"
+                    android:layout_width="240dp"
+                    android:layout_height="240dp"
                     android:gravity="center">
 
                     <!-- Top-left corner -->
@@ -323,6 +310,22 @@
                     android:layout_marginTop="14dp"/>
 
             </LinearLayout>
+
+    <!-- ── Scrollable content ── -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/scroll_main"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:fillViewport="true"
+        app:layout_constraintTop_toBottomOf="@id/orb_section"
+        app:layout_constraintBottom_toTopOf="@id/bottom_bar_line"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
             <!-- ── Chips row 1 ── -->
             <LinearLayout

@@ -188,6 +188,12 @@ public class MainActivity extends AppCompatActivity {
     // audio duration without changing playAudioBytes' signature.
     private int pendingSpeakMsgIndex = -1;
     private String pendingSpeakDisplayText = null;
+    // Server-voice circuit breaker + one-time notices (see speak()).
+    private volatile int serverVoiceFailures = 0;
+    private volatile long serverVoiceSkipUntil = 0;
+    private boolean serverVoiceNoticeShown = false;
+    private long lastVoiceNoticeAt = 0;
+    private boolean orbHiddenForKeyboard = false;
     private List<Uri> partyGamePhotoUris = new ArrayList<>();
 
     private TextToSpeech tts;
@@ -412,6 +418,7 @@ public class MainActivity extends AppCompatActivity {
         tvAttachSublabel             = findViewById(R.id.tv_attach_sublabel);
         layoutAttachInfo             = findViewById(R.id.layout_attach_info);
         orbSection      = findViewById(R.id.orb_section);
+        setupKeyboardAwareOrb();
         chipsRow1       = findViewById(R.id.chips_row1);
         chipsRow2       = findViewById(R.id.chips_row2);
         chipsRow3       = findViewById(R.id.chips_row3);
@@ -619,7 +626,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void hideWelcome() {
-        if (orbSection != null) orbSection.setVisibility(View.GONE);
+        /* HENRY stays pinned above the chat so you can watch him speak */
         if (chipsRow1  != null) chipsRow1.setVisibility(View.GONE);
         if (chipsRow2  != null) chipsRow2.setVisibility(View.GONE);
         if (chipsRow3  != null) chipsRow3.setVisibility(View.GONE);
@@ -688,13 +695,24 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // ── Native TTS ────────────────────────────────────────────────────────────
-    private void initNativeTts() {
-        tts = new TextToSpeech(this, status -> {
+    private void initNativeTts() { initNativeTtsWithEngine(null); }
+
+    /** engine == null -> the phone's own default speech engine (Samsung, Google, ...). The old code
+     *  forced "com.google.android.tts", which fails silently on phones that don't use or have it,
+     *  leaving the app permanently mute with no message. Google's engine is now the second chance. */
+    private void initNativeTtsWithEngine(final String engine) {
+        if (engine != null && tts != null) { try { tts.shutdown(); } catch (Exception ignored) {} }
+        TextToSpeech.OnInitListener listener = status -> {
             if (status == TextToSpeech.SUCCESS) {
                 applyNativeVoice(currentVoice);
                 ttsReady = true;
+            } else if (engine == null) {
+                mainHandler.post(() -> initNativeTtsWithEngine("com.google.android.tts"));
+            } else {
+                ttsReady = false;
             }
-        }, "com.google.android.tts");
+        };
+        tts = (engine == null) ? new TextToSpeech(this, listener) : new TextToSpeech(this, listener, engine);
     }
 
     private void applyNativeVoice(String voice) {
@@ -710,13 +728,27 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
         }
-        boolean isFrench = voice.startsWith("french");
-        boolean isMale   = voice.endsWith("_male");
-        if (isFrench) tts.setLanguage(Locale.FRENCH);
-        else           tts.setLanguage(new Locale("en", "US"));
+        boolean isMale = voice.endsWith("_male");
+        applyNativeLanguageFor(voice);
         tts.setPitch(isMale ? 0.75f : 1.05f);
         float[] rates = { 0.75f, 0.90f, 1.10f };
         tts.setSpeechRate(rates[Math.max(0, Math.min(2, ttsSpeed))]);
+    }
+
+    /** Picks the closest language the phone can really speak for the chosen voice. Before, every
+     *  choice except French used en-US (so British/Filipino did nothing), and a language with no
+     *  data installed was ignored without any check, which also produces silence. */
+    private void applyNativeLanguageFor(String voice) {
+        Locale[] wanted;
+        if (voice.startsWith("french"))        wanted = new Locale[]{ Locale.FRANCE, Locale.FRENCH };
+        else if (voice.startsWith("british"))  wanted = new Locale[]{ Locale.UK, Locale.US };
+        else if (voice.startsWith("filipino")) wanted = new Locale[]{ new Locale("fil", "PH"), new Locale("tl", "PH"), Locale.US };
+        else                                    wanted = new Locale[]{ Locale.US, Locale.ENGLISH };
+        for (Locale l : wanted) {
+            int r = tts.setLanguage(l);
+            if (r != TextToSpeech.LANG_MISSING_DATA && r != TextToSpeech.LANG_NOT_SUPPORTED) return;
+        }
+        tts.setLanguage(Locale.getDefault());
     }
 
     // ── Voice Picker / Settings ──────────────────────────────────────────────
@@ -1573,6 +1605,9 @@ public class MainActivity extends AppCompatActivity {
      *  precise duration once it's known — it restarts pacing from the current moment. */
     private void startTeleprompterReveal(final int msgIndex, final String fullText, long durationMs) {
         if (msgIndex < 0 || msgIndex >= messages.size() || fullText == null || fullText.isEmpty()) return;
+        // A DIFFERENT message was still mid-reveal (e.g. two greetings spoken back to back): finish it
+        // first, otherwise it stays cut off forever ("Good day. H"). Same message = just re-pace it.
+        if (teleprompterMsgIndex >= 0 && teleprompterMsgIndex != msgIndex) finishTeleprompterReveal();
         if (teleprompterTicker != null) mainHandler.removeCallbacks(teleprompterTicker);
         teleprompterMsgIndex = msgIndex;
         teleprompterFullText = fullText;
@@ -1627,6 +1662,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         new Thread(() -> {
+            // Circuit breaker: after two failures in a row, skip the server voice for a few minutes so the
+            // user hears the phone's voice immediately instead of waiting on a request that will fail again.
+            if (System.currentTimeMillis() < serverVoiceSkipUntil) {
+                mainHandler.post(() -> speakNative(clean));
+                return;
+            }
             try {
                 JSONObject body = new JSONObject();
                 body.put("text", clean);
@@ -1640,12 +1681,14 @@ public class MainActivity extends AppCompatActivity {
                     if (resp.isSuccessful() && resp.code() != 204 && resp.body() != null) {
                         byte[] audio = resp.body().bytes();
                         if (audio.length > 0) {
+                            serverVoiceFailures = 0;
                             mainHandler.post(() -> playAudioBytes(audio, clean));
                             return;
                         }
                     }
                 }
             } catch (Exception ignored) {}
+            registerServerVoiceFailure();
             mainHandler.post(() -> speakNative(clean));
         }).start();
     }
@@ -1679,14 +1722,51 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) { speakNative(fallbackText); }
     }
 
+    private void registerServerVoiceFailure() {
+        serverVoiceFailures++;
+        if (serverVoiceFailures >= 2) {
+            serverVoiceSkipUntil = System.currentTimeMillis() + 5 * 60 * 1000L;
+            serverVoiceFailures = 0;
+            if (!serverVoiceNoticeShown) {
+                serverVoiceNoticeShown = true;
+                mainHandler.post(() -> Toast.makeText(this,
+                        "Server voice unavailable — using your phone's voice", Toast.LENGTH_LONG).show());
+            }
+        }
+    }
+
+    /** The orb is now pinned above the chat. With the keyboard open that would leave almost no room
+     *  to see messages, so hide it while typing and bring it back when the keyboard closes. */
+    private void setupKeyboardAwareOrb() {
+        final View root = getWindow().getDecorView();
+        root.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+            android.graphics.Rect r = new android.graphics.Rect();
+            root.getWindowVisibleDisplayFrame(r);
+            int screenH = root.getRootView().getHeight();
+            boolean keyboardOpen = screenH > 0 && (screenH - r.bottom) > screenH * 0.15f;
+            if (orbSection == null || keyboardOpen == orbHiddenForKeyboard) return;
+            orbHiddenForKeyboard = keyboardOpen;
+            orbSection.setVisibility(keyboardOpen ? View.GONE : View.VISIBLE);
+        });
+    }
+
     private void speakNative(String clean) {
         if (!ttsReady || tts == null) {
-            isSpeaking = false; setState(OrbView.OrbState.IDLE); return;
+            isSpeaking = false; setState(OrbView.OrbState.IDLE);
+            // This used to return in total silence, so "no voice" just looked like a broken app.
+            long now = System.currentTimeMillis();
+            if (now - lastVoiceNoticeAt > 60_000L) {
+                lastVoiceNoticeAt = now;
+                Toast.makeText(this, "Voice engine isn't ready. Open phone Settings → Text-to-speech and make sure a voice is installed.", Toast.LENGTH_LONG).show();
+            }
+            return;
         }
+        int result;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP)
-            tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
+            result = tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null, UUID.randomUUID().toString());
         else
-            tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null);
+            result = tts.speak(clean, TextToSpeech.QUEUE_FLUSH, null);
+        if (result == TextToSpeech.ERROR) { isSpeaking = false; setState(OrbView.OrbState.IDLE); }
     }
 
     private void stopSpeaking() {
